@@ -1,0 +1,133 @@
+import { differenceInHours } from "date-fns";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  sendAdminOverdueSummaryEmail,
+  sendReviewReminderEmail,
+} from "@/lib/services/email-service";
+import { one } from "@/lib/utils/relations";
+
+export async function sendPendingReviewReminders(
+  supabase: SupabaseClient<any>,
+) {
+  const { data: assignments, error } = await supabase
+    .from("review_assignments")
+    .select("*, reviewer:profiles!review_assignments_reviewer_id_fkey(*), review_rounds(*, projects(*))")
+    .in("status", ["pending", "overdue"])
+    .eq("review_rounds.status", "active");
+  if (error) throw error;
+
+  let sent = 0;
+  const now = new Date();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+  for (const assignment of assignments ?? []) {
+    const lastReminded = assignment.last_reminded_at
+      ? new Date(assignment.last_reminded_at)
+      : null;
+    if (lastReminded && differenceInHours(now, lastReminded) < 24) continue;
+    const reviewer = one(assignment.reviewer);
+    const project = one(assignment.review_rounds?.projects);
+    if (!reviewer?.email || !project) continue;
+
+    await sendReviewReminderEmail(supabase, {
+      to: reviewer.email,
+      projectName: project.name,
+      roundTitle: assignment.review_rounds.title,
+      pendingCount: 1,
+      dueAt: new Date(assignment.review_rounds.due_at).toLocaleString(),
+      url: `${appUrl}/my-reviews`,
+      workspaceId: project.workspace_id,
+      projectId: assignment.review_rounds.project_id,
+      roundId: assignment.round_id,
+    });
+
+    await supabase
+      .from("review_assignments")
+      .update({
+        reminder_count: assignment.reminder_count + 1,
+        last_reminded_at: now.toISOString(),
+      })
+      .eq("id", assignment.id);
+    sent += 1;
+  }
+
+  return sent;
+}
+
+export async function markOverdueAssignments(
+  supabase: SupabaseClient<any>,
+) {
+  const { data: rounds, error } = await supabase
+    .from("review_rounds")
+    .select("*")
+    .eq("status", "active")
+    .lt("due_at", new Date().toISOString());
+  if (error) throw error;
+
+  let count = 0;
+  for (const round of rounds ?? []) {
+    const { data, error: updateError } = await supabase
+      .from("review_assignments")
+      .update({ status: "overdue" })
+      .eq("round_id", round.id)
+      .eq("status", "pending")
+      .select("id");
+    if (updateError) throw updateError;
+    count += data?.length ?? 0;
+  }
+  return count;
+}
+
+export async function sendAdminOverdueSummaries(
+  supabase: SupabaseClient<any>,
+) {
+  const { data: rounds, error } = await supabase
+    .from("review_rounds")
+    .select("*, projects(*)")
+    .eq("status", "active")
+    .lt("due_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString());
+  if (error) throw error;
+
+  let sent = 0;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+  for (const round of rounds ?? []) {
+    const { data: assignments } = await supabase
+      .from("review_assignments")
+      .select("*, reviewer:profiles!review_assignments_reviewer_id_fkey(*)")
+      .eq("round_id", round.id)
+      .neq("status", "submitted");
+    const { data: admins } = await supabase
+      .from("workspace_members")
+      .select("profiles(*)")
+      .eq("workspace_id", round.projects?.workspace_id ?? "")
+      .eq("role", "admin");
+    const pendingMembers = [
+      ...new Set(
+        (assignments ?? []).map((assignment) => {
+          const reviewer = one(assignment.reviewer);
+          return reviewer?.full_name ?? reviewer?.email ?? "Unknown";
+        }),
+      ),
+    ];
+
+    for (const admin of admins ?? []) {
+      const profile = one(admin.profiles);
+      if (!profile?.email) continue;
+      await sendAdminOverdueSummaryEmail(supabase, {
+        to: profile.email,
+        projectName: round.projects?.name ?? "Peer review project",
+        roundTitle: round.title,
+        pendingMembers,
+        overdueAssignments: assignments?.length ?? 0,
+        url: `${appUrl}/projects/${round.project_id}/rounds/${round.id}`,
+        workspaceId: round.projects?.workspace_id ?? "",
+        projectId: round.project_id,
+        roundId: round.id,
+      });
+      sent += 1;
+    }
+  }
+
+  return sent;
+}
