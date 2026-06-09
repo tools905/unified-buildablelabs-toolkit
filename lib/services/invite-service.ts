@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkspaceRole } from "@/lib/db/types";
 import { sendInviteEmail as sendInvite } from "@/lib/services/email-service";
 import { writeAuditLog } from "@/lib/services/audit-service";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function createInvite(
   supabase: SupabaseClient<any>,
@@ -61,7 +62,8 @@ export async function acceptInvite(
   token: string,
   userId: string,
 ) {
-  const { data: invite, error } = await supabase
+  const admin = createAdminClient();
+  const { data: invite, error } = await admin
     .from("invites")
     .select("*")
     .eq("token", token)
@@ -71,7 +73,7 @@ export async function acceptInvite(
 
   if (error) throw error;
 
-  const { error: memberError } = await supabase
+  const { error: memberError } = await admin
     .from("workspace_members")
     .upsert(
       {
@@ -84,7 +86,7 @@ export async function acceptInvite(
     );
   if (memberError) throw memberError;
 
-  const { error: inviteError } = await supabase
+  const { error: inviteError } = await admin
     .from("invites")
     .update({
       status: "accepted",

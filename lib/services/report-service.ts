@@ -114,7 +114,7 @@ export async function generateRoundReport(
   }
 
   const reviewees = revieweeInputs.map((reviewee) => {
-    const aiWeights = ai?.roleWeights[reviewee.roleLabel];
+    const aiWeights = ai?.roleWeights?.[reviewee.roleLabel];
     const score = calculateRoleWeightedScore(
       reviewee.rawCategoryAverages,
       reviewee.roleLabel,
@@ -123,7 +123,7 @@ export async function generateRoundReport(
 
     return {
       ...reviewee,
-      aiSummary: ai?.memberSummaries[reviewee.revieweeId] ?? null,
+      aiSummary: ai?.memberSummaries?.[reviewee.revieweeId] ?? null,
       roleWeights: score.roleWeights,
       highestWeightedCategories: highestWeightedCategories(score.roleWeights),
       weightedScore: score.weightedScore,

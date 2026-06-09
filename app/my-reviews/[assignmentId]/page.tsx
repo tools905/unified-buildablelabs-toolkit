@@ -8,6 +8,7 @@ import { RatingSlider } from "@/app/my-reviews/[assignmentId]/rating-slider";
 import { requireUser } from "@/lib/auth/require-user";
 import { getAssignmentForReview } from "@/lib/services/assignment-service";
 import { submitReview } from "@/lib/services/review-service";
+import { one } from "@/lib/utils/relations";
 
 const ratingFields = [
   ["communicationRating", "Communication"],
@@ -30,7 +31,7 @@ export default async function AssignmentPage({
   const { supabase, user } = await requireUser();
   const { assignmentId } = await params;
   const assignment = await getAssignmentForReview(supabase, assignmentId, user.id);
-  const response = assignment.review_responses?.[0];
+  const response = one(assignment.review_responses);
 
   async function submitAction(formData: FormData) {
     "use server";

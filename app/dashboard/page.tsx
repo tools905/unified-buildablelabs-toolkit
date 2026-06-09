@@ -23,13 +23,13 @@ export default async function DashboardPage() {
       supabase
         .from("review_rounds")
         .select("*, projects!inner(workspace_id)")
-        .eq("projects.workspace_id", workspace.id)
-        .eq("status", "active"),
+        .eq("projects.workspace_id", workspace.id),
     ]);
 
   const pending = assignments?.filter((a) => a.status === "pending").length ?? 0;
   const submitted = assignments?.filter((a) => a.status === "submitted").length ?? 0;
   const overdue = assignments?.filter((a) => a.status === "overdue").length ?? 0;
+  const openRounds = rounds?.filter((round) => round.status === "active").length ?? 0;
   const reportsReady =
     rounds?.filter((round) => ["completed", "closed"].includes(round.status)).length ?? 0;
 
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
       </div>
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         <StatCard title="Active Projects" value={projects?.length ?? 0} />
-        <StatCard title="Open Review Rounds" value={rounds?.length ?? 0} />
+        <StatCard title="Open Review Rounds" value={openRounds} />
         <StatCard title="Pending Reviews" value={pending} />
         <StatCard title="Overdue Reviews" value={overdue} />
         <StatCard title="Reports Ready" value={reportsReady} />
