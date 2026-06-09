@@ -55,17 +55,20 @@ export async function generateAiReportEnhancements(input: {
   const result = await requestOpenRouterJson<AiReportResponse>({
     temperature: 0.1,
     system: [
-      "You are an expert peer-review analytics assistant specializing in delivering deep, high-value, constructive organizational insights.",
-      "Analyze the peer-reviews thoroughly. Identify hidden patterns, team dynamic trends, and operational insights.",
+      "You are an expert peer-review analytics assistant specializing in delivering direct, concise, and high-value constructive insights.",
+      "Analyze the peer-reviews thoroughly. Avoid conversational filler or generic introductions. Get straight to the point.",
       "Return only valid JSON matching the exact required schema.",
       "Do not identify reviewers or expose reviewer identities.",
       "Do not create a leaderboard.",
       "Use role-specific weighting based on the role label and rating category definitions.",
       "Weights must include every category and sum to 1.0 before rounding.",
-      "Provide actionable, evidence-based, professional, and detailed summaries of feedback."
+      "You MUST highlight specific feedback points using inline tags:",
+      "- Wrap areas going well/strengths in <good>text here</good>",
+      "- Wrap concerns/weaknesses/friction points in <concern>text here</concern>",
+      "Apply these highlights selectively for key phrases or concise sentences."
     ].join(" "),
     user: {
-      task: "Create a detailed report-level AI summary analysis of the team and comprehensive, role-specific member syntheses.",
+      task: "Create a concise team summary analysis of the round and brief member syntheses.",
       projectName: input.projectName,
       roundTitle: input.roundTitle,
       ratingCategories,
@@ -80,11 +83,11 @@ export async function generateAiReportEnhancements(input: {
         examples: member.examples.slice(0, 8),
       })),
       requiredJsonShape: {
-        overallSummary: "A comprehensive, analytical overview of the review round. Discuss team collaboration, overall performance, key alignment strengths, common friction areas, and a bulleted list of 2-3 strategic team-wide action items.",
+        overallSummary: "A concise, structured team summary (max 150 words). Do NOT start with introductory fluff. Get straight to the point. Structure it with these headings using double newlines:\n\n**What is Going Well**\n- Bullet points of strengths, wrapping positive points in <good>...</good> tags.\n\n**Where the Issues Are**\n- Bullet points of concerns, wrapping negative/friction points in <concern>...</concern> tags.\n\n**Strategic Action Items**\n- 2-3 concrete bullet points of action steps.",
         memberSummaries: [
           {
             revieweeId: "same id from input",
-            oneLiner: "A detailed, evidence-based synthesis paragraph of this member's feedback (3-5 sentences). Outline their main strengths, constructive areas for improvement, specific accomplishments mentioned, and concrete action steps for growth."
+            oneLiner: "A concise, direct synthesis (2-3 sentences max) outlining main strengths and improvement areas. Wrap positive findings/achievements in <good>...</good> and concerns/weaknesses in <concern>...</concern>."
           },
         ],
         roleWeights: [

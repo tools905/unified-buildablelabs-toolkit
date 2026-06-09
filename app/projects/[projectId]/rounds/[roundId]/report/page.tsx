@@ -1,9 +1,57 @@
+import React from "react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
 import { getRoundReport } from "@/lib/services/report-service";
+
+function renderHighlightedText(text: string) {
+  if (!text) return null;
+
+  // Split by <good>...</good>, <concern>...</concern>, and **...** tags
+  const regex = /(<good>[\s\S]*?<\/good>|<concern>[\s\S]*?<\/concern>|\*\*[\s\S]*?\*\*)/gi;
+  const parts = text.split(regex);
+
+  return parts.map((part, index) => {
+    if (part.toLowerCase().startsWith("<good>")) {
+      const content = part.replace(/<\/?good>/gi, "");
+      return (
+        <span
+          key={index}
+          className="bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 px-1.5 py-0.5 rounded font-medium inline-block my-0.5"
+        >
+          {content}
+        </span>
+      );
+    } else if (part.toLowerCase().startsWith("<concern>")) {
+      const content = part.replace(/<\/?concern>/gi, "");
+      return (
+        <span
+          key={index}
+          className="bg-rose-500/15 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 px-1.5 py-0.5 rounded font-medium inline-block my-0.5"
+        >
+          {content}
+        </span>
+      );
+    } else if (part.startsWith("**") && part.endsWith("**")) {
+      const content = part.slice(2, -2);
+      return (
+        <strong key={index} className="font-semibold text-foreground block mt-3 mb-1 first:mt-0">
+          {content}
+        </strong>
+      );
+    }
+
+    // Split text by newlines to keep line breaks
+    return part.split("\n").map((line, lineIdx, array) => (
+      <React.Fragment key={`${index}-${lineIdx}`}>
+        {line}
+        {lineIdx < array.length - 1 && <br />}
+      </React.Fragment>
+    ));
+  });
+}
 
 const categoryDisplayNames: Record<string, string> = {
   communication: "Communication",
@@ -52,9 +100,9 @@ export default async function ReportPage({
           </CardHeader>
           <CardContent>
             {report.ai?.overallSummary ? (
-              <p className="text-sm text-muted-foreground">
-                {report.ai.overallSummary}
-              </p>
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {renderHighlightedText(report.ai.overallSummary)}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">
                 {report.ai.unavailableReason}
@@ -85,9 +133,9 @@ export default async function ReportPage({
                   Role: {reviewee.roleLabel}. Reviews received: {reviewee.reviewCount}.
                 </p>
                 {reviewee.aiSummary ? (
-                  <p className="mb-3 rounded-md bg-muted p-3 text-sm">
-                    {reviewee.aiSummary}
-                  </p>
+                  <div className="mb-3 rounded-md bg-muted p-3 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                    {renderHighlightedText(reviewee.aiSummary)}
+                  </div>
                 ) : null}
                 <h3 className="font-medium">Highest weighted categories</h3>
                 <div className="mt-2 flex flex-wrap gap-2">
