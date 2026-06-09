@@ -7,7 +7,11 @@ import {
   type RatingMap,
   type WeightMap,
 } from "@/lib/services/scoring-service";
-import { isOpenRouterConfigured, requestOpenRouterJson } from "@/lib/services/openrouter-service";
+import {
+  isOpenRouterConfigured,
+  requestOpenRouterJson,
+  OPENROUTER_MODEL,
+} from "@/lib/services/openrouter-service";
 
 export type AiReportMemberInput = {
   revieweeId: string;
@@ -51,16 +55,17 @@ export async function generateAiReportEnhancements(input: {
   const result = await requestOpenRouterJson<AiReportResponse>({
     temperature: 0.1,
     system: [
-      "You are a cautious peer-review analytics assistant.",
-      "Return only valid JSON.",
-      "Do not identify reviewers or infer reviewer identities.",
+      "You are an expert peer-review analytics assistant specializing in delivering deep, high-value, constructive organizational insights.",
+      "Analyze the peer-reviews thoroughly. Identify hidden patterns, team dynamic trends, and operational insights.",
+      "Return only valid JSON matching the exact required schema.",
+      "Do not identify reviewers or expose reviewer identities.",
       "Do not create a leaderboard.",
       "Use role-specific weighting based on the role label and rating category definitions.",
       "Weights must include every category and sum to 1.0 before rounding.",
-      "Member one-liners must be concise, fair, evidence-based, and at most 24 words.",
+      "Provide actionable, evidence-based, professional, and detailed summaries of feedback."
     ].join(" "),
     user: {
-      task: "Create report-level AI summary and role-specific scoring weights.",
+      task: "Create a detailed report-level AI summary analysis of the team and comprehensive, role-specific member syntheses.",
       projectName: input.projectName,
       roundTitle: input.roundTitle,
       ratingCategories,
@@ -75,9 +80,12 @@ export async function generateAiReportEnhancements(input: {
         examples: member.examples.slice(0, 8),
       })),
       requiredJsonShape: {
-        overallSummary: "one concise paragraph for the whole round",
+        overallSummary: "A comprehensive, analytical overview of the review round. Discuss team collaboration, overall performance, key alignment strengths, common friction areas, and a bulleted list of 2-3 strategic team-wide action items.",
         memberSummaries: [
-          { revieweeId: "same id from input", oneLiner: "one line summary" },
+          {
+            revieweeId: "same id from input",
+            oneLiner: "A detailed, evidence-based synthesis paragraph of this member's feedback (3-5 sentences). Outline their main strengths, constructive areas for improvement, specific accomplishments mentioned, and concrete action steps for growth."
+          },
         ],
         roleWeights: [
           {
@@ -110,6 +118,6 @@ export async function generateAiReportEnhancements(input: {
     overallSummary: result.overallSummary ?? "",
     memberSummaries,
     roleWeights,
-    model: "nvidia/nemotron-3-super-120b-a12b",
+    model: OPENROUTER_MODEL,
   };
 }
