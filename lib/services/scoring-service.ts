@@ -92,7 +92,32 @@ export const ratingCategories: RatingCategory[] = [
 
 export function getRoleWeights(roleLabel?: string | null): WeightMap {
   if (!roleLabel) return defaultWeights;
-  return roleWeights[roleLabel.trim().toLowerCase()] ?? defaultWeights;
+  const normalizedLabel = roleLabel.trim().toLowerCase();
+  
+  // Exact match
+  if (roleWeights[normalizedLabel]) {
+    return roleWeights[normalizedLabel];
+  }
+  
+  // Heuristic substring matches
+  if (normalizedLabel.includes("intern")) {
+    return roleWeights["intern"];
+  }
+  if (normalizedLabel.includes("designer") || normalizedLabel.includes("architect")) {
+    return roleWeights["system designer"];
+  }
+  if (normalizedLabel.includes("manager") || normalizedLabel.includes("lead")) {
+    return roleWeights["manager"];
+  }
+  if (
+    normalizedLabel.includes("developer") ||
+    normalizedLabel.includes("engineer") ||
+    normalizedLabel.includes("programmer")
+  ) {
+    return roleWeights["developer"];
+  }
+
+  return defaultWeights;
 }
 
 export function normalizeWeightMap(

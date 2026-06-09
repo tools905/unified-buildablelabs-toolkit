@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generatePlannedRoundsFromDates } from "@/lib/utils/dates";
 import { projectSchema, type ProjectInput } from "@/lib/validation/project-schema";
 import { writeAuditLog } from "@/lib/services/audit-service";
+import type { ProjectStatus } from "@/lib/db/types";
 
 export async function createProject(
   supabase: SupabaseClient<any>,
@@ -55,7 +56,7 @@ export async function createProject(
 export async function updateProject(
   supabase: SupabaseClient<any>,
   projectId: string,
-  input: Partial<Pick<ProjectInput, "name" | "description" | "reviewDueHours">>,
+  input: Partial<Pick<ProjectInput, "name" | "description" | "reviewDueHours">> & { status?: ProjectStatus },
 ) {
   const { data, error } = await supabase
     .from("projects")
@@ -63,6 +64,7 @@ export async function updateProject(
       name: input.name,
       description: input.description,
       review_due_hours: input.reviewDueHours,
+      status: input.status,
       updated_at: new Date().toISOString(),
     })
     .eq("id", projectId)

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,8 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireUser } from "@/lib/auth/require-user";
 import { isDevTestingEnabled, seedDummyWorkspaceMembers } from "@/lib/services/dev-testing-service";
 import { createInvite } from "@/lib/services/invite-service";
-import { getCurrentWorkspace, getWorkspaceMembers, isWorkspaceAdmin } from "@/lib/services/workspace-service";
+import { getCurrentWorkspace, getWorkspaceMembers, isWorkspaceAdmin, setWorkspaceRole } from "@/lib/services/workspace-service";
 import { inviteSchema } from "@/lib/validation/invite-schema";
+import type { WorkspaceRole } from "@/lib/db/types";
 
 export default async function TeamPage() {
   const { supabase, user } = await requireUser();
@@ -51,6 +53,23 @@ export default async function TeamPage() {
     redirect("/team?seeded=1");
   }
 
+  async function toggleRoleAction(formData: FormData) {
+    "use server";
+    const { supabase, user } = await requireUser();
+    const workspace = await getCurrentWorkspace(supabase, user.id);
+    if (!workspace) throw new Error("Workspace required.");
+    if (!(await isWorkspaceAdmin(workspace.id, user.id, supabase))) {
+      throw new Error("Admin access required.");
+    }
+    const targetUserId = String(formData.get("userId"));
+    const newRole = String(formData.get("role")) as WorkspaceRole;
+    if (targetUserId === user.id) {
+      throw new Error("You cannot change your own role.");
+    }
+    await setWorkspaceRole(supabase, workspace.id, targetUserId, newRole);
+    redirect("/team");
+  }
+
   const [members, { data: invites }] = await Promise.all([
     getWorkspaceMembers(supabase, workspace.id),
     supabase.from("invites").select("*").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
@@ -58,9 +77,14 @@ export default async function TeamPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold">Team</h1>
-        <p className="text-muted-foreground">Manage members and invitations.</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold">Team</h1>
+          <p className="text-muted-foreground">Manage members and invitations.</p>
+        </div>
+        <Button asChild variant="outline">
+          <Link href="/team/logs">View logs</Link>
+        </Button>
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <Card>
@@ -82,7 +106,22 @@ export default async function TeamPage() {
                   <TableRow key={member.id}>
                     <TableCell>{member.profiles?.full_name ?? "Unnamed"}</TableCell>
                     <TableCell>{member.profiles?.email}</TableCell>
-                    <TableCell><Badge>{member.role}</Badge></TableCell>
+                    <TableCell className="flex items-center gap-2">
+                      <Badge>{member.role}</Badge>
+                      {admin && member.user_id !== user.id ? (
+                        <form action={toggleRoleAction}>
+                          <input type="hidden" name="userId" value={member.user_id} />
+                          <input
+                            type="hidden"
+                            name="role"
+                            value={member.role === "admin" ? "member" : "admin"}
+                          />
+                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-[10px]">
+                            {member.role === "admin" ? "Demote" : "Promote"}
+                          </Button>
+                        </form>
+                      ) : null}
+                    </TableCell>
                     <TableCell>{member.status}</TableCell>
                   </TableRow>
                 ))}

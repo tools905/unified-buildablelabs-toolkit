@@ -5,6 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
 import { getRoundReport } from "@/lib/services/report-service";
 
+const categoryDisplayNames: Record<string, string> = {
+  communication: "Communication",
+  reliability: "Reliability",
+  ownership: "Ownership",
+  executionQuality: "Execution Quality",
+  collaboration: "Collaboration",
+  technicalQuality: "Technical Quality",
+  problemSolving: "Problem Solving",
+  leadership: "Leadership",
+  systemDesign: "System Design",
+  learningGrowth: "Learning Growth",
+};
+
 export default async function ReportPage({
   params,
 }: {
@@ -80,7 +93,7 @@ export default async function ReportPage({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {reviewee.highestWeightedCategories.map((item) => (
                     <Badge key={item.category}>
-                      {item.category}: {Math.round(item.weight * 100)}%
+                      {categoryDisplayNames[item.category] ?? item.category}: {Math.round(item.weight * 100)}%
                     </Badge>
                   ))}
                   <Badge>weights: {reviewee.scoringSource}</Badge>
@@ -89,7 +102,7 @@ export default async function ReportPage({
                 <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                   {Object.entries(reviewee.rawCategoryAverages).map(([category, value]) => (
                     <div key={category} className="rounded-md bg-muted p-2">
-                      {category}: {String(value ?? "n/a")}
+                      {categoryDisplayNames[category] ?? category}: {String(value ?? "n/a")}
                     </div>
                   ))}
                 </div>

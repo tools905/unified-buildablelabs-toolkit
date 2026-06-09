@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { requireUser } from "@/lib/auth/require-user";
 import { closeRound, getRoundProgress } from "@/lib/services/round-service";
+import { sendPendingReviewReminders } from "@/lib/services/reminder-service";
 
 export default async function RoundPage({
   params,
@@ -27,6 +28,13 @@ export default async function RoundPage({
     const { supabase } = await requireUser();
     await closeRound(supabase, roundId);
     redirect(`/projects/${projectId}/rounds/${roundId}/report`);
+  }
+
+  async function sendRemindersAction() {
+    "use server";
+    const { supabase } = await requireUser();
+    await sendPendingReviewReminders(supabase, roundId);
+    redirect(`/projects/${projectId}/rounds/${roundId}`);
   }
 
   return (
@@ -62,6 +70,11 @@ export default async function RoundPage({
             </div>
           </div>
           <div className="flex gap-2">
+            {round.status === "active" ? (
+              <form action={sendRemindersAction}>
+                <Button variant="outline">Send reminders</Button>
+              </form>
+            ) : null}
             {round.status === "active" || round.status === "planned" ? (
               <form action={closeAction}>
                 <Button variant="destructive">Close round</Button>

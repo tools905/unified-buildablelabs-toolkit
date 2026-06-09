@@ -8,12 +8,19 @@ import { one } from "@/lib/utils/relations";
 
 export async function sendPendingReviewReminders(
   supabase: SupabaseClient<any>,
+  roundId?: string,
 ) {
-  const { data: assignments, error } = await supabase
+  let query = supabase
     .from("review_assignments")
-    .select("*, reviewer:profiles!review_assignments_reviewer_id_fkey(*), review_rounds(*, projects(*))")
+    .select("*, reviewer:profiles!review_assignments_reviewer_id_fkey(*), review_rounds!inner(*, projects(*))")
     .in("status", ["pending", "overdue"])
     .eq("review_rounds.status", "active");
+
+  if (roundId) {
+    query = query.eq("round_id", roundId);
+  }
+
+  const { data: assignments, error } = await query;
   if (error) throw error;
 
   let sent = 0;
