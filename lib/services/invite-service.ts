@@ -17,14 +17,18 @@ export async function createInvite(
   const token = crypto.randomBytes(32).toString("hex");
   const { data, error } = await supabase
     .from("invites")
-    .insert({
-      workspace_id: input.workspaceId,
-      email: input.email.toLowerCase(),
-      role: input.role,
-      token,
-      invited_by: input.invitedBy,
-      expires_at: addDays(new Date(), 14).toISOString(),
-    })
+    .upsert(
+      {
+        workspace_id: input.workspaceId,
+        email: input.email.toLowerCase(),
+        role: input.role,
+        token,
+        invited_by: input.invitedBy,
+        expires_at: addDays(new Date(), 14).toISOString(),
+        status: "pending",
+      },
+      { onConflict: "workspace_id,email,status" },
+    )
     .select("*, workspaces(name), profiles!invites_invited_by_fkey(full_name,email)")
     .single();
 
