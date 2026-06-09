@@ -34,7 +34,7 @@ export default async function ProjectsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {projects.map((project) => (
           <Link key={project.id} href={`/projects/${project.id}`}>
-            <Card className="h-full hover:bg-muted/60">
+            <Card className="h-full card-hover-effect">
               <CardHeader>
                 <CardTitle>{project.name}</CardTitle>
               </CardHeader>

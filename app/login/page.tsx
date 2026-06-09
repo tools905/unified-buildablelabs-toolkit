@@ -13,7 +13,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Peer Reviews</CardTitle>
+          <CardTitle>BuildableLabs Peer-Reviews</CardTitle>
           <CardDescription>Log in or create your account.</CardDescription>
         </CardHeader>
         <CardContent>

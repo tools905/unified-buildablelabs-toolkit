@@ -14,8 +14,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/dashboard" className="text-lg font-semibold">
-            Peer Reviews
+          <Link href="/dashboard" className="text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+            BuildableLabs Peer-Reviews
           </Link>
           <nav className="flex items-center gap-1">
             {links.map((link) => {
