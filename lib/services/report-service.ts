@@ -8,9 +8,11 @@ import {
   calculateRoleWeightedScore,
   highestWeightedCategories,
   type RatingMap,
+  type WeightMap,
 } from "@/lib/services/scoring-service";
 import { getRoundProgress } from "@/lib/services/round-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 function responseToRatings(response: Record<string, number | null>): RatingMap {
   return {
@@ -87,30 +89,53 @@ export async function generateRoundReport(
   });
 
   let ai: AiReportEnhancements | null = null;
-  try {
-    ai = await generateAiReportEnhancements({
-      projectName: round.projects?.name ?? "Peer review project",
-      roundTitle: round.title,
-      members: revieweeInputs.map((reviewee) => ({
-        revieweeId: reviewee.revieweeId,
-        revieweeName: reviewee.revieweeName,
-        roleLabel: reviewee.roleLabel,
-        reviewCount: reviewee.reviewCount,
-        rawCategoryAverages: reviewee.rawCategoryAverages,
-        strengths: reviewee.strengths,
-        improvements: reviewee.improvements,
-        examples: reviewee.examples,
-      })),
-    });
-  } catch (error) {
+
+  // Check if AI report is already cached in the database
+  if (round.ai_overall_summary !== null) {
     ai = {
-      overallSummary: "",
-      memberSummaries: {},
-      roleWeights: {},
-      model: "nvidia/nemotron-3-super-120b-a12b",
-      unavailableReason:
-        error instanceof Error ? error.message : "AI summary unavailable.",
+      overallSummary: round.ai_overall_summary,
+      memberSummaries: (round.ai_member_summaries as Record<string, string>) ?? {},
+      roleWeights: (round.ai_role_weights as Record<string, WeightMap>) ?? {},
+      model: "cached",
     };
+  } else {
+    try {
+      ai = await generateAiReportEnhancements({
+        projectName: round.projects?.name ?? "Peer review project",
+        roundTitle: round.title,
+        members: revieweeInputs.map((reviewee) => ({
+          revieweeId: reviewee.revieweeId,
+          revieweeName: reviewee.revieweeName,
+          roleLabel: reviewee.roleLabel,
+          reviewCount: reviewee.reviewCount,
+          rawCategoryAverages: reviewee.rawCategoryAverages,
+          strengths: reviewee.strengths,
+          improvements: reviewee.improvements,
+          examples: reviewee.examples,
+        })),
+      });
+
+      if (ai) {
+        const admin = createAdminClient();
+        await admin
+          .from("review_rounds")
+          .update({
+            ai_overall_summary: ai.overallSummary,
+            ai_member_summaries: ai.memberSummaries,
+            ai_role_weights: ai.roleWeights,
+          })
+          .eq("id", roundId);
+      }
+    } catch (error) {
+      ai = {
+        overallSummary: "",
+        memberSummaries: {},
+        roleWeights: {},
+        model: "deepseek/deepseek-v4-flash",
+        unavailableReason:
+          error instanceof Error ? error.message : "AI summary unavailable.",
+      };
+    }
   }
 
   const reviewees = revieweeInputs.map((reviewee) => {

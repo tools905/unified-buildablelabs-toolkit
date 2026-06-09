@@ -174,6 +174,9 @@ export type Database = {
           completed_at: string | null;
           closed_at: string | null;
           created_at: string;
+          ai_overall_summary: string | null;
+          ai_member_summaries: Json | null;
+          ai_role_weights: Json | null;
         };
         Insert: {
           id?: string;
@@ -187,6 +190,9 @@ export type Database = {
           completed_at?: string | null;
           closed_at?: string | null;
           created_at?: string;
+          ai_overall_summary?: string | null;
+          ai_member_summaries?: Json | null;
+          ai_role_weights?: Json | null;
         };
         Update: Partial<Database["public"]["Tables"]["review_rounds"]["Insert"]>;
       };
