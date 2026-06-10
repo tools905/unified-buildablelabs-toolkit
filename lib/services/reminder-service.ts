@@ -6,6 +6,8 @@ import {
 } from "@/lib/services/email-service";
 import { one } from "@/lib/utils/relations";
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export async function sendPendingReviewReminders(
   supabase: SupabaseClient<any>,
   roundId?: string,
@@ -56,6 +58,7 @@ export async function sendPendingReviewReminders(
       })
       .eq("id", assignment.id);
     sent += 1;
+    await delay(600);
   }
 
   return sent;
@@ -133,6 +136,7 @@ export async function sendAdminOverdueSummaries(
         roundId: round.id,
       });
       sent += 1;
+      await delay(600);
     }
   }
 
