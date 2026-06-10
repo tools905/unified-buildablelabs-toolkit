@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { requireUser } from "@/lib/auth/require-user";
 import { acceptInvite } from "@/lib/services/invite-service";
-import { createWorkspace, ensureProfile, getCurrentWorkspace } from "@/lib/services/workspace-service";
+import { createWorkspace, ensureProfile, getCurrentWorkspace, joinDefaultWorkspace } from "@/lib/services/workspace-service";
 
 export default async function OnboardingPage({
   searchParams,
@@ -23,7 +23,12 @@ export default async function OnboardingPage({
   }
 
   const existing = await getCurrentWorkspace(supabase, user.id);
-  if (existing) redirect("/dashboard");
+  if (existing) {
+    redirect("/dashboard");
+  } else {
+    await joinDefaultWorkspace(supabase, user.id);
+    redirect("/dashboard");
+  }
 
   async function createWorkspaceAction(formData: FormData) {
     "use server";

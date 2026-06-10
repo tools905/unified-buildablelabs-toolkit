@@ -17,6 +17,14 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
+  const requiresAuth = protectedPrefixes.some((prefix) =>
+    request.nextUrl.pathname.startsWith(prefix),
+  );
+
+  if (!requiresAuth) {
+    return response;
+  }
+
   const supabase = createServerClient<any>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -42,11 +50,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const requiresAuth = protectedPrefixes.some((prefix) =>
-    request.nextUrl.pathname.startsWith(prefix),
-  );
-
-  if (requiresAuth && !user) {
+  if (!user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set(
@@ -56,5 +60,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  return response;
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-user-id", user.id);
+  if (user.email) {
+    requestHeaders.set("x-user-email", user.email);
+  }
+  if (user.user_metadata?.full_name) {
+    requestHeaders.set(
+      "x-user-full-name",
+      encodeURIComponent(user.user_metadata.full_name),
+    );
+  }
+
+  const newResponse = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+
+  response.headers.forEach((value, key) => {
+    newResponse.headers.append(key, value);
+  });
+
+  return newResponse;
 }

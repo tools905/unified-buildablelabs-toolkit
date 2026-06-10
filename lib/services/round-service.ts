@@ -180,3 +180,27 @@ export async function getRoundProgress(
     missingReviewers,
   };
 }
+
+export async function cancelRound(
+  supabase: SupabaseClient<any>,
+  roundId: string,
+) {
+  const { data, error } = await supabase
+    .from("review_rounds")
+    .update({ status: "cancelled" })
+    .eq("id", roundId)
+    .in("status", ["active", "planned"])
+    .select("*, projects(*)")
+    .single();
+
+  if (error) throw error;
+
+  await writeAuditLog(supabase, {
+    workspaceId: data.projects?.workspace_id,
+    action: "round.cancelled",
+    entityType: "review_round",
+    entityId: data.id,
+  });
+
+  return data;
+}

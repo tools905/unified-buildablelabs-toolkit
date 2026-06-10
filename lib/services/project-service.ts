@@ -149,3 +149,15 @@ export async function generatePlannedRounds(
   if (insertError) throw insertError;
   return data ?? [];
 }
+
+export async function deleteProject(
+  supabase: SupabaseClient<any>,
+  projectId: string,
+) {
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", projectId);
+
+  if (error) throw error;
+}

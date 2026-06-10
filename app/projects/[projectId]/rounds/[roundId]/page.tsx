@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { requireUser } from "@/lib/auth/require-user";
-import { closeRound, getRoundProgress } from "@/lib/services/round-service";
+import { closeRound, getRoundProgress, cancelRound } from "@/lib/services/round-service";
 import { sendPendingReviewReminders } from "@/lib/services/reminder-service";
 
 export default async function RoundPage({
@@ -28,6 +28,13 @@ export default async function RoundPage({
     const { supabase } = await requireUser();
     await closeRound(supabase, roundId);
     redirect(`/projects/${projectId}/rounds/${roundId}/report`);
+  }
+
+  async function cancelAction() {
+    "use server";
+    const { supabase } = await requireUser();
+    await cancelRound(supabase, roundId);
+    redirect(`/projects/${projectId}`);
   }
 
   async function sendRemindersAction() {
@@ -76,9 +83,27 @@ export default async function RoundPage({
               </form>
             ) : null}
             {round.status === "active" || round.status === "planned" ? (
-              <form action={closeAction}>
-                <Button variant="destructive">Close round</Button>
-              </form>
+              <>
+                <form action={closeAction}>
+                  <Button variant="destructive">Close round</Button>
+                </form>
+                <form
+                  action={cancelAction}
+                  onSubmit={(e) => {
+                    if (
+                      !confirm(
+                        "Are you sure you want to stop/cancel this review round? Reviewers will no longer be able to submit reviews, and no report will be generated.",
+                      )
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <Button type="submit" variant="outline" className="text-destructive hover:bg-destructive/10">
+                    Stop/Cancel round
+                  </Button>
+                </form>
+              </>
             ) : null}
             {round.status === "completed" || round.status === "closed" ? (
               <Button asChild>
