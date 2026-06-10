@@ -12,7 +12,8 @@ export async function ensureProfile(
       ? user.user_metadata.full_name
       : null;
 
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("profiles")
     .upsert(
       {
