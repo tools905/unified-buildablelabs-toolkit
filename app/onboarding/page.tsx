@@ -13,9 +13,10 @@ export default async function OnboardingPage({
 }: {
   searchParams: Promise<{ invite?: string }>;
 }) {
-  const { supabase, user } = await requireUser();
-  await ensureProfile(supabase, user);
   const params = await searchParams;
+  const inviteQuery = params.invite ? `?invite=${params.invite}` : "";
+  const { supabase, user } = await requireUser(`/onboarding${inviteQuery}`);
+  await ensureProfile(supabase, user);
 
   if (params.invite) {
     await acceptInvite(supabase, params.invite, user.id);
