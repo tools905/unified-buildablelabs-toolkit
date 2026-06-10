@@ -42,7 +42,10 @@ export async function sendEmail(
   input: EmailInput,
 ) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Peer Reviews <reviews@example.com>";
+  let from = process.env.EMAIL_FROM ?? "Peer Reviews <reviews@example.com>";
+  if (from.startsWith('"') && from.endsWith('"')) {
+    from = from.slice(1, -1);
+  }
 
   if (!apiKey) {
     await logEmail(supabase, input, "skipped", null, "RESEND_API_KEY missing");
