@@ -15,7 +15,17 @@ import { getCurrentWorkspace, getWorkspaceMembers, isWorkspaceAdmin, setWorkspac
 import { inviteSchema } from "@/lib/validation/invite-schema";
 import type { WorkspaceRole } from "@/lib/db/types";
 
-export default async function TeamPage() {
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    success?: string;
+    email?: string;
+    error?: string;
+    seeded?: string;
+  }>;
+}) {
+  const params = await searchParams;
   const { supabase, user } = await requireUser();
   const workspace = await getCurrentWorkspace(supabase, user.id);
   if (!workspace) redirect("/onboarding");
@@ -32,13 +42,73 @@ export default async function TeamPage() {
       email: formData.get("email"),
       role: formData.get("role") || "member",
     });
-    await createInvite(supabase, {
-      workspaceId: workspace.id,
-      email: input.email,
-      role: input.role,
-      invitedBy: user.id,
-    });
-    redirect("/team");
+    
+    let success = false;
+    let errorMsg = "";
+    try {
+      await createInvite(supabase, {
+        workspaceId: workspace.id,
+        email: input.email,
+        role: input.role,
+        invitedBy: user.id,
+      });
+      success = true;
+    } catch (err: any) {
+      if (err && err.digest && err.digest.startsWith("NEXT_REDIRECT")) {
+        throw err;
+      }
+      errorMsg = err instanceof Error ? err.message : "Failed to send invite";
+    }
+
+    if (success) {
+      redirect(`/team?success=invited&email=${encodeURIComponent(input.email)}`);
+    } else {
+      redirect(`/team?error=${encodeURIComponent(errorMsg)}`);
+    }
+  }
+
+  async function resendInviteAction(formData: FormData) {
+    "use server";
+    const { supabase, user } = await requireUser();
+    const workspace = await getCurrentWorkspace(supabase, user.id);
+    if (!workspace) throw new Error("Workspace required.");
+    if (!(await isWorkspaceAdmin(workspace.id, user.id, supabase))) {
+      throw new Error("Admin access required.");
+    }
+    
+    const inviteId = String(formData.get("inviteId"));
+    const { data: invite, error: fetchErr } = await supabase
+      .from("invites")
+      .select("*")
+      .eq("id", inviteId)
+      .single();
+
+    if (fetchErr || !invite) {
+      redirect(`/team?error=${encodeURIComponent("Invite not found")}`);
+    }
+
+    let success = false;
+    let errorMsg = "";
+    try {
+      await createInvite(supabase, {
+        workspaceId: workspace.id,
+        email: invite.email,
+        role: invite.role,
+        invitedBy: user.id,
+      });
+      success = true;
+    } catch (err: any) {
+      if (err && err.digest && err.digest.startsWith("NEXT_REDIRECT")) {
+        throw err;
+      }
+      errorMsg = err instanceof Error ? err.message : "Failed to resend invite";
+    }
+
+    if (success) {
+      redirect(`/team?success=resent&email=${encodeURIComponent(invite.email)}`);
+    } else {
+      redirect(`/team?error=${encodeURIComponent(errorMsg)}`);
+    }
   }
 
   async function seedDummyMembersAction() {
@@ -86,6 +156,41 @@ export default async function TeamPage() {
           <Link href="/team/logs">View logs</Link>
         </Button>
       </div>
+
+      {params.success === "invited" && params.email && (
+        <Alert className="mb-6 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <AlertTitle>Success</AlertTitle>
+          <AlertDescription>
+            An invitation email has been sent to <strong>{params.email}</strong>.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {params.success === "resent" && params.email && (
+        <Alert className="mb-6 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <AlertTitle>Invite Resent</AlertTitle>
+          <AlertDescription>
+            The invitation email for <strong>{params.email}</strong> has been resent.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {params.error && (
+        <Alert className="mb-6 border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{params.error}</AlertDescription>
+        </Alert>
+      )}
+
+      {params.seeded === "1" && (
+        <Alert className="mb-6 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <AlertTitle>Seeded Successfully</AlertTitle>
+          <AlertDescription>
+            Dummy workspace members have been added for local testing.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <Card>
           <CardHeader>
@@ -185,12 +290,26 @@ export default async function TeamPage() {
               <CardTitle>Invites</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(invites ?? []).map((invite) => (
-                <div key={invite.id} className="rounded-md border border-border p-3 text-sm">
-                  <div className="font-medium">{invite.email}</div>
-                  <div className="text-muted-foreground">{invite.status}</div>
-                </div>
-              ))}
+              {(invites ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No pending invites.</p>
+              ) : (
+                (invites ?? []).map((invite) => (
+                  <div key={invite.id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
+                    <div>
+                      <div className="font-medium">{invite.email}</div>
+                      <div className="text-xs text-muted-foreground capitalize">{invite.status} ({invite.role})</div>
+                    </div>
+                    {invite.status === "pending" ? (
+                      <form action={resendInviteAction}>
+                        <input type="hidden" name="inviteId" value={invite.id} />
+                        <Button size="sm" variant="outline" className="h-7 text-xs">
+                          Resend
+                        </Button>
+                      </form>
+                    ) : null}
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

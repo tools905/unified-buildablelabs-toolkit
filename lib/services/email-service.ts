@@ -3,6 +3,7 @@ import "server-only";
 import { Resend } from "resend";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NotificationType } from "@/lib/db/types";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type EmailInput = {
   to: string;
@@ -22,7 +23,8 @@ async function logEmail(
   providerMessageId?: string | null,
   errorMessage?: string | null,
 ) {
-  await supabase.from("notification_logs").insert({
+  const admin = createAdminClient();
+  await admin.from("notification_logs").insert({
     workspace_id: input.workspaceId ?? null,
     project_id: input.projectId ?? null,
     round_id: input.roundId ?? null,
@@ -55,6 +57,11 @@ export async function sendEmail(
       subject: input.subject,
       html: input.html,
     });
+    if (result.error) {
+      const message = result.error.message || "Unknown Resend error";
+      await logEmail(supabase, input, "failed", null, message);
+      return { error: message };
+    }
     await logEmail(supabase, input, "sent", result.data?.id ?? null, null);
     return result;
   } catch (error) {

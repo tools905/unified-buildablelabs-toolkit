@@ -36,7 +36,7 @@ export async function createInvite(
   if (error) throw error;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  await sendInvite(supabase, {
+  const emailResult = await sendInvite(supabase, {
     to: data.email,
     workspaceName: data.workspaces?.name ?? "your workspace",
     inviterName: data.profiles?.full_name ?? data.profiles?.email ?? "An admin",
@@ -44,6 +44,10 @@ export async function createInvite(
     expiresAt: new Date(data.expires_at).toLocaleDateString(),
     workspaceId: data.workspace_id,
   });
+
+  if (emailResult && "error" in emailResult && emailResult.error) {
+    throw new Error(`Failed to send invite email: ${emailResult.error}`);
+  }
 
   await writeAuditLog(supabase, {
     workspaceId: input.workspaceId,
