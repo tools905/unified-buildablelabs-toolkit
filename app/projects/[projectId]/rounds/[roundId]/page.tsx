@@ -4,6 +4,7 @@ import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/dashboard/confirm-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { requireUser } from "@/lib/auth/require-user";
@@ -87,21 +88,15 @@ export default async function RoundPage({
                 <form action={closeAction}>
                   <Button variant="destructive">Close round</Button>
                 </form>
-                <form
-                  action={cancelAction}
-                  onSubmit={(e) => {
-                    if (
-                      !confirm(
-                        "Are you sure you want to stop/cancel this review round? Reviewers will no longer be able to submit reviews, and no report will be generated.",
-                      )
-                    ) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
-                  <Button type="submit" variant="outline" className="text-destructive hover:bg-destructive/10">
+                <form action={cancelAction}>
+                  <ConfirmButton
+                    type="submit"
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/10"
+                    message="Are you sure you want to stop/cancel this review round? Reviewers will no longer be able to submit reviews, and no report will be generated."
+                  >
                     Stop/Cancel round
-                  </Button>
+                  </ConfirmButton>
                 </form>
               </>
             ) : null}

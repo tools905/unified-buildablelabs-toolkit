@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/dashboard/confirm-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,21 +123,14 @@ export default async function ProjectSettingsPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form
-              action={deleteProjectAction}
-              onSubmit={(e) => {
-                if (
-                  !confirm(
-                    "Are you sure you want to delete this project? All rounds, reviews, and logs will be permanently removed. This action cannot be undone.",
-                  )
-                ) {
-                  e.preventDefault();
-                }
-              }}
-            >
-              <Button type="submit" variant="destructive">
+            <form action={deleteProjectAction}>
+              <ConfirmButton
+                type="submit"
+                variant="destructive"
+                message="Are you sure you want to delete this project? All rounds, reviews, and logs will be permanently removed. This action cannot be undone."
+              >
                 Delete Project
-              </Button>
+              </ConfirmButton>
             </form>
           </CardContent>
         </Card>
