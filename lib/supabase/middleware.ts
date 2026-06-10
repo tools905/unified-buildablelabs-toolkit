@@ -78,8 +78,16 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
+  // Copy cookies explicitly from response to newResponse
+  response.cookies.getAll().forEach((cookie) => {
+    newResponse.cookies.set(cookie);
+  });
+
+  // Copy other headers except set-cookie (which is handled by response.cookies above)
   response.headers.forEach((value, key) => {
-    newResponse.headers.append(key, value);
+    if (key.toLowerCase() !== "set-cookie") {
+      newResponse.headers.append(key, value);
+    }
   });
 
   return newResponse;
