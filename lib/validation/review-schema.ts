@@ -5,9 +5,9 @@ const optionalRating = z.coerce.number().int().min(1).max(5).optional();
 export const reviewSchema = z.object({
   strengths: z.string().min(10),
   improvements: z.string().min(10),
-  communicationRating: z.coerce.number().int().min(1).max(5),
-  reliabilityRating: z.coerce.number().int().min(1).max(5),
-  ownershipRating: z.coerce.number().int().min(1).max(5),
+  communicationRating: optionalRating,
+  reliabilityRating: optionalRating,
+  ownershipRating: optionalRating,
   executionQualityRating: optionalRating,
   collaborationRating: optionalRating,
   technicalQualityRating: optionalRating,

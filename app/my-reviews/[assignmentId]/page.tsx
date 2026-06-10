@@ -39,9 +39,9 @@ export default async function AssignmentPage({
     await submitReview(supabase, assignmentId, user.id, {
       strengths: String(formData.get("strengths") ?? ""),
       improvements: String(formData.get("improvements") ?? ""),
-      communicationRating: Number(formData.get("communicationRating")),
-      reliabilityRating: Number(formData.get("reliabilityRating")),
-      ownershipRating: Number(formData.get("ownershipRating")),
+      communicationRating: Number(formData.get("communicationRating") || 0) || undefined,
+      reliabilityRating: Number(formData.get("reliabilityRating") || 0) || undefined,
+      ownershipRating: Number(formData.get("ownershipRating") || 0) || undefined,
       executionQualityRating: Number(formData.get("executionQualityRating") || 0) || undefined,
       collaborationRating: Number(formData.get("collaborationRating") || 0) || undefined,
       technicalQualityRating: Number(formData.get("technicalQualityRating") || 0) || undefined,
@@ -76,7 +76,6 @@ export default async function AssignmentPage({
                   key={name}
                   name={name}
                   label={label}
-                  required={["communicationRating", "reliabilityRating", "ownershipRating"].includes(name)}
                   defaultValue={ratingDefault(response, name)}
                 />
               ))}

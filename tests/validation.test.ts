@@ -44,4 +44,16 @@ describe("validation", () => {
     });
     expect(parsed.communicationRating).toBe(4);
   });
+
+  it("allows rating fields to be completely omitted/optional", () => {
+    const parsed = reviewSchema.parse({
+      strengths: "Very thoughtful collaborator",
+      improvements: "Could document decisions more clearly",
+      specificExample: "Delivered the API changes with careful review notes.",
+    });
+    expect(parsed.communicationRating).toBeUndefined();
+    expect(parsed.reliabilityRating).toBeUndefined();
+    expect(parsed.ownershipRating).toBeUndefined();
+    expect(parsed.executionQualityRating).toBeUndefined();
+  });
 });

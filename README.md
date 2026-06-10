@@ -55,19 +55,30 @@ npx pnpm@9.15.4 test
 npx pnpm@9.15.4 build
 ```
 
-## Cron
+## Cron & Scheduling
 
-Vercel cron invokes:
+Scheduling is handled directly in the database using the **Supabase `pg_cron` and `pg_net` extensions**. 
 
-- `GET /api/cron/start-rounds`
-- `GET /api/cron/send-reminders`
-- `GET /api/cron/close-overdue-rounds`
+A database cron job triggers the Next.js API endpoint `/api/cron/daily` at 3:30 AM every day, which executes the daily reviews, starts planned rounds, marks overdue assignments, and sends reminders.
 
-Each cron route requires:
+To authorize these requests, the scheduler retrieves the application URL and cron secret from the `public.system_settings` table in the database.
 
-```http
-Authorization: Bearer $CRON_SECRET
+### Configuring the Scheduler
+
+Before the cron job can execute successfully, you must configure the settings in your hosted database:
+
+```sql
+update public.system_settings 
+set value = 'https://your-production-domain.com' 
+where key = 'app_url';
+
+update public.system_settings 
+set value = 'your-secure-cron-secret' 
+where key = 'cron_secret';
 ```
+
+Each cron route rejects requests with missing or invalid authorization headers.
+
 
 ## Email
 
