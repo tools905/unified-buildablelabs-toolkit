@@ -2,9 +2,14 @@ import { z } from "zod";
 
 const optionalRating = z.coerce.number().int().min(1).max(5).optional();
 
+const optionalOpenEnded = z.preprocess(
+  (val) => (val === "N/A" || val === "" ? undefined : val),
+  z.string().min(10).optional()
+);
+
 export const reviewSchema = z.object({
-  strengths: z.string().min(10),
-  improvements: z.string().min(10),
+  strengths: optionalOpenEnded,
+  improvements: optionalOpenEnded,
   communicationRating: optionalRating,
   reliabilityRating: optionalRating,
   ownershipRating: optionalRating,
@@ -15,7 +20,7 @@ export const reviewSchema = z.object({
   leadershipRating: optionalRating,
   systemDesignRating: optionalRating,
   learningGrowthRating: optionalRating,
-  specificExample: z.string().min(10),
+  specificExample: optionalOpenEnded,
   privateNote: z.string().optional(),
 });
 

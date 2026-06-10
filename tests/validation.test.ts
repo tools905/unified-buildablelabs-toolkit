@@ -56,4 +56,11 @@ describe("validation", () => {
     expect(parsed.ownershipRating).toBeUndefined();
     expect(parsed.executionQualityRating).toBeUndefined();
   });
+
+  it("allows open-ended text fields to be completely omitted/optional", () => {
+    const parsed = reviewSchema.parse({});
+    expect(parsed.strengths).toBeUndefined();
+    expect(parsed.improvements).toBeUndefined();
+    expect(parsed.specificExample).toBeUndefined();
+  });
 });

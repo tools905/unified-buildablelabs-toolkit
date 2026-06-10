@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { RatingSlider } from "@/app/my-reviews/[assignmentId]/rating-slider";
+import { TextField } from "@/app/my-reviews/[assignmentId]/text-field";
 import { requireUser } from "@/lib/auth/require-user";
 import { getAssignmentForReview } from "@/lib/services/assignment-service";
 import { submitReview } from "@/lib/services/review-service";
@@ -37,8 +36,8 @@ export default async function AssignmentPage({
     "use server";
     const { supabase, user } = await requireUser();
     await submitReview(supabase, assignmentId, user.id, {
-      strengths: String(formData.get("strengths") ?? ""),
-      improvements: String(formData.get("improvements") ?? ""),
+      strengths: String(formData.get("strengths") || "") || undefined,
+      improvements: String(formData.get("improvements") || "") || undefined,
       communicationRating: Number(formData.get("communicationRating") || 0) || undefined,
       reliabilityRating: Number(formData.get("reliabilityRating") || 0) || undefined,
       ownershipRating: Number(formData.get("ownershipRating") || 0) || undefined,
@@ -49,8 +48,8 @@ export default async function AssignmentPage({
       leadershipRating: Number(formData.get("leadershipRating") || 0) || undefined,
       systemDesignRating: Number(formData.get("systemDesignRating") || 0) || undefined,
       learningGrowthRating: Number(formData.get("learningGrowthRating") || 0) || undefined,
-      specificExample: String(formData.get("specificExample") ?? ""),
-      privateNote: String(formData.get("privateNote") ?? ""),
+      specificExample: String(formData.get("specificExample") || "") || undefined,
+      privateNote: String(formData.get("privateNote") || "") || undefined,
     });
     redirect("/my-reviews");
   }
@@ -87,25 +86,6 @@ export default async function AssignmentPage({
         </CardContent>
       </Card>
     </AppShell>
-  );
-}
-
-function TextField({
-  name,
-  label,
-  defaultValue,
-  optional,
-}: {
-  name: string;
-  label: string;
-  defaultValue?: string | null;
-  optional?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={name}>{label}</Label>
-      <Textarea id={name} name={name} required={!optional} minLength={optional ? undefined : 10} defaultValue={defaultValue ?? ""} />
-    </div>
   );
 }
 
