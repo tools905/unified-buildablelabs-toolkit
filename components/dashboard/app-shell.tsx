@@ -2,15 +2,12 @@ import Link from "next/link";
 import { Menu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { createClient } from "@/lib/supabase/server";
+import { getUserSession } from "@/lib/auth/require-user";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
 
 async function getShellContext() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { supabase, user } = await getUserSession();
 
     if (!user) return { admin: false };
 

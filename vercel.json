@@ -1,16 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/daily",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/linkedin-daily",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/linkedin-weekly",
-      "schedule": "0 3 * * 1"
-    }
-  ]
-}
+{}

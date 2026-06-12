@@ -20,12 +20,12 @@ export default async function PeerReviewToolPage() {
     await Promise.all([
       supabase
         .from("projects")
-        .select("*, review_rounds(*)")
+        .select("id, name, cadence")
         .eq("workspace_id", workspace.id),
-      supabase.from("review_assignments").select("*").eq("reviewer_id", user.id),
+      supabase.from("review_assignments").select("status").eq("reviewer_id", user.id),
       supabase
         .from("review_rounds")
-        .select("*, projects!inner(workspace_id)")
+        .select("status, projects!inner(workspace_id)")
         .eq("projects.workspace_id", workspace.id),
     ]);
 

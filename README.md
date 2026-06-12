@@ -17,7 +17,7 @@ areas for current and future team workflows.
 - Supabase Auth, Postgres, SQL migrations, and RLS
 - shadcn-style UI primitives
 - Resend for transactional email
-- Vercel Cron-compatible API routes
+- Supabase `pg_cron` and `pg_net` scheduled jobs
 - Zod, date-fns, React Hook Form-ready schemas
 - Vitest for unit tests
 
@@ -120,5 +120,14 @@ password and service role key before using the app in production.
 
 LinkedIn collection defaults to the deterministic mock connector. The OAuth,
 fallback, and third-party connector boundaries are present but intentionally return
-no activities until a compliant data provider is configured. Vercel schedules daily
-sync/scoring and Monday report generation through the protected cron routes.
+no activities until a compliant data provider is configured. Supabase schedules
+daily sync/scoring and Monday report generation through protected HTTPS routes.
+
+Supabase Vault must contain:
+
+```txt
+toolkit_app_url
+toolkit_cron_secret
+```
+
+The second value must match `CRON_SECRET` in the deployed app environment.

@@ -1,7 +1,16 @@
 import { differenceInCalendarDays } from "date-fns";
 import type { LinkedInMemberStats, LinkedInPostScore, LinkedInTrackedMember } from "./types";
 
-type ScoredPost = { id: string; posted_at: string; linkedin_post_scores?: LinkedInPostScore | LinkedInPostScore[] | null };
+type AnalyticsScore = Pick<
+  LinkedInPostScore,
+  "total_score" | "archetype" | "strengths" | "weaknesses"
+>;
+
+type ScoredPost = {
+  id: string;
+  posted_at: string;
+  linkedin_post_scores?: AnalyticsScore | AnalyticsScore[] | null;
+};
 
 function one<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;

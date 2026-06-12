@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, WorkspaceRole } from "@/lib/db/types";
 import { writeAuditLog } from "@/lib/services/audit-service";
@@ -64,7 +65,7 @@ export async function createWorkspace(
   return workspace;
 }
 
-export async function getCurrentWorkspace(
+export const getCurrentWorkspace = cache(async function getCurrentWorkspace(
   supabase: SupabaseClient<any>,
   userId: string,
 ): Promise<Database["public"]["Tables"]["workspaces"]["Row"] | null> {
@@ -79,9 +80,9 @@ export async function getCurrentWorkspace(
   if (error) throw error;
   const workspace = data?.workspaces;
   return Array.isArray(workspace) ? (workspace[0] ?? null) : (workspace ?? null);
-}
+});
 
-export async function getWorkspaceMembership(
+export const getWorkspaceMembership = cache(async function getWorkspaceMembership(
   supabase: SupabaseClient<any>,
   workspaceId: string,
   userId: string,
@@ -96,7 +97,7 @@ export async function getWorkspaceMembership(
 
   if (error) throw error;
   return data;
-}
+});
 
 export async function getWorkspaceMembers(
   supabase: SupabaseClient<any>,
@@ -216,4 +217,3 @@ export async function joinDefaultWorkspace(
     return newWorkspace;
   }
 }
-

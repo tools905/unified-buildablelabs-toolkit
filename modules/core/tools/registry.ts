@@ -1,6 +1,6 @@
 import "server-only";
 
-import { unstable_noStore as noStore } from "next/cache";
+import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -38,9 +38,7 @@ export const toolkitTools: ToolkitTool[] = [
   },
 ];
 
-export async function listToolkitTools() {
-  noStore();
-
+const loadToolkitTools = unstable_cache(async () => {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return toolkitTools;
   }
@@ -68,6 +66,10 @@ export async function listToolkitTools() {
   } catch {
     return toolkitTools;
   }
+}, ["toolkit-tools"], { revalidate: 30, tags: ["toolkit-tools"] });
+
+export async function listToolkitTools() {
+  return loadToolkitTools();
 }
 
 export async function getToolkitTool(slug: ToolkitToolSlug) {

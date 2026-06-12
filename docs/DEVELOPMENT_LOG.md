@@ -336,8 +336,9 @@ Scheduled routes:
 /api/cron/linkedin-weekly
 ```
 
-Both require `Authorization: Bearer $CRON_SECRET`. Vercel schedules are stored in
-`vercel.json`.
+Both require `Authorization: Bearer $CRON_SECRET`. Scheduling is owned by Supabase
+through `pg_cron`, with asynchronous calls made by `pg_net`. The deployment URL and
+token are stored in Vault as `toolkit_app_url` and `toolkit_cron_secret`.
 
 ## Suggested Future HR Bot Build Path
 
@@ -357,6 +358,28 @@ Run these before committing:
 npx pnpm@9.15.4 lint
 npx pnpm@9.15.4 test
 npx pnpm@9.15.4 build
+```
+
+## Navigation Performance
+
+Section navigation was optimized by:
+
+- caching the Supabase server client, authenticated user, workspace, and membership
+  once per server-render request;
+- caching the shared tool registry for 30 seconds;
+- prefetching sidebar destinations;
+- reducing Peer Review queries to only the fields rendered;
+- reducing LinkedIn score payloads and loading reports only on the reports page;
+- parallelizing independent LinkedIn database requests;
+- adding route-level loading feedback.
+
+Local production navigation checks after the optimization:
+
+```txt
+Tools directory: about 69 ms
+Peer Review dashboard: about 939 ms
+LinkedIn dashboard: about 894 ms
+Mobile horizontal overflow at 390 px: none
 ```
 
 Current verification after LinkedIn Assessor migration:

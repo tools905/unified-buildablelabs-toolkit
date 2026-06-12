@@ -12,7 +12,7 @@ import type { LinkedInConnectorSource, LinkedInTrackedMember } from "./types";
 export async function getLinkedInDashboardData(
   supabase: SupabaseClient<any>,
   workspaceId: string,
-  options?: { profileId?: string; memberOnly?: boolean },
+  options?: { profileId?: string; memberOnly?: boolean; includeReports?: boolean },
 ) {
   let memberQuery = supabase
     .from("linkedin_tracked_members")
@@ -21,11 +21,10 @@ export async function getLinkedInDashboardData(
     .eq("is_active", true)
     .order("created_at", { ascending: false });
   if (options?.memberOnly && options.profileId) memberQuery = memberQuery.eq("profile_id", options.profileId);
-  const [{ data: members, error: memberError }, { data: windows }, { data: reports }, { data: settings }] = await Promise.all([
+  const [{ data: members, error: memberError }, { data: windows }, { data: settings }] = await Promise.all([
     memberQuery,
-    supabase.from("linkedin_analysis_windows").select("*").eq("workspace_id", workspaceId).order("start_date", { ascending: false }).limit(10),
-    supabase.from("linkedin_weekly_reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(12),
-    supabase.from("linkedin_settings").select("*").eq("workspace_id", workspaceId).maybeSingle(),
+    supabase.from("linkedin_analysis_windows").select("id, name, start_date, end_date").eq("workspace_id", workspaceId).order("start_date", { ascending: false }).limit(10),
+    supabase.from("linkedin_settings").select("default_monthly_post_target, default_volume_weight, default_quality_weight, connector_preference, weekly_reports_enabled, member_insights_enabled").eq("workspace_id", workspaceId).maybeSingle(),
   ]);
   if (memberError) throw memberError;
   const activeWindow = windows?.[0] ?? {
@@ -34,15 +33,21 @@ export async function getLinkedInDashboardData(
     end_date: new Date().toISOString(),
   };
   const memberIds = (members ?? []).map((member) => member.id);
-  const { data: posts, error: postError } = memberIds.length
-    ? await supabase
+  const [postResult, reportResult] = await Promise.all([
+    memberIds.length
+      ? supabase
         .from("linkedin_posts")
-        .select("*, linkedin_post_scores(*)")
+        .select("id, tracked_member_id, post_url, post_text, posted_at, linkedin_post_scores(total_score, archetype, ai_summary, strengths, weaknesses, improvement_suggestions)")
         .in("tracked_member_id", memberIds)
         .gte("posted_at", activeWindow.start_date)
         .lte("posted_at", activeWindow.end_date)
         .order("posted_at", { ascending: false })
-    : { data: [], error: null };
+      : Promise.resolve({ data: [], error: null }),
+    options?.includeReports
+      ? supabase.from("linkedin_weekly_reports").select("id, start_date, end_date, report_summary, created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(12)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const { data: posts, error: postError } = postResult;
   if (postError) throw postError;
   const typedMembers = (members ?? []) as LinkedInTrackedMember[];
   const stats = typedMembers.map((member) =>
@@ -71,7 +76,7 @@ export async function getLinkedInDashboardData(
       suggestions: (score?.improvement_suggestions ?? []) as string[],
     };
   });
-  return { stats, posts: feed, reports: reports ?? [], windows: windows ?? [], window: activeWindow, settings, summary: summarizeLinkedInStats(stats) };
+  return { stats, posts: feed, reports: reportResult.data ?? [], windows: windows ?? [], window: activeWindow, settings, summary: summarizeLinkedInStats(stats) };
 }
 
 export async function createLinkedInTrackedMember(
