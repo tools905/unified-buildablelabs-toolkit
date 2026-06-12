@@ -5,6 +5,8 @@ import { hasSupabaseBrowserEnv } from "@/lib/utils/env";
 const protectedPrefixes = [
   "/dashboard",
   "/team",
+  "/tools",
+  "/admin",
   "/projects",
   "/my-reviews",
   "/onboarding",

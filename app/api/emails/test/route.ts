@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
   const result = await sendEmail(supabase, {
     to,
-    subject: "Peer Reviews test email",
+    subject: "BuildableLabs Toolkit test email",
     html: "<p>Email delivery is configured.</p>",
     type: "invite",
   });

@@ -23,7 +23,7 @@ export async function requestOpenRouterJson<T>(input: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-      "X-Title": "Peer Reviews",
+      "X-Title": "Unified BuildableLabs Toolkit",
     },
     body: JSON.stringify({
       model: OPENROUTER_MODEL,

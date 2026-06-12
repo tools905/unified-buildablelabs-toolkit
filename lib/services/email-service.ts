@@ -42,7 +42,7 @@ export async function sendEmail(
   input: EmailInput,
 ) {
   const apiKey = process.env.RESEND_API_KEY;
-  let from = process.env.EMAIL_FROM ?? "Peer Reviews <reviews@example.com>";
+  let from = process.env.EMAIL_FROM ?? "BuildableLabs Toolkit <toolkit@example.com>";
   if (from.startsWith('"') && from.endsWith('"')) {
     from = from.slice(1, -1);
   }
@@ -84,7 +84,7 @@ export function inviteEmailHtml(input: {
   acceptUrl: string;
   expiresAt: string;
 }) {
-  return `<h1>Join ${input.workspaceName}</h1><p>${input.inviterName} invited you to Peer Reviews.</p>${button(input.acceptUrl, "Accept invite")}<p>This invite expires ${input.expiresAt}.</p>`;
+  return `<h1>Join ${input.workspaceName}</h1><p>${input.inviterName} invited you to the BuildableLabs Toolkit.</p>${button(input.acceptUrl, "Accept invite")}<p>This invite expires ${input.expiresAt}.</p>`;
 }
 
 export async function sendInviteEmail(
@@ -100,7 +100,7 @@ export async function sendInviteEmail(
 ) {
   return sendEmail(supabase, {
     to: input.to,
-    subject: `You're invited to join ${input.workspaceName} on Peer Reviews`,
+    subject: `You're invited to join ${input.workspaceName} on the BuildableLabs Toolkit`,
     html: inviteEmailHtml(input),
     type: "invite",
     workspaceId: input.workspaceId,

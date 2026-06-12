@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Peer-Review Platform for BuildableLabs",
-  description: "Recurring peer feedback for small project teams.",
+  title: "Unified BuildableLabs Toolkit",
+  description: "Internal tools for BuildableLabs workflows, reviews, reports, and team operations.",
 };
 
 export default function RootLayout({

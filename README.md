@@ -1,15 +1,23 @@
-# Peer Review Webapp
+# Unified BuildableLabs Toolkit
 
-A webapp-only MVP for recurring peer reviews in small teams. Admins create workspaces, invite members, create projects, start review rounds, track completion, and view anonymous role-weighted reports.
+An internal toolkit web app for BuildableLabs. The app uses one shared auth system,
+one Supabase Postgres database, one default internal workspace, and modular tool
+areas for current and future team workflows.
+
+## Current Modules
+
+- Peer Review: functional module migrated from the original Peer Review app.
+- LinkedIn Assessor: route and module shell ready for future migration.
+- HR Bot: route and module shell ready for future knowledge-base/chat work.
 
 ## Tech Stack
 
 - Next.js App Router, TypeScript, Tailwind CSS
+- Supabase Auth, Postgres, SQL migrations, and RLS
 - shadcn-style UI primitives
-- Supabase Auth, Postgres, and RLS
 - Resend for transactional email
-- Vercel Cron routes
-- Zod, React Hook Form-ready schemas, date-fns
+- Vercel Cron-compatible API routes
+- Zod, date-fns, React Hook Form-ready schemas
 - Vitest for unit tests
 
 ## Local Setup
@@ -17,9 +25,12 @@ A webapp-only MVP for recurring peer reviews in small teams. Admins create works
 ```bash
 npx pnpm@9.15.4 install
 cp .env.example .env.local
+npx pnpm@9.15.4 dev
 ```
 
-Fill `.env.local` with local Supabase values. For the first pass, use Supabase CLI local development. Hosted Supabase and Resend credentials are only needed for live deployment and email testing.
+Real credentials belong in `.env.local` and Vercel environment variables only.
+Do not commit Supabase service role keys, database passwords, Resend keys, cron
+secrets, or AI provider keys.
 
 ## Environment Variables
 
@@ -27,74 +38,73 @@ Fill `.env.local` with local Supabase values. For the first pass, use Supabase C
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+
+DATABASE_URL=
+DIRECT_URL=
+
 RESEND_API_KEY=
-EMAIL_FROM="Peer Reviews <reviews@example.com>"
+EMAIL_FROM="BuildableLabs Toolkit <toolkit@example.com>"
+
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b
+
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 CRON_SECRET=
+
 NODE_ENV=development
 ```
 
-Never expose `SUPABASE_SERVICE_ROLE_KEY` in client code. It is imported only from server-only modules.
+The current Supabase project ref is `zvqyldecmclgoddukmnl`.
 
 ## Supabase Setup
 
-Apply migrations from `supabase/migrations` in order:
+Apply migrations from `supabase/migrations` in order. The existing Peer Review
+schema remains intact, and `009_toolkit_core.sql` adds shared toolkit tables:
 
-1. `001_initial_schema.sql`
-2. `002_functions.sql`
-3. `003_rls_policies.sql`
+- `tools`
+- `tool_settings`
+- `notifications`
+- `jobs`
 
-The schema includes workspaces, profiles, workspace members, invites, projects, project members, review rounds, review assignments, review responses, notification logs, and audit logs.
+The first authenticated user who reaches onboarding can create or join the
+default `BuildableLabs` workspace. The workspace tables are kept for compatibility,
+but the product treats this as one internal workspace.
 
-## Development
+## Main Routes
+
+- `/dashboard`
+- `/tools`
+- `/tools/peer-review`
+- `/tools/peer-review/admin`
+- `/tools/peer-review/member`
+- `/tools/peer-review/reports`
+- `/tools/linkedin-assessor`
+- `/tools/hr-bot`
+- `/admin`
+- `/admin/tools`
+- `/admin/settings`
+- `/admin/audit-logs`
+
+Legacy Peer Review routes under `/projects` and `/my-reviews` redirect to the
+new toolkit routes.
+
+## Verification
 
 ```bash
-npx pnpm@9.15.4 dev
 npx pnpm@9.15.4 lint
 npx pnpm@9.15.4 test
 npx pnpm@9.15.4 build
 ```
 
-## Cron & Scheduling
+## Deployment Notes
 
-Scheduling is handled directly in the database using the **Supabase `pg_cron` and `pg_net` extensions**. 
+Create a new Vercel project from this repository and configure environment
+variables in Vercel. After deployment, update:
 
-A database cron job triggers the Next.js API endpoint `/api/cron/daily` at 3:30 AM every day, which executes the daily reviews, starts planned rounds, marks overdue assignments, and sends reminders.
+- `NEXT_PUBLIC_APP_URL`
+- Supabase auth redirect URLs
+- cron callback URL and `CRON_SECRET`
+- Resend sender/domain configuration
 
-To authorize these requests, the scheduler retrieves the application URL and cron secret from the `public.system_settings` table in the database.
-
-### Configuring the Scheduler
-
-Before the cron job can execute successfully, you must configure the settings in your hosted database:
-
-```sql
-update public.system_settings 
-set value = 'https://your-production-domain.com' 
-where key = 'app_url';
-
-update public.system_settings 
-set value = 'your-secure-cron-secret' 
-where key = 'cron_secret';
-```
-
-Each cron route rejects requests with missing or invalid authorization headers.
-
-
-## Email
-
-Email sending uses Resend and logs each send attempt in `notification_logs`. Missing `RESEND_API_KEY` skips sending and logs the skipped status so local development can proceed without real email credentials.
-
-## Security Notes
-
-- Dashboard routes require auth through middleware.
-- Admin-only operations are enforced in pages/services and RLS.
-- Members can only read and submit their own review assignments.
-- Reports hide reviewer identity in feedback sections.
-- Private notes are only displayed in admin reports.
-- Cron routes reject invalid or missing secrets.
-
-## MVP Limitations
-
-- Custom cadence is safely skipped for MVP.
-- Project settings are read-mostly after creation.
-- No Telegram, Slack, OpenClaw, billing, AI analysis, PDF export, chat, mobile app, or HRMS features.
+If credentials were shared outside a secret manager, rotate the Supabase database
+password and service role key before using the app in production.
