@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -10,51 +10,57 @@ import { Progress } from "@/components/ui/progress";
 import { requireUser } from "@/lib/auth/require-user";
 import { closeRound, getRoundProgress, cancelRound } from "@/lib/services/round-service";
 import { sendPendingReviewReminders } from "@/lib/services/reminder-service";
+import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
+import { one } from "@/lib/utils/relations";
 
 export default async function RoundPage({
   params,
 }: {
   params: Promise<{ projectId: string; roundId: string }>;
 }) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { projectId, roundId } = await params;
+  const workspace = await getCurrentWorkspace(supabase, user.id);
+  if (!workspace) redirect("/onboarding");
   const [{ data: round }, progress] = await Promise.all([
     supabase.from("review_rounds").select("*, projects(*)").eq("id", roundId).single(),
     getRoundProgress(supabase, roundId),
   ]);
   if (!round) redirect(`/tools/peer-review/admin/${projectId}`);
+  const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
+  if (!admin || round.projects?.workspace_id !== workspace.id) notFound();
 
   async function closeAction() {
     "use server";
-    const { supabase } = await requireUser();
+    const { supabase } = await requireRoundAdmin(roundId, projectId);
     await closeRound(supabase, roundId);
     redirect(`/tools/peer-review/admin/${projectId}/rounds/${roundId}/report`);
   }
 
   async function cancelAction() {
     "use server";
-    const { supabase } = await requireUser();
+    const { supabase } = await requireRoundAdmin(roundId, projectId);
     await cancelRound(supabase, roundId);
     redirect(`/tools/peer-review/admin/${projectId}`);
   }
 
   async function sendRemindersAction() {
     "use server";
-    const { supabase } = await requireUser();
+    const { supabase } = await requireRoundAdmin(roundId, projectId);
     await sendPendingReviewReminders(supabase, roundId);
     redirect(`/tools/peer-review/admin/${projectId}/rounds/${roundId}`);
   }
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold">{round.title}</h1>
+          <h1 className="text-2xl font-semibold sm:text-3xl">{round.title}</h1>
           <p className="text-muted-foreground">{round.projects?.name}</p>
         </div>
         <Badge>{round.status}</Badge>
       </div>
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Total" value={progress.total} />
         <StatCard title="Submitted" value={progress.submitted} />
         <StatCard title="Pending" value={progress.pending} />
@@ -77,7 +83,7 @@ export default async function RoundPage({
               ))}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {round.status === "active" ? (
               <form action={sendRemindersAction}>
                 <Button variant="outline">Send reminders</Button>
@@ -110,4 +116,26 @@ export default async function RoundPage({
       </Card>
     </AppShell>
   );
+}
+
+async function requireRoundAdmin(roundId: string, projectId: string) {
+  const { supabase, user } = await requireUser();
+  const workspace = await getCurrentWorkspace(supabase, user.id);
+  if (!workspace || !(await isWorkspaceAdmin(workspace.id, user.id, supabase))) {
+    throw new Error("Admin access required.");
+  }
+
+  const { data: round } = await supabase
+    .from("review_rounds")
+    .select("project_id, projects!inner(workspace_id)")
+    .eq("id", roundId)
+    .single();
+  if (
+    round?.project_id !== projectId ||
+    one(round?.projects)?.workspace_id !== workspace.id
+  ) {
+    throw new Error("Admin access required.");
+  }
+
+  return { supabase, user };
 }

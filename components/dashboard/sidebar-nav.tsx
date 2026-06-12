@@ -80,8 +80,9 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <Link
       href={item.href}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+        "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active
           ? "bg-primary text-primary-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -101,7 +102,7 @@ export function SidebarNav({ admin }: { admin: boolean }) {
     activeTool?.items.filter((item) => admin || !item.adminOnly) ?? [];
 
   return (
-    <nav className="space-y-6">
+    <nav className="space-y-5">
       <div>
         <div className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">
           Workspace

@@ -18,23 +18,23 @@ export default async function DashboardPage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <h1 className="text-3xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>
         <p className="text-muted-foreground">
           Open a BuildableLabs internal tool to continue your workflow.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-4">
         {enabledTools.map((tool) => (
-          <Card key={tool.slug} className="card-hover-effect">
+          <Card key={tool.slug} className="card-hover-effect flex h-full flex-col">
             <CardHeader>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <CardTitle>{tool.name}</CardTitle>
                 <Badge>Enabled</Badge>
               </div>
               <CardDescription>{tool.description}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button asChild>
+            <CardContent className="mt-auto">
+              <Button asChild className="w-full sm:w-auto">
                 <Link href={`/tools/${tool.slug}`}>Open tool</Link>
               </Button>
             </CardContent>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/dashboard/confirm-button";
@@ -19,13 +19,26 @@ export default async function ProjectSettingsPage({
 }: {
   params: Promise<{ projectId: string }>;
 }) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { projectId } = await params;
   const project = await getProject(supabase, projectId);
+  const workspace = await getCurrentWorkspace(supabase, user.id);
+  if (!workspace) redirect("/onboarding");
+  const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
+  if (!admin || project.workspace_id !== workspace.id) notFound();
 
   async function updateProjectAction(formData: FormData) {
     "use server";
-    const { supabase } = await requireUser();
+    const { supabase, user } = await requireUser();
+    const workspace = await getCurrentWorkspace(supabase, user.id);
+    const actionProject = await getProject(supabase, projectId);
+    if (
+      !workspace ||
+      actionProject.workspace_id !== workspace.id ||
+      !(await isWorkspaceAdmin(workspace.id, user.id, supabase))
+    ) {
+      throw new Error("Admin access required.");
+    }
     await updateProject(supabase, projectId, {
       name: String(formData.get("name") ?? ""),
       description: String(formData.get("description") ?? ""),
@@ -42,7 +55,10 @@ export default async function ProjectSettingsPage({
     if (!workspace) throw new Error("Workspace required.");
 
     const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
-    if (!admin) throw new Error("Only workspace admins can delete projects.");
+    const actionProject = await getProject(supabase, projectId);
+    if (!admin || actionProject.workspace_id !== workspace.id) {
+      throw new Error("Only workspace admins can delete projects.");
+    }
 
     await deleteProject(supabase, projectId);
 
@@ -105,8 +121,8 @@ export default async function ProjectSettingsPage({
                 <Label htmlFor="description">Description</Label>
                 <Textarea id="description" name="description" defaultValue={project.description ?? ""} />
               </div>
-              <div className="flex gap-2">
-                <Button type="submit">Save settings</Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button type="submit" className="w-full sm:w-auto">Save settings</Button>
                 <Button type="button" asChild variant="outline">
                   <Link href={`/tools/peer-review/admin/${project.id}`}>Cancel</Link>
                 </Button>

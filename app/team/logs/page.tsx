@@ -35,12 +35,12 @@ export default async function TeamLogsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold">Workspace logs</h1>
+          <h1 className="text-2xl font-semibold sm:text-3xl">Workspace logs</h1>
           <p className="text-muted-foreground">Audit trails and email notification history.</p>
         </div>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="w-full sm:w-auto">
           <Link href="/team">Back to Team</Link>
         </Button>
       </div>
@@ -124,7 +124,7 @@ export default async function TeamLogsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate text-muted-foreground" title={log.error_message ?? ""}>
-                        {log.error_message ?? "—"}
+                        {log.error_message ?? "-"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(log.sent_at).toLocaleString()}

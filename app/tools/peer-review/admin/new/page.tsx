@@ -29,6 +29,9 @@ export default async function NewProjectPage({
     const { supabase, user } = await requireUser();
     const workspace = await getCurrentWorkspace(supabase, user.id);
     if (!workspace) throw new Error("Workspace required.");
+    if (!(await isWorkspaceAdmin(workspace.id, user.id, supabase))) {
+      throw new Error("Admin access required.");
+    }
     const memberIds = formData.getAll("memberIds").map(String);
     if (memberIds.length < minimumProjectMembers()) {
       redirect("/tools/peer-review/admin/new?error=members");

@@ -35,7 +35,7 @@ export default async function MyReviewsPage() {
         {assignments.map((assignment) => (
           <Card key={assignment.id} className="card-hover-effect">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-2">
+              <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span>{assignment.reviewee?.full_name ?? assignment.reviewee?.email}</span>
                 <Badge className={statusBadgeClass(assignment.status)}>{assignment.status}</Badge>
               </CardTitle>

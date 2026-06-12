@@ -32,7 +32,7 @@ export default async function AuditLogsPage() {
             <CardHeader>
               <CardTitle className="text-base">{log.action}</CardTitle>
               <CardDescription>
-                {log.entity_type} · {new Date(log.created_at).toLocaleString()}
+                {log.entity_type} - {new Date(log.created_at).toLocaleString()}
               </CardDescription>
             </CardHeader>
           </Card>

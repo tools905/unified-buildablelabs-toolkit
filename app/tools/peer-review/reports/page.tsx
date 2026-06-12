@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
-import { getCurrentWorkspace } from "@/lib/services/workspace-service";
+import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
 
 export const dynamic = "force-dynamic";
@@ -12,15 +13,16 @@ export default async function PeerReviewReportsPage() {
   const { supabase, user } = await requireUser("/tools/peer-review/reports");
   await requireEnabledTool("peer-review");
   const workspace = await getCurrentWorkspace(supabase, user.id);
+  if (!workspace || !(await isWorkspaceAdmin(workspace.id, user.id, supabase))) {
+    notFound();
+  }
 
-  const { data: rounds } = workspace
-    ? await supabase
-        .from("review_rounds")
-        .select("*, projects!inner(workspace_id, name)")
-        .eq("projects.workspace_id", workspace.id)
-        .in("status", ["completed", "closed"])
-        .order("created_at", { ascending: false })
-    : { data: [] };
+  const { data: rounds } = await supabase
+    .from("review_rounds")
+    .select("*, projects!inner(workspace_id, name)")
+    .eq("projects.workspace_id", workspace.id)
+    .in("status", ["completed", "closed"])
+    .order("created_at", { ascending: false });
 
   return (
     <AppShell>

@@ -88,7 +88,7 @@ export default async function ReportPage({
           Anonymous feedback grouped by reviewee. Reviewer identities are hidden.
         </p>
       </div>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <Badge>{report.progress.completionRate}% complete</Badge>
         <Badge>{report.progress.submitted} submitted</Badge>
         <Badge>{report.progress.total - report.progress.submitted} missing</Badge>
@@ -147,7 +147,7 @@ export default async function ReportPage({
                   <Badge>weights: {reviewee.scoringSource}</Badge>
                 </div>
                 <h3 className="mt-4 font-medium">Raw category averages</h3>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
                   {Object.entries(reviewee.rawCategoryAverages).map(([category, value]) => (
                     <div key={category} className="rounded-md bg-muted p-2">
                       {categoryDisplayNames[category] ?? category}: {String(value ?? "n/a")}

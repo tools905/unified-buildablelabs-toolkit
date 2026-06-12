@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,22 +16,21 @@ export default async function ProjectsPage() {
   const workspace = await getCurrentWorkspace(supabase, user.id);
   if (!workspace) redirect("/onboarding");
   const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
+  if (!admin) notFound();
   const projects = await listProjects(supabase, workspace.id);
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold">Projects</h1>
+          <h1 className="text-2xl font-semibold sm:text-3xl">Projects</h1>
           <p className="text-muted-foreground">Review cadence and rounds.</p>
         </div>
-        {admin ? (
-          <Button asChild>
-            <Link href="/tools/peer-review/admin/new">New project</Link>
-          </Button>
-        ) : null}
+        <Button asChild className="w-full sm:w-auto">
+          <Link href="/tools/peer-review/admin/new">New project</Link>
+        </Button>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {projects.map((project) => (
           <Link key={project.id} href={`/tools/peer-review/admin/${project.id}`}>
             <Card className="h-full card-hover-effect">
@@ -42,7 +41,7 @@ export default async function ProjectsPage() {
                 <p className="line-clamp-2 text-sm text-muted-foreground">
                   {project.description ?? "No description"}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Badge>{project.status}</Badge>
                   <Badge>{project.cadence}</Badge>
                   <Badge>{project.review_rounds?.length ?? 0} rounds</Badge>

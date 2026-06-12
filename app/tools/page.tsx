@@ -15,21 +15,21 @@ export default async function ToolsPage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <h1 className="text-3xl font-semibold">Tools</h1>
+        <h1 className="text-2xl font-semibold sm:text-3xl">Tools</h1>
         <p className="text-muted-foreground">Shared internal tools for BuildableLabs workflows.</p>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-4">
         {tools.map((tool) => (
-          <Card key={tool.slug} className="card-hover-effect">
+          <Card key={tool.slug} className="card-hover-effect flex h-full flex-col">
             <CardHeader>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <CardTitle>{tool.name}</CardTitle>
                 <Badge>{tool.enabled ? "Enabled" : "Disabled"}</Badge>
               </div>
               <CardDescription>{tool.description}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button asChild variant={tool.enabled ? "default" : "secondary"}>
+            <CardContent className="mt-auto">
+              <Button asChild variant={tool.enabled ? "default" : "secondary"} className="w-full sm:w-auto">
                 <Link href={`/tools/${tool.slug}`}>
                   Open tool
                 </Link>

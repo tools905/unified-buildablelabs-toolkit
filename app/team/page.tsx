@@ -147,12 +147,12 @@ export default async function TeamPage({
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold">Team</h1>
+          <h1 className="text-2xl font-semibold sm:text-3xl">Team</h1>
           <p className="text-muted-foreground">Manage members and invitations.</p>
         </div>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="w-full sm:w-auto">
           <Link href="/team/logs">View logs</Link>
         </Button>
       </div>
@@ -294,7 +294,7 @@ export default async function TeamPage({
                 <p className="text-sm text-muted-foreground text-center py-4">No pending invites.</p>
               ) : (
                 (invites ?? []).map((invite) => (
-                  <div key={invite.id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
+                  <div key={invite.id} className="flex flex-col gap-3 rounded-md border border-border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="font-medium">{invite.email}</div>
                       <div className="text-xs text-muted-foreground capitalize">{invite.status} ({invite.role})</div>
@@ -302,7 +302,7 @@ export default async function TeamPage({
                     {invite.status === "pending" ? (
                       <form action={resendInviteAction}>
                         <input type="hidden" name="inviteId" value={invite.id} />
-                        <Button size="sm" variant="outline" className="h-7 text-xs">
+                        <Button size="sm" variant="outline" className="h-8 w-full text-xs sm:w-auto">
                           Resend
                         </Button>
                       </form>
