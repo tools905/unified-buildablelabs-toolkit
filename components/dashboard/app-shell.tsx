@@ -1,33 +1,8 @@
 import Link from "next/link";
-import {
-  Bot,
-  ClipboardCheck,
-  FileBarChart,
-  LayoutDashboard,
-  Settings,
-  Share2,
-  Users,
-  Wrench,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
-
-const memberLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/tools/peer-review/member", label: "Peer Reviews", icon: ClipboardCheck },
-  { href: "/tools/linkedin-assessor", label: "LinkedIn Insights", icon: Share2 },
-  { href: "/tools/hr-bot", label: "HR Bot", icon: Bot },
-];
-
-const adminLinks = [
-  { href: "/tools", label: "Tools", icon: Wrench },
-  { href: "/tools/peer-review/admin", label: "Peer Review", icon: ClipboardCheck },
-  { href: "/admin", label: "Reports", icon: FileBarChart },
-  { href: "/team", label: "Team", icon: Users },
-  { href: "/admin/tools", label: "Tool Settings", icon: Settings },
-];
 
 async function getShellContext() {
   try {
@@ -51,34 +26,26 @@ async function getShellContext() {
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const { admin } = await getShellContext();
-  const links = admin ? [...memberLinks, ...adminLinks] : memberLinks;
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-lg font-bold tracking-tight text-foreground">
-              Unified BuildableLabs Toolkit
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col lg:flex-row">
+        <aside className="border-b border-border bg-card/80 px-4 py-4 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r lg:px-5">
+          <div className="mb-5 flex items-center justify-between gap-3 lg:block">
+            <Link href="/dashboard" className="block">
+              <div className="text-base font-bold tracking-tight text-foreground">
+                BuildableLabs
+              </div>
+              <div className="text-xs text-muted-foreground">Unified Toolkit</div>
             </Link>
-            <Badge>{admin ? "Admin" : "Member"}</Badge>
+            <Badge className="lg:mt-3">{admin ? "Admin" : "Member"}</Badge>
           </div>
-          <nav className="flex flex-wrap items-center gap-1">
-            {links.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Button key={link.href} asChild variant="ghost" size="sm">
-                  <Link href={link.href}>
-                    <Icon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{link.label}</span>
-                  </Link>
-                </Button>
-              );
-            })}
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-6">{children}</main>
+          <SidebarNav admin={admin} />
+        </aside>
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
