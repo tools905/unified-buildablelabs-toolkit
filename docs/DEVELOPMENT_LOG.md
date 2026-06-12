@@ -267,15 +267,77 @@ Recommended test types:
 - workflow/job tests
 - permission tests for admin vs member behavior
 
-## Suggested Future LinkedIn Assessor Build Path
+## LinkedIn Assessor Implementation
 
-1. Create LinkedIn schema migration.
-2. Add `modules/linkedin-assessor/services`.
-3. Add profile management in `/tools/linkedin-assessor/admin`.
-4. Add tracking runs and post ingestion as isolated services.
-5. Add scoring/report generation under `modules/linkedin-assessor/reports`.
-6. Show member-safe insights under `/tools/linkedin-assessor`.
-7. Keep scraping/OAuth/provider logic isolated from dashboards.
+The standalone LinkedIn Assessor workflow was migrated into the unified toolkit.
+The source snapshot remains available in the separate `linkedin-assessor` Git
+repository, but ongoing development now belongs here.
+
+Implemented routes:
+
+```txt
+/tools/linkedin-assessor
+/tools/linkedin-assessor/admin
+/tools/linkedin-assessor/admin/members/new
+/tools/linkedin-assessor/admin/members/[id]
+/tools/linkedin-assessor/admin/posts
+/tools/linkedin-assessor/admin/leaderboards
+/tools/linkedin-assessor/admin/settings
+/tools/linkedin-assessor/reports
+```
+
+Implemented workflow:
+
+1. Admin creates a tracked LinkedIn profile and may link it to a toolkit user.
+2. Daily sync selects the configured connector and stores all fetched activities.
+3. Only activities classified as `original_post` become assessable posts.
+4. Unscored posts use the shared intelligence layer: OpenRouter first, DeepSeek
+   second, and the deterministic local scorer if both are unavailable.
+5. Member statistics combine prorated posting volume and average post quality.
+6. Admins can view team dashboards, post intelligence, leaderboards, settings,
+   analysis windows, and weekly reports.
+7. Members can only view their own linked profile, and only when member insights
+   are enabled.
+
+Module structure:
+
+```txt
+modules/linkedin-assessor/
+  analytics.ts
+  connectors.ts
+  context.ts
+  fallback-scoring.ts
+  scoring.ts
+  service.ts
+  types.ts
+  validation.ts
+```
+
+Database migration:
+
+```txt
+supabase/migrations/010_linkedin_assessor.sql
+```
+
+The migration was applied to Supabase project `zvqyldecmclgoddukmnl` and verified
+through the migration history and REST table endpoints.
+
+Connector status:
+
+- `mock`: functional and deterministic for end-to-end testing.
+- `linkedin_oauth`: boundary exists; provider implementation still required.
+- `third_party_api`: boundary exists; provider implementation still required.
+- `fallback`: boundary exists; compliant collection implementation still required.
+
+Scheduled routes:
+
+```txt
+/api/cron/linkedin-daily
+/api/cron/linkedin-weekly
+```
+
+Both require `Authorization: Bearer $CRON_SECRET`. Vercel schedules are stored in
+`vercel.json`.
 
 ## Suggested Future HR Bot Build Path
 
@@ -297,11 +359,11 @@ npx pnpm@9.15.4 test
 npx pnpm@9.15.4 build
 ```
 
-Current verification after toolkit implementation:
+Current verification after LinkedIn Assessor migration:
 
 ```txt
 lint: passed
-test: passed, 4 files / 16 tests
+test: passed, 5 files / 19 tests
 build: passed
 ```
 
@@ -332,13 +394,3 @@ After deployment:
 - Configure Resend sender/domain.
 - Update cron callback URL and `CRON_SECRET`.
 - Rotate any secrets that were shared outside a secret manager.
-
-## Known Local Caveat
-
-There is a local unstaged deletion of:
-
-```txt
-supabase/migrations/008_auto_join_workspace.sql
-```
-
-That deletion existed before the toolkit implementation commit and was intentionally not committed. Review it before future commits.

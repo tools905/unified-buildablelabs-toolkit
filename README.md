@@ -7,7 +7,8 @@ areas for current and future team workflows.
 ## Current Modules
 
 - Peer Review: functional module migrated from the original Peer Review app.
-- LinkedIn Assessor: route and module shell ready for future migration.
+- LinkedIn Assessor: profile tracking, mock-first collection, original-post filtering,
+  AI scoring, leaderboards, coaching insights, analysis windows, and weekly reports.
 - HR Bot: route and module shell ready for future knowledge-base/chat work.
 
 ## Tech Stack
@@ -61,7 +62,8 @@ The current Supabase project ref is `zvqyldecmclgoddukmnl`.
 ## Supabase Setup
 
 Apply migrations from `supabase/migrations` in order. The existing Peer Review
-schema remains intact, and `009_toolkit_core.sql` adds shared toolkit tables:
+schema remains intact. `009_toolkit_core.sql` adds shared toolkit tables and
+`010_linkedin_assessor.sql` adds the workspace-aware LinkedIn workflow.
 
 - `tools`
 - `tool_settings`
@@ -81,6 +83,11 @@ but the product treats this as one internal workspace.
 - `/tools/peer-review/member`
 - `/tools/peer-review/reports`
 - `/tools/linkedin-assessor`
+- `/tools/linkedin-assessor/admin`
+- `/tools/linkedin-assessor/admin/posts`
+- `/tools/linkedin-assessor/admin/leaderboards`
+- `/tools/linkedin-assessor/admin/settings`
+- `/tools/linkedin-assessor/reports`
 - `/tools/hr-bot`
 - `/admin`
 - `/admin/tools`
@@ -110,3 +117,8 @@ variables in Vercel. After deployment, update:
 
 If credentials were shared outside a secret manager, rotate the Supabase database
 password and service role key before using the app in production.
+
+LinkedIn collection defaults to the deterministic mock connector. The OAuth,
+fallback, and third-party connector boundaries are present but intentionally return
+no activities until a compliant data provider is configured. Vercel schedules daily
+sync/scoring and Monday report generation through the protected cron routes.

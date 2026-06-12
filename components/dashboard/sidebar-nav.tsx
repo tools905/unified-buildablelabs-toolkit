@@ -4,11 +4,13 @@ import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   Bot,
   ClipboardCheck,
   FileBarChart,
   LayoutDashboard,
   MessageCircle,
+  Newspaper,
   Settings,
   Share2,
   Users,
@@ -53,8 +55,11 @@ const toolNav: Array<{
     title: "LinkedIn Assessor",
     items: [
       { href: "/tools/linkedin-assessor", label: "Overview", icon: Share2, exact: true },
-      { href: "/tools/linkedin-assessor/admin", label: "Admin", icon: Settings, adminOnly: true },
+      { href: "/tools/linkedin-assessor/admin", label: "Dashboard", icon: LayoutDashboard, adminOnly: true, exact: true },
+      { href: "/tools/linkedin-assessor/admin/posts", label: "Posts", icon: Newspaper, adminOnly: true },
+      { href: "/tools/linkedin-assessor/admin/leaderboards", label: "Leaderboards", icon: BarChart3, adminOnly: true },
       { href: "/tools/linkedin-assessor/reports", label: "Reports", icon: FileBarChart, adminOnly: true },
+      { href: "/tools/linkedin-assessor/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
     ],
   },
   {
