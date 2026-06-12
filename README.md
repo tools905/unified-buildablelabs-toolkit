@@ -46,7 +46,9 @@ RESEND_API_KEY=
 EMAIL_FROM="BuildableLabs Toolkit <toolkit@example.com>"
 
 OPENROUTER_API_KEY=
-OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b
+OPENROUTER_MODEL=deepseek/deepseek-v4-flash
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-flash
 
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 CRON_SECRET=

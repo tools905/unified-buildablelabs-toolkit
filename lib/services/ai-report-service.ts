@@ -7,11 +7,7 @@ import {
   type RatingMap,
   type WeightMap,
 } from "@/lib/services/scoring-service";
-import {
-  isOpenRouterConfigured,
-  requestOpenRouterJson,
-  OPENROUTER_MODEL,
-} from "@/lib/services/openrouter-service";
+import { requestIntelligenceJson } from "@/modules/shared/ai";
 
 export type AiReportMemberInput = {
   revieweeId: string;
@@ -50,9 +46,9 @@ export async function generateAiReportEnhancements(input: {
   roundTitle: string;
   members: AiReportMemberInput[];
 }): Promise<AiReportEnhancements | null> {
-  if (!isOpenRouterConfigured() || input.members.length === 0) return null;
+  if (input.members.length === 0) return null;
 
-  const result = await requestOpenRouterJson<AiReportResponse>({
+  const intelligence = await requestIntelligenceJson<AiReportResponse>({
     temperature: 0.1,
     system: [
       "You are an expert peer-review analytics assistant specializing in delivering direct, concise, and high-value constructive insights.",
@@ -103,6 +99,7 @@ export async function generateAiReportEnhancements(input: {
     },
   });
 
+  const result = intelligence?.data;
   if (!result) return null;
 
   const memberSummaries = Object.fromEntries(
@@ -121,6 +118,6 @@ export async function generateAiReportEnhancements(input: {
     overallSummary: result.overallSummary ?? "",
     memberSummaries,
     roleWeights,
-    model: OPENROUTER_MODEL,
+    model: `${intelligence.provider}:${intelligence.model}`,
   };
 }

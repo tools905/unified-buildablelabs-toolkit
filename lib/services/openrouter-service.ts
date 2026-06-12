@@ -3,7 +3,7 @@ import "server-only";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export const OPENROUTER_MODEL =
-  "deepseek/deepseek-v4-flash";
+  process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash";
 
 export function isOpenRouterConfigured() {
   return Boolean(process.env.OPENROUTER_API_KEY);

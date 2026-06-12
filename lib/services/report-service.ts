@@ -131,7 +131,7 @@ export async function generateRoundReport(
         overallSummary: "",
         memberSummaries: {},
         roleWeights: {},
-        model: "deepseek/deepseek-v4-flash",
+        model: "unavailable",
         unavailableReason:
           error instanceof Error ? error.message : "AI summary unavailable.",
       };
