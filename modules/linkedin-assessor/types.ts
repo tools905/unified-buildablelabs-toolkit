@@ -9,11 +9,18 @@ export const linkedinMemberRoles = [
 ] as const;
 
 export const linkedinConnectors = [
-  "linkedin_oauth",
   "fallback",
   "third_party_api",
   "mock",
 ] as const;
+
+export type LinkedInConnectorSource = (typeof linkedinConnectors)[number];
+
+export const linkedinConnectorLabels: Record<LinkedInConnectorSource, string> = {
+  fallback: "Fallback collector (not configured)",
+  third_party_api: "Third-party API (for example, Apify)",
+  mock: "Mock test data",
+};
 
 export const linkedinArchetypes = [
   "lesson_learned",
@@ -33,7 +40,6 @@ export const linkedinArchetypes = [
 ] as const;
 
 export type LinkedInMemberRole = (typeof linkedinMemberRoles)[number];
-export type LinkedInConnectorSource = (typeof linkedinConnectors)[number];
 export type LinkedInArchetype = (typeof linkedinArchetypes)[number];
 export type LinkedInActivityType = "original_post" | "collaborative_post" | "repost" | "comment" | "reaction" | "unknown";
 export type LinkedInPostKind = "original_post" | "collaborative_post";

@@ -46,7 +46,7 @@ describe("LinkedIn Assessor", () => {
   });
 
   it("fails visibly when a production connector is not configured", async () => {
-    await expect(getLinkedInConnector("linkedin_oauth").fetchActivities({ trackedMemberId: "member", linkedinProfileUrl: "https://www.linkedin.com/in/test/", from: new Date(), to: new Date() })).rejects.toThrow("not configured");
+    await expect(getLinkedInConnector("fallback").fetchActivities({ trackedMemberId: "member", linkedinProfileUrl: "https://www.linkedin.com/in/test/", from: new Date(), to: new Date() })).rejects.toThrow("not configured");
   });
 
   it("validates manual submissions and rolling window bounds", () => {
@@ -54,6 +54,7 @@ describe("LinkedIn Assessor", () => {
     expect(valid.postKind).toBe("original_post");
     expect(() => linkedinManualPostSchema.parse({ trackedMemberId: "11111111-1111-4111-8111-111111111111", postUrl: "https://example.com/post", postText: "A complete original post with enough text to assess properly.", postedAt: "2026-06-10", postKind: "original_post" })).toThrow();
     expect(() => linkedinSettingsSchema.parse({ monthlyPostTarget: 12, volumeWeight: 0.45, qualityWeight: 0.55, connectorPreference: "mock", weeklyReportsEnabled: true, memberInsightsEnabled: true, memberSubmissionsEnabled: true, analysisWindowDays: 3 })).toThrow();
+    expect(() => linkedinSettingsSchema.parse({ monthlyPostTarget: 12, volumeWeight: 0.45, qualityWeight: 0.55, connectorPreference: "linkedin_oauth", weeklyReportsEnabled: true, memberInsightsEnabled: true, memberSubmissionsEnabled: true, analysisWindowDays: 30 })).toThrow();
   });
 
   it("uses score overrides and excludes marked posts from quality", () => {

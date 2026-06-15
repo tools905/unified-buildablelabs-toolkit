@@ -118,9 +118,9 @@ variables in Vercel. After deployment, update:
 If credentials were shared outside a secret manager, rotate the Supabase database
 password and service role key before using the app in production.
 
-LinkedIn collection defaults to the deterministic mock connector. The OAuth,
-fallback, and third-party connector boundaries are present but intentionally return
-no activities until a compliant data provider is configured. Supabase schedules
+LinkedIn collection defaults to the deterministic mock connector. The fallback
+and third-party connector boundaries fail visibly until a compliant data provider
+is configured. Supabase schedules
 daily sync/scoring and Monday report generation through protected HTTPS routes.
 
 Supabase Vault must contain:

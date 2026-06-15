@@ -325,7 +325,6 @@ through the migration history and REST table endpoints.
 Connector status:
 
 - `mock`: functional and deterministic for end-to-end testing.
-- `linkedin_oauth`: boundary exists; provider implementation still required.
 - `third_party_api`: boundary exists; provider implementation still required.
 - `fallback`: boundary exists; compliant collection implementation still required.
 
@@ -466,6 +465,15 @@ An isolated disposable workspace was used to verify the complete live workflow:
 
 The weekly report wording now uses `assessed posts` because reports include both
 original and collaborative posts.
+
+### Connector and scoring guidance
+
+- Removed `linkedin_oauth` from the application and database connector options
+  because the required LinkedIn member-post access is not available for this use case.
+- Existing OAuth selections migrate to the unconfigured `fallback` boundary.
+- Added in-product explanations for volume weight, quality weight, the final-score
+  formula, rolling analysis duration, mock test data, fallback collection, and the
+  future third-party API/Apify path.
 
 ## Deployment Notes
 
