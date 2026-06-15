@@ -54,17 +54,19 @@ class MockConnector implements LinkedInConnector {
 }
 
 class EmptyConnector implements LinkedInConnector {
-  async fetchActivities() {
-    return [];
+  constructor(private readonly provider: LinkedInConnectorSource) {}
+
+  async fetchActivities(): Promise<FetchedLinkedInActivity[]> {
+    throw new Error(`${this.provider.replaceAll("_", " ")} collection is not configured yet.`);
   }
 }
 
 export function getLinkedInConnector(provider: LinkedInConnectorSource): LinkedInConnector {
-  return provider === "mock" ? new MockConnector() : new EmptyConnector();
+  return provider === "mock" ? new MockConnector() : new EmptyConnector(provider);
 }
 
 export function classifyLinkedInActivity(activity: FetchedLinkedInActivity): LinkedInActivityType {
   const type = (activity.rawPayload as { type?: string } | null)?.type;
-  if (type === "original_post" || type === "repost" || type === "comment" || type === "reaction") return type;
+  if (type === "original_post" || type === "collaborative_post" || type === "repost" || type === "comment" || type === "reaction") return type;
   return activity.text?.trim() ? "unknown" : "reaction";
 }

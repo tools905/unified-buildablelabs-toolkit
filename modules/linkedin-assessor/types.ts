@@ -35,7 +35,9 @@ export const linkedinArchetypes = [
 export type LinkedInMemberRole = (typeof linkedinMemberRoles)[number];
 export type LinkedInConnectorSource = (typeof linkedinConnectors)[number];
 export type LinkedInArchetype = (typeof linkedinArchetypes)[number];
-export type LinkedInActivityType = "original_post" | "repost" | "comment" | "reaction" | "unknown";
+export type LinkedInActivityType = "original_post" | "collaborative_post" | "repost" | "comment" | "reaction" | "unknown";
+export type LinkedInPostKind = "original_post" | "collaborative_post";
+export type LinkedInIngestionSource = "connector" | "manual" | "browser_extension";
 
 export type LinkedInTrackedMember = {
   id: string;
@@ -90,6 +92,8 @@ export type LinkedInMemberStats = {
   qualityWeight: number;
   averageQualityScore: number | null;
   finalScore: number | null;
+  bestPostId: string | null;
+  weakestPostId: string | null;
   trend: "improving" | "stable" | "declining" | "insufficient_data";
   topStrengths: string[];
   improvementFocus: string[];

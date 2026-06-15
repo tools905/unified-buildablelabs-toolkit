@@ -3,10 +3,14 @@ import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { LinkedInMemberTable } from "@/components/linkedin-assessor/member-table";
 import { LinkedInScoreOverview } from "@/components/linkedin-assessor/score-overview";
+import { ManualPostForm } from "@/components/linkedin-assessor/manual-post-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLinkedInDashboardData } from "@/modules/linkedin-assessor";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { getLinkedInDashboardData, linkedinMemberRoles } from "@/modules/linkedin-assessor";
 import { requireLinkedInContext } from "@/modules/linkedin-assessor/context";
+import { connectOwnLinkedInProfileAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +37,11 @@ export default async function LinkedInAssessorPage() {
         <CardHeader><CardTitle>{admin ? "Team performance" : "My LinkedIn insights"}</CardTitle><CardDescription>Volume and quality are combined using each tracked profile&apos;s configured weights.</CardDescription></CardHeader>
         <CardContent><LinkedInMemberTable stats={data.stats} linkMembers={admin} /></CardContent>
       </Card>
-      {!admin && data.stats.length === 0 ? <Card className="mt-6"><CardHeader><CardTitle>No linked LinkedIn profile</CardTitle><CardDescription>Ask an admin to link your toolkit account to a tracked LinkedIn profile.</CardDescription></CardHeader></Card> : null}
+      {!admin && data.posts.length > 0 ? <div className="mt-6 space-y-4"><h2 className="text-xl font-semibold">My post coaching</h2>{data.posts.map((post) => <Card key={post.id}><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="text-base">{new Date(post.postedAt).toLocaleDateString()}</CardTitle><CardDescription>{post.postKind.replaceAll("_", " ")} · {post.archetype.replaceAll("_", " ")}</CardDescription></div><span className="text-2xl font-semibold">{post.score ?? "N/A"}</span></div></CardHeader><CardContent><p className="text-sm leading-6">{post.text}</p>{post.summary ? <p className="mt-3 text-sm text-muted-foreground">{post.summary}</p> : null}<div className="mt-4 grid gap-4 md:grid-cols-3"><CoachingList title="Strengths" items={post.strengths} /><CoachingList title="Weaknesses" items={post.weaknesses} /><CoachingList title="Next improvements" items={post.suggestions} /></div>{post.url ? <a href={post.url} target="_blank" rel="noreferrer" className="mt-4 inline-block text-sm text-muted-foreground hover:underline">Open post on LinkedIn</a> : null}</CardContent></Card>)}</div> : null}
+      {!admin && data.stats.length === 0 ? <Card className="mt-6"><CardHeader><CardTitle>Connect my profile</CardTitle><CardDescription>Create your tracked profile using the workspace defaults. Automated account authorization will be connected during the fetch-provider phase.</CardDescription></CardHeader><CardContent><form action={connectOwnLinkedInProfileAction} className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="name">Display name</Label><Input id="name" name="name" required /></div><div className="space-y-2"><Label htmlFor="memberRole">Role</Label><select id="memberRole" name="memberRole" defaultValue="other" className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm">{linkedinMemberRoles.map((role) => <option key={role} value={role}>{role.replaceAll("_", " ")}</option>)}</select></div><div className="space-y-2 sm:col-span-2"><Label htmlFor="linkedinProfileUrl">LinkedIn profile URL</Label><Input id="linkedinProfileUrl" name="linkedinProfileUrl" placeholder="linkedin.com/in/profile" required /></div><div className="sm:col-span-2"><Button>Connect profile</Button></div></form></CardContent></Card> : null}
+      {!admin && data.stats.length > 0 && data.settings?.member_submissions_enabled !== false ? <Card className="mt-6"><CardHeader><CardTitle>Submit a missing post</CardTitle><CardDescription>Use this fallback when an original or collaborative post was not collected automatically.</CardDescription></CardHeader><CardContent><ManualPostForm members={data.members.map((member) => ({ id: member.id, name: member.name }))} memberId={data.members[0]?.id} /></CardContent></Card> : null}
     </AppShell>
   );
 }
+
+function CoachingList({ title, items }: { title: string; items: string[] }) { return <section><h3 className="mb-2 text-sm font-medium">{title}</h3><ul className="space-y-1 text-sm text-muted-foreground">{items.length ? items.map((item) => <li key={item}>{item}</li>) : <li>No signal available.</li>}</ul></section>; }

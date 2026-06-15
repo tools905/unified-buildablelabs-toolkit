@@ -1,15 +1,18 @@
 import { differenceInCalendarDays } from "date-fns";
 import type { LinkedInMemberStats, LinkedInPostScore, LinkedInTrackedMember } from "./types";
 
-type AnalyticsScore = Pick<
-  LinkedInPostScore,
-  "total_score" | "archetype" | "strengths" | "weaknesses"
->;
+type AnalyticsScore = LinkedInPostScore;
 
 type ScoredPost = {
   id: string;
   posted_at: string;
   linkedin_post_scores?: AnalyticsScore | AnalyticsScore[] | null;
+  linkedin_score_overrides?: Array<{
+    total_score: number | null;
+    archetype: string | null;
+    exclude_from_quality_average: boolean;
+    created_at: string;
+  }> | null;
 };
 
 function one<T>(value: T | T[] | null | undefined) {
@@ -26,7 +29,19 @@ export function calculateLinkedInMemberStats(input: {
   startDate: Date;
   endDate: Date;
 }): LinkedInMemberStats {
-  const scored = input.posts.map((post) => ({ ...post, score: one(post.linkedin_post_scores) })).filter((post) => post.score);
+  const scored = input.posts.map((post) => {
+    const original = one(post.linkedin_post_scores);
+    const override = [...(post.linkedin_score_overrides ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    if (!original || override?.exclude_from_quality_average) return { ...post, score: null };
+    return {
+      ...post,
+      score: {
+        ...original,
+        total_score: override?.total_score ?? original.total_score,
+        archetype: override?.archetype ?? original.archetype,
+      },
+    };
+  }).filter((post) => post.score);
   const days = Math.max(1, differenceInCalendarDays(input.endDate, input.startDate) + 1);
   const periodTarget = input.member.monthly_post_target * (days / 30);
   const volumeScore = Math.min(input.posts.length / periodTarget, 1) * 100;
@@ -51,6 +66,7 @@ export function calculateLinkedInMemberStats(input: {
   const second = scored.filter((post) => new Date(post.posted_at).getTime() > midpoint);
   const average = (items: typeof scored) => items.length ? items.reduce((sum, post) => sum + Number(post.score?.total_score ?? 0), 0) / items.length : 0;
   const trend = scored.length < 4 ? "insufficient_data" : average(second) >= average(first) + 5 ? "improving" : average(second) <= average(first) - 5 ? "declining" : "stable";
+  const ranked = [...scored].sort((a, b) => Number(b.score?.total_score ?? 0) - Number(a.score?.total_score ?? 0));
   return {
     trackedMemberId: input.member.id,
     name: input.member.name,
@@ -65,6 +81,8 @@ export function calculateLinkedInMemberStats(input: {
     qualityWeight: Number(input.member.quality_weight),
     averageQualityScore: rounded(averageQuality),
     finalScore: rounded(finalScore),
+    bestPostId: ranked[0]?.id ?? null,
+    weakestPostId: ranked.at(-1)?.id ?? null,
     trend,
     topStrengths: top(strengths),
     improvementFocus: top(weaknesses),

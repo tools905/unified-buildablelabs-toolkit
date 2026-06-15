@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { linkedinConnectors, linkedinMemberRoles } from "./types";
+import { linkedinArchetypes, linkedinConnectors, linkedinMemberRoles } from "./types";
 
 export function normalizeLinkedInProfileUrl(input: string) {
   const trimmed = input.trim();
@@ -48,8 +48,36 @@ export const linkedinSettingsSchema = z
     connectorPreference: z.enum(linkedinConnectors),
     weeklyReportsEnabled: z.coerce.boolean(),
     memberInsightsEnabled: z.coerce.boolean(),
+    memberSubmissionsEnabled: z.coerce.boolean(),
+    analysisWindowDays: z.coerce.number().int().min(7).max(365),
   })
   .refine((value) => Math.abs(value.volumeWeight + value.qualityWeight - 1) < 0.001, {
     message: "Volume and quality weights must total 1.",
     path: ["qualityWeight"],
   });
+
+export const linkedinManualPostSchema = z.object({
+  trackedMemberId: z.string().uuid(),
+  postUrl: z.string().trim().url().refine((value) => {
+    const host = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+    return host === "linkedin.com" || host.endsWith(".linkedin.com");
+  }, "Use a LinkedIn post URL."),
+  postText: z.string().trim().min(20).max(15000),
+  postedAt: z.coerce.date(),
+  postKind: z.enum(["original_post", "collaborative_post"]),
+  collaborationContext: z.string().trim().max(1000).optional().or(z.literal("")),
+});
+
+export const linkedinSelfProfileSchema = z.object({
+  name: z.string().trim().min(1),
+  memberRole: z.enum(linkedinMemberRoles),
+  linkedinProfileUrl: z.string().min(1).transform(normalizeLinkedInProfileUrl),
+});
+
+export const linkedinScoreOverrideSchema = z.object({
+  postId: z.string().uuid(),
+  totalScore: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
+  archetype: z.enum(linkedinArchetypes).optional().or(z.literal("")),
+  adminNotes: z.string().trim().max(2000).optional().or(z.literal("")),
+  excludeFromQualityAverage: z.coerce.boolean(),
+});

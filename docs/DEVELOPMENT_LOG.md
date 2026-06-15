@@ -390,6 +390,62 @@ test: passed, 5 files / 19 tests
 build: passed
 ```
 
+## LinkedIn Assessor Functionality Expansion
+
+### Data model and access controls
+
+- Added migration `012_linkedin_assessor_functionality.sql`.
+- Added a configurable rolling analysis duration from 7 to 365 days.
+- Added workspace control for member-submitted posts.
+- Added `collaborative_post` as an assessable activity type.
+- Added post provenance for connector, manual, and browser-extension ingestion.
+- Added submitter and collaboration-context metadata to posts.
+- Tightened member post, activity, and score RLS so disabling member insights is
+  enforced by Postgres as well as the application UI.
+
+### Analytics and service behavior
+
+- Made unconfigured production connectors fail visibly instead of recording a
+  misleading successful sync with zero activities.
+- Added collaborative posts to connector classification and persistence.
+- Added direct manual/browser-extension post ingestion with workspace and member
+  ownership checks.
+- Added effective-score calculation using the latest admin override, including
+  exclusion from quality averages.
+- Restored best-post and weakest-post analytics from the standalone assessor.
+- Fixed weekly reports so their calculations use the report's actual seven-day
+  period and disabled workspaces are skipped.
+- Connected rolling-window and member-submission settings to the service layer.
+
+### Admin and member workflows
+
+- Added a live 7-365 day analysis-duration slider.
+- Applied workspace defaults when admins or members create tracked profiles.
+- Added member self-connection for a LinkedIn profile.
+- Added manual missing-post submission for admins and linked members, including
+  original/collaborative classification and immediate scoring.
+- Restored full member score breakdowns, best/weakest post markers, editable
+  profile settings, pause/resume/archive controls, and per-profile sync history.
+- Added detailed post score components, AI provider metadata, LinkedIn links,
+  score correction, archetype override, admin notes, and quality exclusion.
+- Added recent sync diagnostics to the admin dashboard.
+- Expanded weekly reports from one-line summaries to stored member breakdowns.
+
+### Scoring reliability
+
+- Restored the standalone assessor's 85% common / 15% role-sensitive scoring
+  philosophy and added explicit guidance for each member role.
+- Added scoring-version persistence for future rubric/model migrations.
+- Made repeat manual submissions update and rescore the existing post instead of
+  failing on the unique LinkedIn URL constraint.
+- Added scoring-job logs with provider usage so deterministic fallbacks are visible
+  to administrators.
+- Enforced member-submission enablement in the service layer, not only in the UI.
+- Added private post-by-post member coaching with summaries, strengths, weaknesses,
+  improvements, and source-post links.
+- Added score-schema validation that rejects AI totals which do not match the
+  component rubric before falling back to deterministic scoring.
+
 ## Deployment Notes
 
 Configure these in Vercel, not in Git:
