@@ -446,6 +446,27 @@ build: passed
 - Added score-schema validation that rejects AI totals which do not match the
   component rubric before falling back to deterministic scoring.
 
+### Live Supabase verification
+
+Migration `012_linkedin_assessor_functionality.sql` was applied to the configured
+Supabase project and confirmed in remote migration history.
+
+An isolated disposable workspace was used to verify the complete live workflow:
+
+- admin and linked-member manual submissions;
+- collaborative-post persistence and duplicate URL updates;
+- mock connector collection and activity exclusion;
+- AI or deterministic scoring, rescoring, and provider logs;
+- rolling 45-day dashboard analytics;
+- score overrides and quality-average exclusions;
+- previous-week report generation with original and collaborative posts;
+- member RLS visibility when insights are enabled and hidden results when disabled;
+- service-layer blocking when member submissions are disabled; and
+- cascade cleanup of all disposable test records and the temporary auth user.
+
+The weekly report wording now uses `assessed posts` because reports include both
+original and collaborative posts.
+
 ## Deployment Notes
 
 Configure these in Vercel, not in Git:

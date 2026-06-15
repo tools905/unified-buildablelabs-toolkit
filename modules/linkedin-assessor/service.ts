@@ -400,7 +400,7 @@ export async function generateLinkedInWeeklyReports(options?: { workspaceId?: st
     if (settings?.weekly_reports_enabled === false) continue;
     const data = await getLinkedInDashboardData(supabase, workspace.id, { startDate, endDate });
     const summary = summarizeLinkedInStats(data.stats);
-    const reportSummary = `${summary.totalPosts} original posts with an average quality score of ${summary.averageQuality ?? "N/A"}. Most active: ${summary.mostActiveMember ?? "N/A"}. Focus: ${summary.recommendedFocus}`;
+    const reportSummary = `${summary.totalPosts} assessed posts with an average quality score of ${summary.averageQuality ?? "N/A"}. Most active: ${summary.mostActiveMember ?? "N/A"}. Focus: ${summary.recommendedFocus}`;
     const { data: report, error: reportError } = await supabase.from("linkedin_weekly_reports").upsert({ workspace_id: workspace.id, start_date: startDate.toISOString(), end_date: endDate.toISOString(), report_json: { summary, members: data.stats }, report_summary: reportSummary }, { onConflict: "workspace_id,start_date,end_date" }).select("id").single();
     if (reportError) throw reportError;
     reportIds.push(report.id);
