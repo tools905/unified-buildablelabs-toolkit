@@ -645,3 +645,17 @@ LinkedIn post scoring now makes writing-quality parameters more explicit.
 - Updated the admin settings explainer to document the full post quality rubric.
 - Applied migration `015_linkedin_hashtag_score.sql` to Supabase and verified the
   `linkedin_post_scores.hashtag_score` column is present.
+
+Smoke verification:
+
+- Created temporary LinkedIn tracked profiles for Nitai and Aditi in Supabase.
+- Submitted one original post and one collaborative post through the manual
+  submission data path.
+- Scored both posts with the current rubric, including hook, hashtag,
+  originality, and writing-quality dimensions.
+- Verified dashboard summary and member statistics were calculated from the
+  submitted posts.
+- Verified the private coaching notification log path without sending real
+  emails.
+- Removed the temporary tracked profiles, posts, scores, activities, and
+  notification logs after the smoke test.
