@@ -14,8 +14,8 @@ import {
   linkedinSelfProfileSchema,
   linkedinTrackedMemberSchema,
   linkedinWindowSchema,
+  scoreLinkedInPostById,
   scoreUnscoredLinkedInPosts,
-  syncLinkedInMembers,
   submitLinkedInPost,
   updateLinkedInTrackedMember,
   upsertLinkedInSettings,
@@ -43,7 +43,6 @@ export async function createTrackedMemberAction(formData: FormData) {
     monthlyPostTarget: parsed.monthlyPostTarget,
     volumeWeight: parsed.volumeWeight,
     qualityWeight: parsed.qualityWeight,
-    connectorPreference: parsed.connectorPreference,
   });
   redirect(`/tools/linkedin-assessor/admin/members/${member.id}`);
 }
@@ -53,12 +52,6 @@ export async function setTrackedMemberStatusAction(formData: FormData) {
   const memberId = String(formData.get("memberId"));
   const status = String(formData.get("status"));
   await updateLinkedInTrackedMember(supabase, workspace.id, memberId, { tracking_status: status === "archived" ? "paused" : status, is_active: status !== "archived" }, user.id);
-  refreshLinkedIn();
-}
-
-export async function syncLinkedInAction(formData: FormData) {
-  const { workspace } = await requireLinkedInAdmin();
-  await syncLinkedInMembers({ workspaceId: workspace.id, memberId: String(formData.get("memberId") || "") || undefined });
   refreshLinkedIn();
 }
 
@@ -100,7 +93,6 @@ export async function updateTrackedMemberAction(formData: FormData) {
     monthly_post_target: parsed.monthlyPostTarget,
     volume_weight: parsed.volumeWeight,
     quality_weight: parsed.qualityWeight,
-    connector_preference: parsed.connectorPreference,
   }, user.id);
   refreshLinkedIn();
 }
@@ -108,14 +100,14 @@ export async function updateTrackedMemberAction(formData: FormData) {
 export async function submitLinkedInPostAction(formData: FormData) {
   const { user, workspace, admin } = await requireLinkedInContext();
   const parsed = linkedinManualPostSchema.parse(Object.fromEntries(formData));
-  await submitLinkedInPost({
+  const post = await submitLinkedInPost({
     workspaceId: workspace.id,
     actorId: user.id,
     admin,
     ...parsed,
     collaborationContext: parsed.collaborationContext || null,
   });
-  await scoreUnscoredLinkedInPosts({ workspaceId: workspace.id });
+  await scoreLinkedInPostById({ workspaceId: workspace.id, postId: post.id, notifyMember: true });
   refreshLinkedIn();
 }
 

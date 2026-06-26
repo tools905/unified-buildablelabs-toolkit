@@ -73,7 +73,6 @@ export function calculateLinkedInMemberStats(input: {
     role: input.member.member_role,
     linkedinProfileUrl: input.member.linkedin_profile_url,
     trackingStatus: input.member.tracking_status,
-    lastSyncAt: input.member.last_sync_at,
     postCount: input.posts.length,
     periodTarget: rounded(periodTarget) ?? 0,
     volumeScore: rounded(volumeScore) ?? 0,

@@ -67,7 +67,7 @@ export async function scoreLinkedInPost(input: { postText: string; memberRole: s
       return { score: linkedinPostScoreSchema.parse(result.data), provider: result.provider, model: result.model };
     }
   } catch {
-    // The deterministic scorer keeps sync jobs useful when external AI is unavailable.
+    // The deterministic scorer keeps background scoring useful when external AI is unavailable.
   }
   return { score: createDeterministicLinkedInScore(input), provider: "deterministic", model: "local-v1" };
 }

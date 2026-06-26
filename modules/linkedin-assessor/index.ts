@@ -1,5 +1,4 @@
 export * from "./analytics";
-export * from "./connectors";
 export * from "./fallback-scoring";
 export * from "./scoring";
 export * from "./service";

@@ -11,8 +11,9 @@ export function generateFullPeerAssignments(
   members: AssignmentMember[],
   options: { allowSmallTeam?: boolean } = {},
 ): GeneratedAssignment[] {
-  if (!options.allowSmallTeam && members.length < 3) {
-    throw new Error("At least 3 active project members are required.");
+  const minimumMembers = options.allowSmallTeam ? 1 : 2;
+  if (members.length < minimumMembers) {
+    throw new Error(`At least ${minimumMembers} active project members are required.`);
   }
 
   const sorted = [...members].sort((a, b) => a.userId.localeCompare(b.userId));

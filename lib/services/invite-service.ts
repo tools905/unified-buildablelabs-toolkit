@@ -5,6 +5,7 @@ import type { WorkspaceRole } from "@/lib/db/types";
 import { sendInviteEmail as sendInvite } from "@/lib/services/email-service";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAppUrl } from "@/lib/utils/app-url";
 
 export async function createInvite(
   supabase: SupabaseClient<any>,
@@ -35,7 +36,7 @@ export async function createInvite(
 
   if (error) throw error;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const emailResult = await sendInvite(supabase, {
     to: data.email,
     workspaceName: data.workspaces?.name ?? "your workspace",

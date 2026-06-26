@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { requireUser } from "@/lib/auth/require-user";
 import { getProject } from "@/lib/services/project-service";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { getRoundProgress, startReviewRound } from "@/lib/services/round-service";
+import { getRoundProgressMap, startReviewRound } from "@/lib/services/round-service";
 
 export default async function ProjectPage({
   params,
@@ -22,13 +22,9 @@ export default async function ProjectPage({
   const project = await getProject(supabase, projectId);
   const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
   if (!admin || project.workspace_id !== workspace.id) notFound();
-  const roundProgress = Object.fromEntries(
-    await Promise.all(
-      (project.review_rounds ?? []).map(async (round) => [
-        round.id,
-        await getRoundProgress(supabase, round.id),
-      ]),
-    ),
+  const roundProgress = await getRoundProgressMap(
+    supabase,
+    (project.review_rounds ?? []).map((round) => round.id),
   );
 
   async function startAction(formData: FormData) {

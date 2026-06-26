@@ -41,7 +41,7 @@ export async function createProject(
     .insert(members);
   if (memberError) throw memberError;
 
-  await generatePlannedRounds(supabase, project.id);
+  await insertPlannedRounds(supabase, project);
   await writeAuditLog(supabase, {
     workspaceId,
     actorId: createdBy,
@@ -80,7 +80,7 @@ export async function getProject(
 ) {
   const { data, error } = await supabase
     .from("projects")
-    .select("*, project_members(*, profiles(*)), review_rounds(*)")
+    .select("*, project_members(id, user_id, role_label, is_active, profiles(id, full_name, email)), review_rounds(id, title, round_number, status, scheduled_start_at, started_at, due_at, completed_at, closed_at)")
     .eq("id", projectId)
     .single();
   if (error) throw error;
@@ -93,7 +93,7 @@ export async function listProjects(
 ) {
   const { data, error } = await supabase
     .from("projects")
-    .select("*, review_rounds(*)")
+    .select("id, name, description, status, cadence, created_at, review_rounds(id)")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -123,10 +123,23 @@ export async function generatePlannedRounds(
     .single();
   if (error) throw error;
 
+  return insertPlannedRounds(supabase, project);
+}
+
+async function insertPlannedRounds(
+  supabase: SupabaseClient<any>,
+  project: {
+    id: string;
+    start_date: string;
+    end_date: string;
+    cadence: string;
+    review_due_hours: number;
+  },
+) {
   const planned = generatePlannedRoundsFromDates(
     new Date(project.start_date),
     new Date(project.end_date),
-    project.cadence,
+    project.cadence as ProjectInput["cadence"],
     project.review_due_hours,
   );
 
@@ -136,7 +149,7 @@ export async function generatePlannedRounds(
     .from("review_rounds")
     .upsert(
       planned.map((round) => ({
-        project_id: projectId,
+        project_id: project.id,
         title: round.title,
         round_number: round.roundNumber,
         scheduled_start_at: round.scheduledStartAt.toISOString(),

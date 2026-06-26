@@ -14,6 +14,6 @@ export function ManualPostForm({ members, memberId }: { members: MemberOption[];
     <div className="space-y-2"><Label htmlFor="postedAt">Published date</Label><Input id="postedAt" name="postedAt" type="date" required /></div>
     <div className="space-y-2"><Label htmlFor="collaborationContext">Collaboration context</Label><Input id="collaborationContext" name="collaborationContext" placeholder="Co-author or collaboration details" /></div>
     <div className="space-y-2 sm:col-span-2"><Label htmlFor="postText">Post text</Label><Textarea id="postText" name="postText" rows={8} minLength={20} placeholder="Paste the complete LinkedIn post text." required /></div>
-    <div className="sm:col-span-2"><Button>Submit and score post</Button></div>
+    <div className="sm:col-span-2"><Button>Submit post</Button></div>
   </form>;
 }

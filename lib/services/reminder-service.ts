@@ -4,9 +4,8 @@ import {
   sendAdminOverdueSummaryEmail,
   sendReviewReminderEmail,
 } from "@/lib/services/email-service";
+import { getAppUrl } from "@/lib/utils/app-url";
 import { one } from "@/lib/utils/relations";
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function sendPendingReviewReminders(
   supabase: SupabaseClient<any>,
@@ -27,13 +26,20 @@ export async function sendPendingReviewReminders(
 
   let sent = 0;
   const now = new Date();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
+  const grouped = new Map<string, typeof assignments>();
 
   for (const assignment of assignments ?? []) {
     const lastReminded = assignment.last_reminded_at
       ? new Date(assignment.last_reminded_at)
       : null;
     if (lastReminded && differenceInHours(now, lastReminded) < 24) continue;
+    const key = `${assignment.round_id}:${assignment.reviewer_id}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), assignment]);
+  }
+
+  for (const group of grouped.values()) {
+    const assignment = group[0];
     const reviewer = one(assignment.reviewer);
     const project = one(assignment.review_rounds?.projects);
     if (!reviewer?.email || !project) continue;
@@ -42,7 +48,7 @@ export async function sendPendingReviewReminders(
       to: reviewer.email,
       projectName: project.name,
       roundTitle: assignment.review_rounds.title,
-      pendingCount: 1,
+      pendingCount: group.length,
       dueAt: new Date(assignment.review_rounds.due_at).toLocaleString(),
       url: `${appUrl}/tools/peer-review/member`,
       workspaceId: project.workspace_id,
@@ -53,12 +59,11 @@ export async function sendPendingReviewReminders(
     await supabase
       .from("review_assignments")
       .update({
-        reminder_count: assignment.reminder_count + 1,
+        reminder_count: Math.max(...group.map((item) => item.reminder_count)) + 1,
         last_reminded_at: now.toISOString(),
       })
-      .eq("id", assignment.id);
+      .in("id", group.map((item) => item.id));
     sent += 1;
-    await delay(600);
   }
 
   return sent;
@@ -99,7 +104,7 @@ export async function sendAdminOverdueSummaries(
   if (error) throw error;
 
   let sent = 0;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
 
   for (const round of rounds ?? []) {
     const { data: assignments } = await supabase
@@ -121,9 +126,9 @@ export async function sendAdminOverdueSummaries(
       ),
     ];
 
-    for (const admin of admins ?? []) {
+    await Promise.all((admins ?? []).map(async (admin) => {
       const profile = one(admin.profiles);
-      if (!profile?.email) continue;
+      if (!profile?.email) return;
       await sendAdminOverdueSummaryEmail(supabase, {
         to: profile.email,
         projectName: round.projects?.name ?? "Peer review project",
@@ -136,8 +141,7 @@ export async function sendAdminOverdueSummaries(
         roundId: round.id,
       });
       sent += 1;
-      await delay(600);
-    }
+    }));
   }
 
   return sent;

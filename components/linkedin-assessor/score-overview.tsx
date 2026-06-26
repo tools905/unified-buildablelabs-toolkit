@@ -5,7 +5,7 @@ export function LinkedInScoreOverview({ stats }: { stats: LinkedInMemberStats[] 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
-        <CardHeader><CardTitle className="text-base">Original posts by member</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Submitted posts by member</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {stats.map((member) => <MetricBar key={member.trackedMemberId} label={member.name} value={member.postCount} maximum={Math.max(1, ...stats.map((item) => item.postCount))} suffix=" posts" />)}
           {stats.length === 0 ? <p className="text-sm text-muted-foreground">Add a tracked member to begin.</p> : null}
@@ -15,7 +15,7 @@ export function LinkedInScoreOverview({ stats }: { stats: LinkedInMemberStats[] 
         <CardHeader><CardTitle className="text-base">Final score</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {stats.map((member) => <MetricBar key={member.trackedMemberId} label={member.name} value={member.finalScore ?? 0} maximum={100} suffix={member.finalScore == null ? " N/A" : ""} />)}
-          {stats.length === 0 ? <p className="text-sm text-muted-foreground">Scores appear after posts are synced and analyzed.</p> : null}
+          {stats.length === 0 ? <p className="text-sm text-muted-foreground">Scores appear after members manually submit posts.</p> : null}
         </CardContent>
       </Card>
     </div>

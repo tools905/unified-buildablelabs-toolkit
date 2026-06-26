@@ -2,9 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateAssignments } from "@/lib/services/assignment-service";
 import { sendReportReadyEmail, sendRoundStartedEmail } from "@/lib/services/email-service";
 import { writeAuditLog } from "@/lib/services/audit-service";
+import { getAppUrl } from "@/lib/utils/app-url";
 import { one } from "@/lib/utils/relations";
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function startReviewRound(
   supabase: SupabaseClient<any>,
@@ -65,7 +64,7 @@ export async function startReviewRound(
     .select("*")
     .in("id", reviewerIds);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const { count: startEmailCount } = await supabase
     .from("notification_logs")
     .select("id", { count: "exact", head: true })
@@ -74,8 +73,8 @@ export async function startReviewRound(
     .eq("status", "sent");
 
   if (assignments.length > 0 && !startEmailCount) {
-    for (const reviewer of reviewers ?? []) {
-      await sendRoundStartedEmail(supabase, {
+    await Promise.all((reviewers ?? []).map((reviewer) =>
+      sendRoundStartedEmail(supabase, {
         to: reviewer.email,
         projectName: updated.projects?.name ?? "Peer review project",
         reviewCount: assignments.filter((a) => a.reviewer_id === reviewer.id).length,
@@ -84,9 +83,8 @@ export async function startReviewRound(
         workspaceId: updated.projects?.workspace_id ?? "",
         projectId: updated.project_id,
         roundId: updated.id,
-      });
-      await delay(600);
-    }
+      }),
+    ));
   }
 
   await writeAuditLog(supabase, {
@@ -146,9 +144,9 @@ async function notifyReportReady(
     .select("profiles(*)")
     .eq("workspace_id", round.projects?.workspace_id ?? "")
     .eq("role", "admin");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
 
-  for (const admin of admins ?? []) {
+  await Promise.all((admins ?? []).map(async (admin) => {
     const profile = one(admin.profiles);
     if (profile?.email) {
       await sendReportReadyEmail(supabase, {
@@ -161,9 +159,8 @@ async function notifyReportReady(
         projectId: round.project_id,
         roundId: round.id,
       });
-      await delay(600);
     }
-  }
+  }));
 }
 
 export async function getRoundProgress(
@@ -196,6 +193,43 @@ export async function getRoundProgress(
     completionRate: total === 0 ? 0 : Math.round((submitted / total) * 100),
     missingReviewers,
   };
+}
+
+export async function getRoundProgressMap(
+  supabase: SupabaseClient<any>,
+  roundIds: string[],
+) {
+  if (roundIds.length === 0) return {};
+
+  const { data: assignments, error } = await supabase
+    .from("review_assignments")
+    .select("round_id,status,reviewer_id,reviewer:profiles!review_assignments_reviewer_id_fkey(*)")
+    .in("round_id", roundIds);
+  if (error) throw error;
+
+  return Object.fromEntries(roundIds.map((roundId) => {
+    const roundAssignments = (assignments ?? []).filter((assignment) => assignment.round_id === roundId);
+    const total = roundAssignments.length;
+    const submitted = roundAssignments.filter((assignment) => assignment.status === "submitted").length;
+    const overdue = roundAssignments.filter((assignment) => assignment.status === "overdue").length;
+    const pending = total - submitted - overdue;
+    const missingReviewers = [
+      ...new Map(
+        roundAssignments
+          .filter((assignment) => assignment.status !== "submitted")
+          .map((assignment) => [assignment.reviewer_id, one(assignment.reviewer)]),
+      ).values(),
+    ];
+
+    return [roundId, {
+      total,
+      submitted,
+      overdue,
+      pending,
+      completionRate: total === 0 ? 0 : Math.round((submitted / total) * 100),
+      missingReviewers,
+    }];
+  }));
 }
 
 export async function cancelRound(

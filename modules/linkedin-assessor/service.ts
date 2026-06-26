@@ -4,10 +4,10 @@ import { endOfWeek, startOfWeek, subDays, subWeeks } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/services/audit-service";
+import { sendLinkedInPostSummaryEmail } from "@/lib/services/email-service";
 import { calculateLinkedInMemberStats, summarizeLinkedInStats } from "./analytics";
-import { classifyLinkedInActivity, getLinkedInConnector, type FetchedLinkedInActivity } from "./connectors";
 import { LINKEDIN_SCORING_VERSION, scoreLinkedInPost } from "./scoring";
-import type { LinkedInConnectorSource, LinkedInPostKind, LinkedInTrackedMember } from "./types";
+import type { LinkedInPostKind, LinkedInPostScore, LinkedInTrackedMember } from "./types";
 
 export async function getLinkedInDashboardData(
   supabase: SupabaseClient<any>,
@@ -24,7 +24,7 @@ export async function getLinkedInDashboardData(
   const [{ data: members, error: memberError }, { data: windows }, { data: settings }] = await Promise.all([
     memberQuery,
     supabase.from("linkedin_analysis_windows").select("id, name, start_date, end_date").eq("workspace_id", workspaceId).order("start_date", { ascending: false }).limit(10),
-    supabase.from("linkedin_settings").select("default_monthly_post_target, default_volume_weight, default_quality_weight, connector_preference, weekly_reports_enabled, member_insights_enabled, member_submissions_enabled, analysis_window_days").eq("workspace_id", workspaceId).maybeSingle(),
+    supabase.from("linkedin_settings").select("default_monthly_post_target, default_volume_weight, default_quality_weight, weekly_reports_enabled, member_insights_enabled, member_submissions_enabled, analysis_window_days").eq("workspace_id", workspaceId).maybeSingle(),
   ]);
   if (memberError) throw memberError;
   const endDate = options?.endDate ?? new Date();
@@ -56,10 +56,14 @@ export async function getLinkedInDashboardData(
   const { data: posts, error: postError } = postResult;
   if (postError) throw postError;
   const typedMembers = (members ?? []) as LinkedInTrackedMember[];
+  const postsByMember = new Map<string, typeof posts>();
+  for (const post of posts ?? []) {
+    postsByMember.set(post.tracked_member_id, [...(postsByMember.get(post.tracked_member_id) ?? []), post]);
+  }
   const stats = typedMembers.map((member) =>
     calculateLinkedInMemberStats({
       member,
-      posts: (posts ?? []).filter((post) => post.tracked_member_id === member.id),
+      posts: postsByMember.get(member.id) ?? [],
       startDate: new Date(activeWindow.start_date),
       endDate: new Date(activeWindow.end_date),
     }),
@@ -113,7 +117,6 @@ export async function createLinkedInTrackedMember(
     monthlyPostTarget: number;
     volumeWeight: number;
     qualityWeight: number;
-    connectorPreference: string;
   },
 ) {
   const { data, error } = await supabase.from("linkedin_tracked_members").insert({
@@ -126,7 +129,6 @@ export async function createLinkedInTrackedMember(
     monthly_post_target: input.monthlyPostTarget,
     volume_weight: input.volumeWeight,
     quality_weight: input.qualityWeight,
-    connector_preference: input.connectorPreference,
     created_by: input.actorId,
   }).select("*").single();
   if (error) throw error;
@@ -145,7 +147,7 @@ export async function createSelfLinkedInTrackedMember(input: {
   const supabase = createAdminClient();
   const { data: existing } = await supabase.from("linkedin_tracked_members").select("id").eq("workspace_id", input.workspaceId).eq("profile_id", input.actorId).maybeSingle();
   if (existing) throw new Error("Your toolkit account already has a LinkedIn profile.");
-  const { data: settings } = await supabase.from("linkedin_settings").select("default_monthly_post_target, default_volume_weight, default_quality_weight, connector_preference").eq("workspace_id", input.workspaceId).maybeSingle();
+  const { data: settings } = await supabase.from("linkedin_settings").select("default_monthly_post_target, default_volume_weight, default_quality_weight").eq("workspace_id", input.workspaceId).maybeSingle();
   return createLinkedInTrackedMember(supabase, {
     workspaceId: input.workspaceId,
     actorId: input.actorId,
@@ -157,7 +159,6 @@ export async function createSelfLinkedInTrackedMember(input: {
     monthlyPostTarget: Number(settings?.default_monthly_post_target ?? 12),
     volumeWeight: Number(settings?.default_volume_weight ?? 0.45),
     qualityWeight: Number(settings?.default_quality_weight ?? 0.55),
-    connectorPreference: settings?.connector_preference ?? "mock",
   });
 }
 
@@ -174,13 +175,12 @@ export async function createLinkedInAnalysisWindow(supabase: SupabaseClient<any>
   return data;
 }
 
-export async function upsertLinkedInSettings(supabase: SupabaseClient<any>, input: { workspaceId: string; monthlyPostTarget: number; volumeWeight: number; qualityWeight: number; connectorPreference: string; weeklyReportsEnabled: boolean; memberInsightsEnabled: boolean; memberSubmissionsEnabled: boolean; analysisWindowDays: number }) {
+export async function upsertLinkedInSettings(supabase: SupabaseClient<any>, input: { workspaceId: string; monthlyPostTarget: number; volumeWeight: number; qualityWeight: number; weeklyReportsEnabled: boolean; memberInsightsEnabled: boolean; memberSubmissionsEnabled: boolean; analysisWindowDays: number }) {
   const { data, error } = await supabase.from("linkedin_settings").upsert({
     workspace_id: input.workspaceId,
     default_monthly_post_target: input.monthlyPostTarget,
     default_volume_weight: input.volumeWeight,
     default_quality_weight: input.qualityWeight,
-    connector_preference: input.connectorPreference,
     weekly_reports_enabled: input.weeklyReportsEnabled,
     member_insights_enabled: input.memberInsightsEnabled,
     member_submissions_enabled: input.memberSubmissionsEnabled,
@@ -188,43 +188,6 @@ export async function upsertLinkedInSettings(supabase: SupabaseClient<any>, inpu
   }, { onConflict: "workspace_id" }).select("*").single();
   if (error) throw error;
   return data;
-}
-
-async function persistActivities(supabase: SupabaseClient<any>, trackedMemberId: string, activities: FetchedLinkedInActivity[]) {
-  let originalPostsStored = 0;
-  let excludedActivities = 0;
-  for (const activity of activities) {
-    const activityType = classifyLinkedInActivity(activity);
-    const { data: stored, error } = await supabase.from("linkedin_activities").upsert({
-      tracked_member_id: trackedMemberId,
-      external_id: activity.externalId,
-      linkedin_url: activity.url,
-      activity_type: activityType,
-      text_content: activity.text,
-      posted_at: activity.postedAt,
-      raw_payload: activity.rawPayload,
-      exclusion_reason: activityType === "original_post" ? null : `Excluded ${activityType} from original post count.`,
-    }, { onConflict: "tracked_member_id,external_id" }).select("id").single();
-    if (error) throw error;
-    if (activityType !== "original_post" && activityType !== "collaborative_post") {
-      excludedActivities += 1;
-      continue;
-    }
-    const { error: postError } = await supabase.from("linkedin_posts").upsert({
-      tracked_member_id: trackedMemberId,
-      activity_id: stored.id,
-      external_post_id: activity.externalId,
-      post_url: activity.url,
-      post_text: activity.text ?? "",
-      posted_at: activity.postedAt,
-      raw_payload: activity.rawPayload,
-      post_kind: activityType,
-      ingestion_source: "connector",
-    }, { onConflict: "tracked_member_id,external_post_id", ignoreDuplicates: true });
-    if (postError) throw postError;
-    originalPostsStored += 1;
-  }
-  return { originalPostsStored, excludedActivities };
 }
 
 export async function submitLinkedInPost(input: {
@@ -236,7 +199,6 @@ export async function submitLinkedInPost(input: {
   postedAt: Date;
   postKind: LinkedInPostKind;
   collaborationContext?: string | null;
-  ingestionSource?: "manual" | "browser_extension";
   admin: boolean;
 }) {
   const supabase = createAdminClient();
@@ -259,7 +221,7 @@ export async function submitLinkedInPost(input: {
       posted_at: input.postedAt.toISOString(),
       raw_payload: rawPayload,
       post_kind: input.postKind,
-      ingestion_source: input.ingestionSource ?? "manual",
+      ingestion_source: "manual",
       submitted_by: input.actorId,
       collaboration_context: input.collaborationContext || null,
     }).eq("id", existingPost.id).select("id").single();
@@ -287,12 +249,72 @@ export async function submitLinkedInPost(input: {
     posted_at: input.postedAt.toISOString(),
     raw_payload: rawPayload,
     post_kind: input.postKind,
-    ingestion_source: input.ingestionSource ?? "manual",
+    ingestion_source: "manual",
     submitted_by: input.actorId,
     collaboration_context: input.collaborationContext || null,
   }, { onConflict: "tracked_member_id,external_post_id" }).select("id").single();
   if (postError) throw postError;
   return post;
+}
+
+async function insertLinkedInPostScore(
+  supabase: SupabaseClient<any>,
+  postId: string,
+  result: { score: LinkedInPostScore; provider: string; model: string },
+) {
+  const { error } = await supabase.from("linkedin_post_scores").insert({
+    post_id: postId,
+    ...result.score,
+    raw_ai_response: result.score,
+    provider: result.provider,
+    model_name: result.model,
+    scoring_version: LINKEDIN_SCORING_VERSION,
+  });
+  if (error) throw error;
+}
+
+export async function scoreLinkedInPostById(input: {
+  workspaceId: string;
+  postId: string;
+  notifyMember?: boolean;
+}) {
+  const supabase = createAdminClient();
+  const { data: post, error } = await supabase
+    .from("linkedin_posts")
+    .select("id, post_text, post_url, tracked_member_id, linkedin_tracked_members!inner(id, workspace_id, profile_id, name, email, member_role)")
+    .eq("id", input.postId)
+    .eq("linkedin_tracked_members.workspace_id", input.workspaceId)
+    .single();
+  if (error) throw error;
+
+  const member = Array.isArray(post.linkedin_tracked_members) ? post.linkedin_tracked_members[0] : post.linkedin_tracked_members;
+  const result = await scoreLinkedInPost({ postText: post.post_text, memberRole: member?.member_role ?? null });
+  await supabase.from("linkedin_post_scores").delete().eq("post_id", post.id);
+  await insertLinkedInPostScore(supabase, post.id, result);
+
+  if (input.notifyMember && member) {
+    let recipient = member.email as string | null;
+    if (!recipient && member.profile_id) {
+      const { data: profile } = await supabase.from("profiles").select("email").eq("id", member.profile_id).maybeSingle();
+      recipient = profile?.email ?? null;
+    }
+    if (recipient) {
+      await sendLinkedInPostSummaryEmail(supabase, {
+        to: recipient,
+        memberName: member.name,
+        postUrl: post.post_url,
+        totalScore: Number(result.score.total_score),
+        archetype: result.score.archetype,
+        summary: result.score.ai_summary,
+        strengths: result.score.strengths,
+        weaknesses: result.score.weaknesses,
+        suggestions: result.score.improvement_suggestions,
+        workspaceId: input.workspaceId,
+      });
+    }
+  }
+
+  return result;
 }
 
 export async function createLinkedInScoreOverride(supabase: SupabaseClient<any>, input: {
@@ -319,35 +341,6 @@ export async function createLinkedInScoreOverride(supabase: SupabaseClient<any>,
   return data;
 }
 
-export async function syncLinkedInMembers(options?: { workspaceId?: string; memberId?: string }) {
-  const supabase = createAdminClient();
-  let query = supabase.from("linkedin_tracked_members").select("*").eq("is_active", true).neq("tracking_status", "paused");
-  if (options?.workspaceId) query = query.eq("workspace_id", options.workspaceId);
-  if (options?.memberId) query = query.eq("id", options.memberId);
-  const { data: members, error } = await query;
-  if (error) throw error;
-  const totals = { membersProcessed: members?.length ?? 0, activitiesFetched: 0, originalPostsStored: 0, excludedActivities: 0, failed: 0 };
-  for (const member of (members ?? []) as LinkedInTrackedMember[]) {
-    const to = new Date();
-    const from = member.last_sync_at ? new Date(member.last_sync_at) : subDays(to, 30);
-    try {
-      const activities = await getLinkedInConnector(member.connector_preference as LinkedInConnectorSource).fetchActivities({ trackedMemberId: member.id, linkedinProfileUrl: member.linkedin_profile_url, from, to });
-      const result = await persistActivities(supabase, member.id, activities);
-      totals.activitiesFetched += activities.length;
-      totals.originalPostsStored += result.originalPostsStored;
-      totals.excludedActivities += result.excludedActivities;
-      await supabase.from("linkedin_tracked_members").update({ last_sync_at: to.toISOString(), last_sync_error: null, tracking_status: "active" }).eq("id", member.id);
-      await supabase.from("linkedin_sync_logs").insert({ workspace_id: member.workspace_id, tracked_member_id: member.id, job_type: "sync_posts", status: "success", message: `Fetched ${activities.length} activities.`, metadata: result });
-    } catch (syncError) {
-      totals.failed += 1;
-      const message = syncError instanceof Error ? syncError.message : "Unknown sync error.";
-      await supabase.from("linkedin_tracked_members").update({ last_sync_error: message, tracking_status: "fetch_failed" }).eq("id", member.id);
-      await supabase.from("linkedin_sync_logs").insert({ workspace_id: member.workspace_id, tracked_member_id: member.id, job_type: "sync_posts", status: "failed", message });
-    }
-  }
-  return totals;
-}
-
 export async function scoreUnscoredLinkedInPosts(options?: { workspaceId?: string }) {
   const supabase = createAdminClient();
   let query = supabase.from("linkedin_posts").select("id, post_text, tracked_member_id, linkedin_tracked_members!inner(workspace_id, member_role), linkedin_post_scores(id)").order("posted_at", { ascending: true }).limit(100);
@@ -365,8 +358,7 @@ export async function scoreUnscoredLinkedInPosts(options?: { workspaceId?: strin
     const workspaceResult = workspaceId ? workspaceResults.get(workspaceId) ?? { scored: 0, failed: 0, providers: {} } : null;
     try {
       const result = await scoreLinkedInPost({ postText: post.post_text, memberRole: member?.member_role ?? null });
-      const { error: insertError } = await supabase.from("linkedin_post_scores").insert({ post_id: post.id, ...result.score, raw_ai_response: result.score, provider: result.provider, model_name: result.model, scoring_version: LINKEDIN_SCORING_VERSION });
-      if (insertError) throw insertError;
+      await insertLinkedInPostScore(supabase, post.id, result);
       postsScored += 1;
       if (workspaceId && workspaceResult) {
         workspaceResult.scored += 1;

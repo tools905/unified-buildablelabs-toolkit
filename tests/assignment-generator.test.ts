@@ -21,9 +21,16 @@ describe("generateFullPeerAssignments", () => {
     expect(one).toEqual(two);
   });
 
-  it("requires at least 3 members", () => {
-    expect(() => generateFullPeerAssignments([{ userId: "a" }, { userId: "b" }])).toThrow(
-      "At least 3 active project members are required.",
+  it("supports two-person review rounds", () => {
+    expect(generateFullPeerAssignments([{ userId: "a" }, { userId: "b" }])).toEqual([
+      { reviewerId: "a", revieweeId: "b" },
+      { reviewerId: "b", revieweeId: "a" },
+    ]);
+  });
+
+  it("requires at least 2 members", () => {
+    expect(() => generateFullPeerAssignments([{ userId: "a" }])).toThrow(
+      "At least 2 active project members are required.",
     );
   });
 });

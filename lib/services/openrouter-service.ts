@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getAppUrl } from "@/lib/utils/app-url";
+
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export const OPENROUTER_MODEL =
@@ -22,7 +24,7 @@ export async function requestOpenRouterJson<T>(input: {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+      "HTTP-Referer": getAppUrl(),
       "X-Title": "Unified BuildableLabs Toolkit",
     },
     body: JSON.stringify({

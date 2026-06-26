@@ -18,7 +18,8 @@ export type NotificationType =
   | "review_reminder"
   | "overdue_reminder"
   | "admin_overdue_summary"
-  | "report_ready";
+  | "report_ready"
+  | "linkedin_post_summary";
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 

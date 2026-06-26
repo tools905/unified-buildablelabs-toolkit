@@ -8,20 +8,6 @@ export const linkedinMemberRoles = [
   "other",
 ] as const;
 
-export const linkedinConnectors = [
-  "fallback",
-  "third_party_api",
-  "mock",
-] as const;
-
-export type LinkedInConnectorSource = (typeof linkedinConnectors)[number];
-
-export const linkedinConnectorLabels: Record<LinkedInConnectorSource, string> = {
-  fallback: "Fallback collector (not configured)",
-  third_party_api: "Third-party API (for example, Apify)",
-  mock: "Mock test data",
-};
-
 export const linkedinArchetypes = [
   "lesson_learned",
   "build_in_public",
@@ -43,7 +29,7 @@ export type LinkedInMemberRole = (typeof linkedinMemberRoles)[number];
 export type LinkedInArchetype = (typeof linkedinArchetypes)[number];
 export type LinkedInActivityType = "original_post" | "collaborative_post" | "repost" | "comment" | "reaction" | "unknown";
 export type LinkedInPostKind = "original_post" | "collaborative_post";
-export type LinkedInIngestionSource = "connector" | "manual" | "browser_extension";
+export type LinkedInIngestionSource = "manual";
 
 export type LinkedInTrackedMember = {
   id: string;
@@ -57,9 +43,6 @@ export type LinkedInTrackedMember = {
   volume_weight: number;
   quality_weight: number;
   tracking_status: string;
-  connector_preference: LinkedInConnectorSource;
-  last_sync_at: string | null;
-  last_sync_error: string | null;
   is_active: boolean;
   created_at: string;
 };
@@ -90,7 +73,6 @@ export type LinkedInMemberStats = {
   role: string;
   linkedinProfileUrl: string;
   trackingStatus: string;
-  lastSyncAt: string | null;
   postCount: number;
   periodTarget: number;
   volumeScore: number;

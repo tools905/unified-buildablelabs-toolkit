@@ -16,6 +16,28 @@ type EmailInput = {
   assignmentId?: string | null;
 };
 
+function normalizeEmailFrom() {
+  let from = process.env.EMAIL_FROM ?? "";
+  if (from.startsWith('"') && from.endsWith('"')) {
+    from = from.slice(1, -1);
+  }
+  return from.trim();
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function list(items: string[]) {
+  if (!items.length) return "<li>No signal available yet.</li>";
+  return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
 async function logEmail(
   supabase: SupabaseClient<any>,
   input: EmailInput,
@@ -42,14 +64,17 @@ export async function sendEmail(
   input: EmailInput,
 ) {
   const apiKey = process.env.RESEND_API_KEY;
-  let from = process.env.EMAIL_FROM ?? "BuildableLabs Toolkit <toolkit@example.com>";
-  if (from.startsWith('"') && from.endsWith('"')) {
-    from = from.slice(1, -1);
-  }
+  const from = normalizeEmailFrom();
 
   if (!apiKey) {
     await logEmail(supabase, input, "skipped", null, "RESEND_API_KEY missing");
     return { skipped: true };
+  }
+
+  if (!from || from.includes("@example.com")) {
+    const message = "EMAIL_FROM must use a verified Resend sender/domain.";
+    await logEmail(supabase, input, "failed", null, message);
+    return { error: message };
   }
 
   try {
@@ -202,5 +227,44 @@ export async function sendReportReadyEmail(
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     roundId: input.roundId,
+  });
+}
+
+export async function sendLinkedInPostSummaryEmail(
+  supabase: SupabaseClient<any>,
+  input: {
+    to: string;
+    memberName: string;
+    postUrl?: string | null;
+    totalScore: number;
+    archetype: string;
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    suggestions: string[];
+    workspaceId: string;
+  },
+) {
+  const postLink = input.postUrl ? button(input.postUrl, "Open LinkedIn post") : "";
+  return sendEmail(supabase, {
+    to: input.to,
+    subject: `Your LinkedIn post coaching summary: ${input.totalScore}/100`,
+    html: `
+      <h1>Your private LinkedIn coaching summary</h1>
+      <p>Hi ${escapeHtml(input.memberName)}, your submitted post has been assessed.</p>
+      <p><strong>Score:</strong> ${input.totalScore}/100</p>
+      <p><strong>Post type:</strong> ${escapeHtml(input.archetype.replaceAll("_", " "))}</p>
+      <p>${escapeHtml(input.summary)}</p>
+      <h2>What worked well</h2>
+      <ul>${list(input.strengths)}</ul>
+      <h2>What to improve</h2>
+      <ul>${list(input.weaknesses)}</ul>
+      <h2>Next revision ideas</h2>
+      <ul>${list(input.suggestions)}</ul>
+      ${postLink}
+      <p style="color:#666;font-size:12px">This is private coaching for the post you manually submitted in the BuildableLabs Toolkit.</p>
+    `,
+    type: "linkedin_post_summary",
+    workspaceId: input.workspaceId,
   });
 }

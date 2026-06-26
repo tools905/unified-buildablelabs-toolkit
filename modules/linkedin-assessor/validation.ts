@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { linkedinArchetypes, linkedinConnectors, linkedinMemberRoles } from "./types";
+import { linkedinArchetypes, linkedinMemberRoles } from "./types";
 
 export function normalizeLinkedInProfileUrl(input: string) {
   const trimmed = input.trim();
@@ -22,7 +22,6 @@ export const linkedinTrackedMemberSchema = z
     monthlyPostTarget: z.coerce.number().int().min(1).max(100),
     volumeWeight: z.coerce.number().min(0).max(1),
     qualityWeight: z.coerce.number().min(0).max(1),
-    connectorPreference: z.enum(linkedinConnectors),
   })
   .refine((value) => Math.abs(value.volumeWeight + value.qualityWeight - 1) < 0.001, {
     message: "Volume and quality weights must total 1.",
@@ -45,7 +44,6 @@ export const linkedinSettingsSchema = z
     monthlyPostTarget: z.coerce.number().int().min(1).max(100),
     volumeWeight: z.coerce.number().min(0).max(1),
     qualityWeight: z.coerce.number().min(0).max(1),
-    connectorPreference: z.enum(linkedinConnectors),
     weeklyReportsEnabled: z.coerce.boolean(),
     memberInsightsEnabled: z.coerce.boolean(),
     memberSubmissionsEnabled: z.coerce.boolean(),

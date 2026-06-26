@@ -74,6 +74,7 @@ export const getCurrentWorkspace = cache(async function getCurrentWorkspace(
     .select("role, workspaces(*)")
     .eq("user_id", userId)
     .eq("status", "active")
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 

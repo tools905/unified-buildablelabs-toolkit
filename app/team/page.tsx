@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireUser } from "@/lib/auth/require-user";
-import { isDevTestingEnabled, seedDummyWorkspaceMembers } from "@/lib/services/dev-testing-service";
 import { createInvite } from "@/lib/services/invite-service";
 import { getCurrentWorkspace, getWorkspaceMembers, isWorkspaceAdmin, setWorkspaceRole } from "@/lib/services/workspace-service";
 import { inviteSchema } from "@/lib/validation/invite-schema";
@@ -22,7 +21,6 @@ export default async function TeamPage({
     success?: string;
     email?: string;
     error?: string;
-    seeded?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -31,7 +29,6 @@ export default async function TeamPage({
   if (!workspace) redirect("/onboarding");
   const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
   if (!admin) redirect("/dashboard");
-  const devTestingEnabled = isDevTestingEnabled();
 
   async function inviteAction(formData: FormData) {
     "use server";
@@ -111,18 +108,6 @@ export default async function TeamPage({
     }
   }
 
-  async function seedDummyMembersAction() {
-    "use server";
-    const { supabase, user } = await requireUser();
-    const workspace = await getCurrentWorkspace(supabase, user.id);
-    if (!workspace) throw new Error("Workspace required.");
-    if (!(await isWorkspaceAdmin(workspace.id, user.id, supabase))) {
-      throw new Error("Admin access required.");
-    }
-    await seedDummyWorkspaceMembers(workspace.id);
-    redirect("/team?seeded=1");
-  }
-
   async function toggleRoleAction(formData: FormData) {
     "use server";
     const { supabase, user } = await requireUser();
@@ -182,15 +167,6 @@ export default async function TeamPage({
         </Alert>
       )}
 
-      {params.seeded === "1" && (
-        <Alert className="mb-6 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-          <AlertTitle>Seeded Successfully</AlertTitle>
-          <AlertDescription>
-            Dummy workspace members have been added for local testing.
-          </AlertDescription>
-        </Alert>
-      )}
-
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <Card>
           <CardHeader>
@@ -235,35 +211,6 @@ export default async function TeamPage({
           </CardContent>
         </Card>
         <div className="space-y-4">
-          {devTestingEnabled ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Local testing panel</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Alert>
-                  <AlertTitle>Dummy reviewers</AlertTitle>
-                  <AlertDescription>
-                    Add two confirmed dummy members to this workspace. Use them
-                    to create a 3-person project, start a round, then log in as
-                    each dummy member to submit assigned reviews.
-                  </AlertDescription>
-                </Alert>
-                <form action={seedDummyMembersAction}>
-                  <Button className="w-full" type="submit">
-                    Add dummy members
-                  </Button>
-                </form>
-                <div className="rounded-md border border-border bg-muted p-3 text-sm">
-                  <div className="font-medium">Dummy password</div>
-                  <code>TestReview123!</code>
-                  <p className="mt-2 text-muted-foreground">
-                    The generated emails appear in the member list after seeding.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
           <Card>
             <CardHeader>
               <CardTitle>Invite member</CardTitle>

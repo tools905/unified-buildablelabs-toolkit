@@ -3,7 +3,7 @@ import { projectSchema } from "@/lib/validation/project-schema";
 import { reviewSchema } from "@/lib/validation/review-schema";
 
 describe("validation", () => {
-  it("rejects projects with fewer than 3 members", () => {
+  it("rejects projects with fewer than 2 members", () => {
     expect(() =>
       projectSchema.parse({
         name: "Demo",

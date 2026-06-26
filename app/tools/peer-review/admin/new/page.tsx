@@ -58,13 +58,13 @@ export default async function NewProjectPage({
         <CardHeader>
           <CardTitle>New project</CardTitle>
           <CardDescription>
-            Select at least three active members. Reviews per person are automatically calculated as member count minus one.
+            Select at least {minMembers} active member{minMembers === 1 ? "" : "s"}. Reviews per person are automatically calculated as member count minus one.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {params.error === "members" ? (
             <Alert className="mb-5 border-destructive/40">
-              <AlertTitle>Choose at least 3 members</AlertTitle>
+              <AlertTitle>Choose at least {minMembers} member{minMembers === 1 ? "" : "s"}</AlertTitle>
               <AlertDescription>
                 Full peer review needs at least {minMembers} active project
                 member{minMembers === 1 ? "" : "s"} in this environment.

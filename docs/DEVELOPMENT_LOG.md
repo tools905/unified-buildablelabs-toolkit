@@ -502,3 +502,130 @@ After deployment:
 - Configure Resend sender/domain.
 - Update cron callback URL and `CRON_SECRET`.
 - Rotate any secrets that were shared outside a secret manager.
+
+## Local Demo Verification
+
+A local production instance was prepared on port `3210` with a completed demo
+workspace state for hands-on testing. The fixture contains:
+
+- one demo administrator and six linked toolkit members;
+- a completed peer-review project with one completed round;
+- 30 submitted all-to-all review assignments and generated member reports;
+- 18 LinkedIn posts across original and collaborative post types;
+- connector and manual-submission examples, scored post breakdowns, an override,
+  an excluded quality score, sync logs, and stored LinkedIn reports; and
+- a rolling 45-day LinkedIn analysis configuration using 40% volume and 60%
+  quality weighting.
+
+Verification covered demo-admin password authentication, the live peer-review
+report service, the LinkedIn dashboard analytics service, stored report loading,
+processing logs, and the host-accessible `/login` route. The test fixture passed
+with 30 of 30 reviews submitted, six reviewees reported, and all 18 LinkedIn posts
+available in the active analysis window.
+
+## Peer Review Production Readiness Fixes
+
+The peer-review start flow was updated for the production workspace shape where
+only Nitai and Aditi are active members.
+
+- Two-person projects are now supported without requiring a dev-only test flag.
+- Starting a round creates the two reciprocal assignments for a two-person team.
+- New-project validation and copy now use the same environment-aware minimum.
+- Email and AI callback URLs now use a shared app URL resolver that falls back to
+  Vercel deployment URLs when `NEXT_PUBLIC_APP_URL` is empty.
+- Round-start, report-ready, reminder, overdue-summary, invite, and OpenRouter
+  links no longer degrade to empty or relative URLs in production.
+- Review reminders are grouped by reviewer so each reviewer receives one reminder
+  per round with the correct pending count instead of one email per assignment.
+- Project admin progress now loads all round assignment progress in one query
+  instead of one query per round, reducing lag on projects with many planned
+  rounds.
+- Demo users, demo LinkedIn profiles, demo review data, and previous test
+  projects were removed from the configured Supabase project. Remaining auth
+  profiles are Nitai and Aditi only.
+- An empty duplicate `BuildableLabs` workspace was removed so the app consistently
+  lands on the production workspace with Nitai and Aditi.
+- Current-workspace selection is now ordered by oldest membership to avoid
+  nondeterministic workspace selection if duplicate memberships are ever created.
+
+Verification:
+
+- `npm test` passed with 24 tests.
+- `npm run build` passed with the production Next.js build.
+- A live Supabase smoke test created a temporary Nitai/Aditi project, started
+  the round, verified two assignments, verified two grouped reminder attempts,
+  and deleted the temporary project. The smoke process blanked `RESEND_API_KEY`
+  to avoid sending real inbox traffic while still exercising the notification
+  logging path.
+- Real Resend delivery was checked and is currently blocked by deployment
+  configuration: `toolkit@example.com` is not a verified sender, and the Resend
+  account is still restricted to testing emails until a domain is verified. The
+  app now fails placeholder senders visibly in `notification_logs` instead of
+  making doomed provider calls.
+
+## Manual-Only LinkedIn Assessor And Performance Pass
+
+The LinkedIn Assessor collection model is now manual-only.
+
+- Removed active sync/scraping controls from the admin dashboard and member
+  profile pages.
+- Removed connector selection from settings, tracked-profile creation, and
+  tracked-profile editing.
+- Updated member-facing and admin copy so the workflow is: member submits the
+  LinkedIn post URL and post writing, then the toolkit scores that exact post.
+- Added migration `014_linkedin_manual_only_and_post_summary.sql` to constrain
+  LinkedIn collection to manual submissions and add the
+  `linkedin_post_summary` notification log type.
+- Changed manual submission to score only the submitted post instead of running a
+  broad unscored-post batch after every submission.
+- Added private Resend coaching emails after submission with score, summary,
+  strengths, weaknesses, and next-step suggestions.
+- Kept the daily LinkedIn cron useful for scoring any unscored manual posts, but
+  removed automated collection from that job.
+
+Performance and production cleanup:
+
+- Project creation now inserts planned rounds from the newly created project
+  object instead of refetching the project from Supabase.
+- Project list/detail queries now select only the fields used by the UI.
+- LinkedIn dashboard member statistics now group posts by member once instead of
+  filtering the full post list once per member.
+- The Team page no longer exposes the dummy-member seeding panel.
+- README and settings copy now reflect manual-only LinkedIn submission and the
+  need for a verified Resend sender.
+
+Verification:
+
+- `npm test` passed with 24 tests.
+- `npm run build` passed with the production Next.js build.
+- A scan of active app/README copy found no remaining mock/fallback/sync scraping
+  prompts.
+
+## LinkedIn Submit Post Cleanup
+
+The LinkedIn Assessor active workflow now presents post submission as the only
+member-facing path.
+
+- Removed the remaining LinkedIn connector module, export, and tests.
+- Removed the disabled automated-member sync service surface from the active
+  module.
+- Renamed member and admin post entry points to `Submit post`.
+- Updated settings and empty-state copy to refer to submitted posts rather than
+  missing, fetched, or collected posts.
+- Trimmed connector and last-sync fields out of app-facing LinkedIn types and
+  dashboard settings queries.
+- Updated migration `014_linkedin_manual_only_and_post_summary.sql` so legacy
+  connector defaults are changed to `manual` for future rows.
+
+Database deployment:
+
+- Applied migration `014` to the Supabase production database and recorded it in
+  `supabase_migrations.schema_migrations`.
+- Verified LinkedIn tracked-member, settings, and post defaults now resolve to
+  `manual`.
+- Verified all existing LinkedIn member/settings/post rows use manual-only
+  values.
+- Cleared stale LinkedIn processing logs and weekly reports that no longer
+  corresponded to active tracked members or submitted posts.
+- Confirmed production data baseline remains one BuildableLabs workspace with
+  only Nitai and Aditi as active workspace members.

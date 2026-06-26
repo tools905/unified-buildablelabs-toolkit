@@ -7,8 +7,8 @@ areas for current and future team workflows.
 ## Current Modules
 
 - Peer Review: functional module migrated from the original Peer Review app.
-- LinkedIn Assessor: profile tracking, mock-first collection, original-post filtering,
-  AI scoring, leaderboards, coaching insights, analysis windows, and weekly reports.
+- LinkedIn Assessor: manual post submission, AI scoring, leaderboards, private
+  coaching emails, analysis windows, and weekly reports.
 - HR Bot: route and module shell ready for future knowledge-base/chat work.
 
 ## Tech Stack
@@ -44,7 +44,7 @@ DATABASE_URL=
 DIRECT_URL=
 
 RESEND_API_KEY=
-EMAIL_FROM="BuildableLabs Toolkit <toolkit@example.com>"
+EMAIL_FROM="BuildableLabs Toolkit <notifications@your-verified-domain.com>"
 
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=deepseek/deepseek-v4-flash
@@ -118,10 +118,11 @@ variables in Vercel. After deployment, update:
 If credentials were shared outside a secret manager, rotate the Supabase database
 password and service role key before using the app in production.
 
-LinkedIn collection defaults to the deterministic mock connector. The fallback
-and third-party connector boundaries fail visibly until a compliant data provider
-is configured. Supabase schedules
-daily sync/scoring and Monday report generation through protected HTTPS routes.
+LinkedIn Assessor is manual-only. Members submit the LinkedIn post URL and the
+post writing; the app scores that submitted post and emails the member a private
+coaching summary through Resend. Supabase schedules daily scoring for any
+unscored manual posts and Monday report generation through protected HTTPS
+routes.
 
 Supabase Vault must contain:
 
