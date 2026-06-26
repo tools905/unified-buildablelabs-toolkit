@@ -59,6 +59,7 @@ export type LinkedInPostScore = {
   storytelling_score: number;
   authority_score: number;
   engagement_score: number;
+  hashtag_score: number;
   writing_quality_score: number;
   archetype: LinkedInArchetype;
   ai_summary: string;

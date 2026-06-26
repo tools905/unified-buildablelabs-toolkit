@@ -13,6 +13,8 @@ describe("LinkedIn Assessor", () => {
     const score = createDeterministicLinkedInScore({ postText: "I learned from one specific customer example because the tradeoff was measurable.", memberRole: "founder" });
     expect(score.total_score).toBeGreaterThanOrEqual(0);
     expect(score.total_score).toBeLessThanOrEqual(100);
+    expect(score.hashtag_score).toBeGreaterThanOrEqual(0);
+    expect(score.hashtag_score).toBeLessThanOrEqual(5);
     expect(score.strengths.length).toBeGreaterThan(0);
   });
 
@@ -26,8 +28,8 @@ describe("LinkedIn Assessor", () => {
       posts: [{
         id: "post-1", posted_at: "2026-06-05T00:00:00.000Z", linkedin_post_scores: {
           total_score: 80, hook_score: 8, clarity_score: 8, specificity_score: 8, originality_score: 8,
-          reader_value_score: 12, depth_score: 8, relevance_score: 8, storytelling_score: 6, authority_score: 6,
-          engagement_score: 4, writing_quality_score: 4, archetype: "educational", ai_summary: "Useful",
+          reader_value_score: 9, depth_score: 8, relevance_score: 7, storytelling_score: 6, authority_score: 6,
+          engagement_score: 4, hashtag_score: 4, writing_quality_score: 4, archetype: "educational", ai_summary: "Useful",
           strengths: ["Clear"], weaknesses: ["Needs proof"], improvement_suggestions: ["Add evidence"],
         },
       }],

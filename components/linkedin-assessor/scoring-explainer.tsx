@@ -13,6 +13,7 @@ export function LinkedInScoringExplainer() {
         <div className="rounded-md border border-border bg-muted/40 p-3 text-foreground">
           Final score = (volume score * volume weight) + (average quality * quality weight). The weights must total 1.00. For example, 0.40 volume and 0.60 quality means quality contributes 60% of the final score.
         </div>
+        <Explanation title="Post quality rubric">Each submitted post is scored out of 100 across hook, clarity, specificity, originality, reader value, depth, relevance, storytelling, authority, engagement, hashtag use, and writing quality.</Explanation>
         <Explanation title="Rolling analysis duration">How many recent days the live dashboard recalculates every day. A 30-day duration means today and the previous 29 days. Posts outside that moving window remain stored but do not affect current dashboard scores.</Explanation>
         <Explanation title="Manual post submission">Members submit the LinkedIn post URL and the post writing directly. The toolkit scores that exact post and emails private coaching to the member.</Explanation>
       </CardContent>

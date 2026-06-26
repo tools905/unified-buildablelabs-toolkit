@@ -238,6 +238,12 @@ export async function sendLinkedInPostSummaryEmail(
     postUrl?: string | null;
     totalScore: number;
     archetype: string;
+    qualityBreakdown?: {
+      hook: number;
+      hashtags: number;
+      originality: number;
+      writingQuality: number;
+    };
     summary: string;
     strengths: string[];
     weaknesses: string[];
@@ -246,6 +252,14 @@ export async function sendLinkedInPostSummaryEmail(
   },
 ) {
   const postLink = input.postUrl ? button(input.postUrl, "Open LinkedIn post") : "";
+  const qualityBreakdown = input.qualityBreakdown
+    ? `<h2>Writing quality breakdown</h2><ul>${list([
+      `Hook: ${input.qualityBreakdown.hook}/10`,
+      `Hashtags: ${input.qualityBreakdown.hashtags}/5`,
+      `Originality: ${input.qualityBreakdown.originality}/10`,
+      `Writing quality: ${input.qualityBreakdown.writingQuality}/5`,
+    ])}</ul>`
+    : "";
   return sendEmail(supabase, {
     to: input.to,
     subject: `Your LinkedIn post coaching summary: ${input.totalScore}/100`,
@@ -255,6 +269,7 @@ export async function sendLinkedInPostSummaryEmail(
       <p><strong>Score:</strong> ${input.totalScore}/100</p>
       <p><strong>Post type:</strong> ${escapeHtml(input.archetype.replaceAll("_", " "))}</p>
       <p>${escapeHtml(input.summary)}</p>
+      ${qualityBreakdown}
       <h2>What worked well</h2>
       <ul>${list(input.strengths)}</ul>
       <h2>What to improve</h2>

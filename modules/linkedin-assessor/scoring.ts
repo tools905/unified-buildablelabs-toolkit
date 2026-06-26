@@ -9,12 +9,13 @@ export const linkedinPostScoreSchema = z.object({
   clarity_score: z.number().min(0).max(10),
   specificity_score: z.number().min(0).max(10),
   originality_score: z.number().min(0).max(10),
-  reader_value_score: z.number().min(0).max(15),
+  reader_value_score: z.number().min(0).max(12),
   depth_score: z.number().min(0).max(10),
-  relevance_score: z.number().min(0).max(10),
+  relevance_score: z.number().min(0).max(8),
   storytelling_score: z.number().min(0).max(8),
   authority_score: z.number().min(0).max(7),
   engagement_score: z.number().min(0).max(5),
+  hashtag_score: z.number().min(0).max(5),
   writing_quality_score: z.number().min(0).max(5),
   archetype: z.enum(linkedinArchetypes),
   ai_summary: z.string().min(1),
@@ -22,7 +23,7 @@ export const linkedinPostScoreSchema = z.object({
   weaknesses: z.array(z.string()).min(1),
   improvement_suggestions: z.array(z.string()).min(1),
 }).superRefine((score, context) => {
-  const componentTotal = score.hook_score + score.clarity_score + score.specificity_score + score.originality_score + score.reader_value_score + score.depth_score + score.relevance_score + score.storytelling_score + score.authority_score + score.engagement_score + score.writing_quality_score;
+  const componentTotal = score.hook_score + score.clarity_score + score.specificity_score + score.originality_score + score.reader_value_score + score.depth_score + score.relevance_score + score.storytelling_score + score.authority_score + score.engagement_score + score.hashtag_score + score.writing_quality_score;
   if (Math.abs(componentTotal - score.total_score) > 1) context.addIssue({ code: "custom", path: ["total_score"], message: "Total score must equal the component score sum." });
 });
 
@@ -41,13 +42,14 @@ export async function scoreLinkedInPost(input: { postText: string; memberRole: s
           clarity_score: "0-10",
           specificity_score: "0-10",
           originality_score: "0-10",
-          reader_value_score: "0-15",
+          reader_value_score: "0-12. Scores usefulness, practical takeaway, and reader benefit.",
           depth_score: "0-10",
-          relevance_score: "0-10",
+          relevance_score: "0-8",
           storytelling_score: "0-8",
           authority_score: "0-7",
-          engagement_score: "0-5",
-          writing_quality_score: "0-5",
+          engagement_score: "0-5. Scores whether the post naturally invites useful comments or reflection, without using public engagement counts.",
+          hashtag_score: "0-5. Scores hashtag relevance, restraint, discoverability, and fit. No hashtags can still earn partial credit if omission is appropriate; spammy or irrelevant hashtags should score low.",
+          writing_quality_score: "0-5. Scores grammar, rhythm, formatting, concision, line breaks, and ease of reading.",
           archetype: linkedinArchetypes,
           output: ["ai_summary", "strengths", "weaknesses", "improvement_suggestions"],
           role_guidance: {

@@ -629,3 +629,19 @@ Database deployment:
   corresponded to active tracked members or submitted posts.
 - Confirmed production data baseline remains one BuildableLabs workspace with
   only Nitai and Aditi as active workspace members.
+
+## LinkedIn Writing Quality Rubric Expansion
+
+LinkedIn post scoring now makes writing-quality parameters more explicit.
+
+- Added a stored `hashtag_score` dimension for LinkedIn post scores.
+- Rebalanced the 100-point rubric so hook, originality, hashtag use, and writing
+  quality are first-class scoring inputs alongside clarity, specificity, reader
+  value, depth, relevance, storytelling, authority, and engagement.
+- Updated the AI scoring prompt and deterministic scorer to score hashtag
+  relevance, restraint, discoverability, and fit.
+- Added hook, hashtag, originality, and writing-quality breakdowns to private
+  member coaching emails.
+- Updated the admin settings explainer to document the full post quality rubric.
+- Applied migration `015_linkedin_hashtag_score.sql` to Supabase and verified the
+  `linkedin_post_scores.hashtag_score` column is present.
