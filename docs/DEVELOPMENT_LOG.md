@@ -659,3 +659,29 @@ Smoke verification:
   emails.
 - Removed the temporary tracked profiles, posts, scores, activities, and
   notification logs after the smoke test.
+
+## Team Member Removal
+
+Admins can now remove active workspace members from the Team page.
+
+- Added a destructive, confirmed Remove action beside each active member except
+  the current user.
+- Removal soft-updates `workspace_members.status` to `removed` so historical
+  reviews, reports, and audit references stay intact.
+- Blocked self-removal and last-admin removal at the service layer.
+- Wrote `workspace.member_removed` audit logs with the removed user's previous
+  role and profile metadata.
+- Filtered team/admin member counts and role updates to active workspace
+  memberships only.
+- Prevented removed users from silently rejoining the default workspace through
+  onboarding.
+
+Database deployment:
+
+- Added and applied migration `016_workspace_member_removal.sql`.
+- Replaced the profile peer-read policy so users can only read active workspace
+  peers.
+- Updated `is_project_member` so project membership also requires active
+  workspace membership.
+- Verified Supabase migration history records `016_workspace_member_removal`
+  and the live policy/function changes are present.

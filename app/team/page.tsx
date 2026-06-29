@@ -5,12 +5,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmButton } from "@/components/dashboard/confirm-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireUser } from "@/lib/auth/require-user";
 import { createInvite } from "@/lib/services/invite-service";
-import { getCurrentWorkspace, getWorkspaceMembers, isWorkspaceAdmin, setWorkspaceRole } from "@/lib/services/workspace-service";
+import {
+  getCurrentWorkspace,
+  getWorkspaceMembers,
+  isWorkspaceAdmin,
+  removeWorkspaceMember,
+  setWorkspaceRole,
+} from "@/lib/services/workspace-service";
 import { inviteSchema } from "@/lib/validation/invite-schema";
 import type { WorkspaceRole } from "@/lib/db/types";
 
@@ -125,6 +132,30 @@ export default async function TeamPage({
     redirect("/team");
   }
 
+  async function removeMemberAction(formData: FormData) {
+    "use server";
+    const { supabase, user } = await requireUser();
+    const workspace = await getCurrentWorkspace(supabase, user.id);
+    if (!workspace) throw new Error("Workspace required.");
+    if (!(await isWorkspaceAdmin(workspace.id, user.id, supabase))) {
+      throw new Error("Admin access required.");
+    }
+
+    const targetUserId = String(formData.get("userId"));
+    try {
+      await removeWorkspaceMember(supabase, {
+        workspaceId: workspace.id,
+        targetUserId,
+        actorId: user.id,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to remove member";
+      redirect(`/team?error=${encodeURIComponent(message)}`);
+    }
+
+    redirect("/team?success=removed");
+  }
+
   const [members, { data: invites }] = await Promise.all([
     getWorkspaceMembers(supabase, workspace.id),
     supabase.from("invites").select("*").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
@@ -160,6 +191,15 @@ export default async function TeamPage({
         </Alert>
       )}
 
+      {params.success === "removed" && (
+        <Alert className="mb-6 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <AlertTitle>Member removed</AlertTitle>
+          <AlertDescription>
+            The member no longer has access to this workspace.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {params.error && (
         <Alert className="mb-6 border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400">
           <AlertTitle>Error</AlertTitle>
@@ -180,6 +220,7 @@ export default async function TeamPage({
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -204,6 +245,23 @@ export default async function TeamPage({
                       ) : null}
                     </TableCell>
                     <TableCell>{member.status}</TableCell>
+                    <TableCell>
+                      {member.user_id !== user.id ? (
+                        <form action={removeMemberAction}>
+                          <input type="hidden" name="userId" value={member.user_id} />
+                          <ConfirmButton
+                            size="sm"
+                            variant="destructive"
+                            className="h-8 w-full text-xs sm:w-auto"
+                            message={`Remove ${member.profiles?.full_name ?? member.profiles?.email ?? "this member"} from the workspace? They will lose toolkit access, but historical reviews and logs will remain.`}
+                          >
+                            Remove
+                          </ConfirmButton>
+                        </form>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Current user</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

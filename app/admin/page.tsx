@@ -23,7 +23,8 @@ export default async function AdminPage() {
       supabase
         .from("workspace_members")
         .select("*", { count: "exact", head: true })
-        .eq("workspace_id", workspaceId),
+        .eq("workspace_id", workspaceId)
+        .eq("status", "active"),
       supabase
         .from("projects")
         .select("*", { count: "exact", head: true })
