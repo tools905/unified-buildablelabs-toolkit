@@ -5,7 +5,7 @@ import type { WorkspaceRole } from "@/lib/db/types";
 import { sendInviteEmail as sendInvite } from "@/lib/services/email-service";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAppUrl } from "@/lib/utils/app-url";
+import { getAppLink } from "@/lib/utils/app-url";
 
 export async function createInvite(
   supabase: SupabaseClient<any>,
@@ -36,12 +36,11 @@ export async function createInvite(
 
   if (error) throw error;
 
-  const appUrl = getAppUrl();
   const emailResult = await sendInvite(supabase, {
     to: data.email,
     workspaceName: data.workspaces?.name ?? "your workspace",
     inviterName: data.profiles?.full_name ?? data.profiles?.email ?? "An admin",
-    acceptUrl: `${appUrl}/onboarding?invite=${data.token}`,
+    acceptUrl: getAppLink(`/onboarding?invite=${data.token}`),
     expiresAt: new Date(data.expires_at).toLocaleDateString(),
     workspaceId: data.workspace_id,
   });

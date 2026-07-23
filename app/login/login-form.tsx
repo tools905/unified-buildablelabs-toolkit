@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { BASE_PATH } from "@/lib/utils/app-url";
 
 export function LoginForm() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export function LoginForm() {
       if (result.error) errorMsg = result.error.message;
     } else if (mode === "forgot_password") {
       const result = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+        redirectTo: `${window.location.origin}${BASE_PATH}/auth/callback?next=${BASE_PATH}/reset-password`,
       });
       if (result.error) {
         errorMsg = result.error.message;

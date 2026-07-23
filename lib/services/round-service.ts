@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateAssignments } from "@/lib/services/assignment-service";
 import { sendReportReadyEmail, sendRoundStartedEmail } from "@/lib/services/email-service";
 import { writeAuditLog } from "@/lib/services/audit-service";
-import { getAppUrl } from "@/lib/utils/app-url";
+import { getAppLink } from "@/lib/utils/app-url";
 import { one } from "@/lib/utils/relations";
 
 export async function startReviewRound(
@@ -64,7 +64,6 @@ export async function startReviewRound(
     .select("*")
     .in("id", reviewerIds);
 
-  const appUrl = getAppUrl();
   const { count: startEmailCount } = await supabase
     .from("notification_logs")
     .select("id", { count: "exact", head: true })
@@ -79,7 +78,7 @@ export async function startReviewRound(
         projectName: updated.projects?.name ?? "Peer review project",
         reviewCount: assignments.filter((a) => a.reviewer_id === reviewer.id).length,
         dueAt: new Date(updated.due_at).toLocaleString(),
-        url: `${appUrl}/tools/peer-review/member`,
+        url: getAppLink("/tools/peer-review/member"),
         workspaceId: updated.projects?.workspace_id ?? "",
         projectId: updated.project_id,
         roundId: updated.id,
@@ -144,8 +143,6 @@ async function notifyReportReady(
     .select("profiles(*)")
     .eq("workspace_id", round.projects?.workspace_id ?? "")
     .eq("role", "admin");
-  const appUrl = getAppUrl();
-
   await Promise.all((admins ?? []).map(async (admin) => {
     const profile = one(admin.profiles);
     if (profile?.email) {
@@ -154,7 +151,7 @@ async function notifyReportReady(
         projectName: round.projects?.name ?? "Peer review project",
         roundTitle: round.title,
         completionRate,
-        url: `${appUrl}/tools/peer-review/admin/${round.project_id}/rounds/${round.id}/report`,
+        url: getAppLink(`/tools/peer-review/admin/${round.project_id}/rounds/${round.id}/report`),
         workspaceId: round.projects?.workspace_id ?? "",
         projectId: round.project_id,
         roundId: round.id,

@@ -4,7 +4,7 @@ import {
   sendAdminOverdueSummaryEmail,
   sendReviewReminderEmail,
 } from "@/lib/services/email-service";
-import { getAppUrl } from "@/lib/utils/app-url";
+import { getAppLink } from "@/lib/utils/app-url";
 import { one } from "@/lib/utils/relations";
 
 export async function sendPendingReviewReminders(
@@ -26,7 +26,6 @@ export async function sendPendingReviewReminders(
 
   let sent = 0;
   const now = new Date();
-  const appUrl = getAppUrl();
   const grouped = new Map<string, typeof assignments>();
 
   for (const assignment of assignments ?? []) {
@@ -50,7 +49,7 @@ export async function sendPendingReviewReminders(
       roundTitle: assignment.review_rounds.title,
       pendingCount: group.length,
       dueAt: new Date(assignment.review_rounds.due_at).toLocaleString(),
-      url: `${appUrl}/tools/peer-review/member`,
+      url: getAppLink("/tools/peer-review/member"),
       workspaceId: project.workspace_id,
       projectId: assignment.review_rounds.project_id,
       roundId: assignment.round_id,
@@ -104,7 +103,6 @@ export async function sendAdminOverdueSummaries(
   if (error) throw error;
 
   let sent = 0;
-  const appUrl = getAppUrl();
 
   for (const round of rounds ?? []) {
     const { data: assignments } = await supabase
@@ -135,7 +133,7 @@ export async function sendAdminOverdueSummaries(
         roundTitle: round.title,
         pendingMembers,
         overdueAssignments: assignments?.length ?? 0,
-        url: `${appUrl}/tools/peer-review/admin/${round.project_id}/rounds/${round.id}`,
+        url: getAppLink(`/tools/peer-review/admin/${round.project_id}/rounds/${round.id}`),
         workspaceId: round.projects?.workspace_id ?? "",
         projectId: round.project_id,
         roundId: round.id,
