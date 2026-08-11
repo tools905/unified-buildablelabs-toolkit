@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils/cn";
 export function Alert({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("rounded-md border border-border bg-card p-4 text-sm", className)}
+      className={cn("rounded-sm border border-border bg-card p-4 text-sm", className)}
       role="alert"
       {...props}
     />
