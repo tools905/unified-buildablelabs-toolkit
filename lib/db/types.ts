@@ -20,6 +20,8 @@ export type NotificationType =
   | "admin_overdue_summary"
   | "report_ready"
   | "linkedin_post_summary";
+export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
+export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
@@ -287,6 +289,181 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["audit_logs"]["Insert"]>;
       };
+      tickets: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          title: string;
+          description: string | null;
+          assigned_to: string | null;
+          status: TicketStatus;
+          progress_percent: number;
+          due_date: string | null;
+          claimed_progress_percent: number | null;
+          verified_progress_percent: number | null;
+          review_status: TicketReviewStatus | null;
+          reviewer_id: string | null;
+          reviewed_at: string | null;
+          review_notes: string | null;
+          linked_meeting_id: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          title: string;
+          description?: string | null;
+          assigned_to?: string | null;
+          status?: TicketStatus;
+          progress_percent?: number;
+          due_date?: string | null;
+          claimed_progress_percent?: number | null;
+          verified_progress_percent?: number | null;
+          review_status?: TicketReviewStatus | null;
+          reviewer_id?: string | null;
+          reviewed_at?: string | null;
+          review_notes?: string | null;
+          linked_meeting_id?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["tickets"]["Insert"]>;
+      };
+      ticket_review_settings: {
+        Row: {
+          workspace_id: string;
+          default_reviewer_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          default_reviewer_id: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ticket_review_settings"]["Insert"]>;
+      };
+      learning_roadmaps: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          description: string | null;
+          sort_order: number;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          name: string;
+          description?: string | null;
+          sort_order?: number;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["learning_roadmaps"]["Insert"]>;
+      };
+      resources: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          title: string;
+          description: string | null;
+          url: string;
+          category: string;
+          tags: string[];
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          title: string;
+          description?: string | null;
+          url: string;
+          category?: string;
+          tags?: string[];
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["resources"]["Insert"]>;
+      };
+      resource_roadmap_mapping: {
+        Row: {
+          id: string;
+          resource_id: string;
+          roadmap_id: string;
+          sort_order: number;
+        };
+        Insert: {
+          id?: string;
+          resource_id: string;
+          roadmap_id: string;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["resource_roadmap_mapping"]["Insert"]>;
+      };
+      meetings: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          granola_note_id: string;
+          title: string | null;
+          event_title: string | null;
+          summary_text: string | null;
+          summary_markdown: string | null;
+          attendees: Json;
+          organiser_email: string | null;
+          web_url: string | null;
+          start_time: string | null;
+          end_time: string | null;
+          tickets_extracted_at: string | null;
+          extracted_tickets_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          granola_note_id: string;
+          title?: string | null;
+          event_title?: string | null;
+          summary_text?: string | null;
+          summary_markdown?: string | null;
+          attendees?: Json;
+          organiser_email?: string | null;
+          web_url?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          tickets_extracted_at?: string | null;
+          extracted_tickets_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["meetings"]["Insert"]>;
+      };
+      ticket_comments: {
+        Row: {
+          id: string;
+          ticket_id: string;
+          author_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ticket_id: string;
+          author_id: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ticket_comments"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -310,6 +487,8 @@ export type Database = {
       review_round_status: ReviewRoundStatus;
       review_assignment_status: ReviewAssignmentStatus;
       notification_type: NotificationType;
+      ticket_status: TicketStatus;
+      ticket_review_status: TicketReviewStatus;
     };
   };
 };

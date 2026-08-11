@@ -2,28 +2,33 @@ import Link from "next/link";
 import { Menu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
+import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { getUserSession } from "@/lib/auth/require-user";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
+import { listNotifications } from "@/lib/services/notification-service";
 
 async function getShellContext() {
   try {
     const { supabase, user } = await getUserSession();
 
-    if (!user) return { admin: false };
+    if (!user) return { admin: false, notifications: [] };
 
     const workspace = await getCurrentWorkspace(supabase, user.id);
-    if (!workspace) return { admin: false };
+    if (!workspace) return { admin: false, notifications: [] };
 
-    return {
-      admin: await isWorkspaceAdmin(workspace.id, user.id, supabase),
-    };
+    const [admin, notifications] = await Promise.all([
+      isWorkspaceAdmin(workspace.id, user.id, supabase),
+      listNotifications(supabase, user.id),
+    ]);
+
+    return { admin, notifications };
   } catch {
-    return { admin: false };
+    return { admin: false, notifications: [] };
   }
 }
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const { admin } = await getShellContext();
+  const { admin, notifications } = await getShellContext();
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,6 +42,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <Badge>{admin ? "Admin" : "Member"}</Badge>
+            <NotificationBell notifications={notifications} />
             <details className="relative">
               <summary
                 aria-label="Open navigation"
@@ -60,7 +66,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               </div>
               <div className="text-xs text-muted-foreground">Unified Toolkit</div>
             </Link>
-            <Badge className="lg:mt-3">{admin ? "Admin" : "Member"}</Badge>
+            <div className="mt-3 flex items-center gap-2">
+              <Badge>{admin ? "Admin" : "Member"}</Badge>
+              <NotificationBell notifications={notifications} />
+            </div>
           </div>
           <SidebarNav admin={admin} />
         </aside>
