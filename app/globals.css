@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0b0f19; /* Premium dark-space background */
-  --foreground: #f8fafc; /* Slate 50 text */
-  --card: #131a26; /* Dark slate card */
-  --card-foreground: #f8fafc;
-  --border: #1e293b; /* Slate 800 borders */
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8; /* Slate 400 subtexts */
-  --primary: #10b981; /* Neon Emerald accent */
+  --background: #0a0b0e; /* Ink */
+  --foreground: #f5f6f8; /* Chrome white */
+  --card: #12141a; /* Raised surface */
+  --card-foreground: #f5f6f8;
+  --border: #1a1d24; /* Line */
+  --muted: #1a1d24;
+  --muted-foreground: #7a8296; /* Muted chrome */
+  --primary: #0b3fde; /* Brand blue */
   --primary-foreground: #ffffff;
   --destructive: #f43f5e;
   --destructive-foreground: #ffffff;
-  --ring: #10b981;
+  --ring: #0b3fde;
+  --radius: 0.25rem;
 }
 
 @theme inline {
@@ -28,8 +29,9 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-ring: var(--ring);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-serif: var(--font-instrument-serif);
 }
 
 body {
@@ -61,15 +63,15 @@ summary::-webkit-details-marker {
 }
 .card-hover-effect:hover {
   transform: translateY(-2px);
-  border-color: rgba(16, 185, 129, 0.3);
-  box-shadow: 0 10px 30px -15px rgba(16, 185, 129, 0.15);
+  border-color: rgba(11, 63, 222, 0.3);
+  box-shadow: 0 10px 30px -15px rgba(11, 63, 222, 0.15);
 }
 
 .glow-glow {
   position: absolute;
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0) 70%);
+  background: radial-gradient(circle, rgba(11, 63, 222, 0.08) 0%, rgba(11, 63, 222, 0) 70%);
   top: -250px;
   left: 50%;
   transform: translateX(-50%);

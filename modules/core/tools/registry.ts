@@ -4,7 +4,13 @@ import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type ToolkitToolSlug = "peer-review" | "linkedin-assessor" | "hr-bot";
+export type ToolkitToolSlug =
+  | "peer-review"
+  | "linkedin-assessor"
+  | "hr-bot"
+  | "tickets"
+  | "resources"
+  | "meetings";
 
 export type ToolkitTool = {
   name: string;
@@ -33,6 +39,27 @@ export const toolkitTools: ToolkitTool[] = [
     name: "HR Bot",
     slug: "hr-bot",
     description: "Answer approved HR, onboarding, policy, and team handbook questions.",
+    enabled: true,
+    adminOnly: false,
+  },
+  {
+    name: "Tickets",
+    slug: "tickets",
+    description: "Track work as tickets across backlog, in progress, and done.",
+    enabled: true,
+    adminOnly: false,
+  },
+  {
+    name: "Resources",
+    slug: "resources",
+    description: "Browse a shared catalog of guides, tools, and learning roadmaps.",
+    enabled: true,
+    adminOnly: false,
+  },
+  {
+    name: "Meetings",
+    slug: "meetings",
+    description: "Recap of past meetings ingested from Granola, with summaries.",
     enabled: true,
     adminOnly: false,
   },

@@ -201,6 +201,17 @@ export async function removeWorkspaceMember(
   });
 }
 
+export async function getWorkspaceByName(supabase: SupabaseClient<any>, name: string) {
+  const { data, error } = await supabase
+    .from("workspaces")
+    .select("*")
+    .eq("name", name)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function joinDefaultWorkspace(
   supabase: SupabaseClient<any>,
   userId: string,

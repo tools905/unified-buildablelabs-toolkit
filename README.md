@@ -10,6 +10,14 @@ areas for current and future team workflows.
 - LinkedIn Assessor: manual post submission, AI scoring, leaderboards, private
   coaching emails, analysis windows, and weekly reports.
 - HR Bot: route and module shell ready for future knowledge-base/chat work.
+- Tickets: kanban-style ticket tracking with claimed-vs-verified progress
+  review and in-platform notifications.
+- Resources: shared catalog of guides, tools, and learning roadmaps.
+- Meetings: recap of past meetings ingested from Granola once a summary is
+  generated (see `docs/GRANOLA_INTEGRATION.md`).
+
+See `docs/ARCHITECTURE.md` for how these fit together, `docs/DEPLOYMENT.md`
+for deployment/env setup, and `CONTRIBUTING.md` for the dev workflow.
 
 ## Tech Stack
 
@@ -54,6 +62,10 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 CRON_SECRET=
 
+# Optional — meeting recap ingestion, see docs/GRANOLA_INTEGRATION.md
+GRANOLA_API_KEY=
+GRANOLA_WEBHOOK_SIGNING_SECRET=
+
 NODE_ENV=development
 ```
 
@@ -69,6 +81,11 @@ schema remains intact. `009_toolkit_core.sql` adds shared toolkit tables and
 - `tool_settings`
 - `notifications`
 - `jobs`
+
+`017_tickets_core.sql` through `021_meeting_ticket_pipeline.sql` add the
+Tickets, Resources, and Meetings modules (tickets/ticket_comments, ticket
+review fields, learning_roadmaps/resources, meetings, and the
+meeting→ticket auto-extraction pipeline).
 
 The first authenticated user who reaches onboarding can create or join the
 default `BuildableLabs` workspace. The workspace tables are kept for compatibility,
@@ -89,6 +106,12 @@ but the product treats this as one internal workspace.
 - `/tools/linkedin-assessor/admin/settings`
 - `/tools/linkedin-assessor/reports`
 - `/tools/hr-bot`
+- `/tools/tickets`
+- `/tools/tickets/reviews`
+- `/tools/tickets/admin`
+- `/tools/resources`
+- `/tools/resources/admin`
+- `/tools/meetings`
 - `/admin`
 - `/admin/tools`
 - `/admin/settings`

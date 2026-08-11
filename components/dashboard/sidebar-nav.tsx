@@ -6,8 +6,11 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Bot,
+  BookOpen,
+  CalendarClock,
   ClipboardCheck,
   FileBarChart,
+  KanbanSquare,
   LayoutDashboard,
   MessageCircle,
   Newspaper,
@@ -70,6 +73,28 @@ const toolNav: Array<{
       { href: "/tools/hr-bot/chat", label: "Chat", icon: MessageCircle },
       { href: "/tools/hr-bot/admin", label: "Admin", icon: Settings, adminOnly: true },
     ],
+  },
+  {
+    match: "/tools/tickets",
+    title: "Tickets",
+    items: [
+      { href: "/tools/tickets", label: "Board", icon: KanbanSquare, exact: true },
+      { href: "/tools/tickets/reviews", label: "Reviews", icon: ClipboardCheck },
+      { href: "/tools/tickets/admin", label: "Admin", icon: Settings, adminOnly: true },
+    ],
+  },
+  {
+    match: "/tools/resources",
+    title: "Resources",
+    items: [
+      { href: "/tools/resources", label: "Browse", icon: BookOpen, exact: true },
+      { href: "/tools/resources/admin", label: "Admin", icon: Settings, adminOnly: true },
+    ],
+  },
+  {
+    match: "/tools/meetings",
+    title: "Meetings",
+    items: [{ href: "/tools/meetings", label: "Recaps", icon: CalendarClock, exact: true }],
   },
 ];
 
