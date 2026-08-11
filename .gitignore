@@ -46,3 +46,21 @@ demo-server.err
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase
+supabase/backups/
+supabase/.temp/
+
+# logs
+*.log
+logs/
+
+# IDE
+.idea
+*.swp
+*.swo
+
+# data files (not expected to be committed if present)
+config.json
+bot_queue.json
+meetings-log.json
