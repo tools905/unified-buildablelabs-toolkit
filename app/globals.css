@@ -3,17 +3,28 @@
 :root {
   --background: #0a0b0e; /* Ink */
   --foreground: #f5f6f8; /* Chrome white */
-  --card: #12141a; /* Raised surface */
+  --card: #14161d; /* Raised surface */
   --card-foreground: #f5f6f8;
-  --border: #1a1d24; /* Line */
+  --border: #20232c; /* Line */
   --muted: #1a1d24;
-  --muted-foreground: #7a8296; /* Muted chrome */
-  --primary: #0b3fde; /* Brand blue */
+  --muted-foreground: #8890a3; /* Muted chrome */
+  --primary: #2b5cff; /* Brand blue, lifted for more presence */
   --primary-foreground: #ffffff;
+  --accent: #7c8cff; /* Secondary accent, violet-lean blue */
+  --accent-foreground: #ffffff;
   --destructive: #f43f5e;
   --destructive-foreground: #ffffff;
-  --ring: #0b3fde;
-  --radius: 0.25rem;
+  --ring: #2b5cff;
+
+  /* Softer, more contemporary corners app-wide (drives rounded-sm/md/lg/xl) */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.55);
+  --shadow-card-hover: 0 20px 45px -20px rgba(43, 92, 255, 0.35);
+  --shadow-popover: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -26,6 +37,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-ring: var(--ring);
@@ -35,7 +48,10 @@
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(43, 92, 255, 0.10) 0%, rgba(43, 92, 255, 0) 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(124, 140, 255, 0.06) 0%, rgba(124, 140, 255, 0) 55%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   letter-spacing: 0;
@@ -57,21 +73,60 @@ summary::-webkit-details-marker {
   display: none;
 }
 
+::selection {
+  background: rgba(43, 92, 255, 0.35);
+  color: var(--foreground);
+}
+
+/* Thin, unobtrusive scrollbars that fit the dark theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Small uppercase kicker label, used above page/section titles */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.card-shadow {
+  box-shadow: var(--shadow-card);
+}
+
+.popover-shadow {
+  box-shadow: var(--shadow-popover);
+}
+
 /* Custom premium hover and glow effects */
 .card-hover-effect {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card-hover-effect:hover {
-  transform: translateY(-2px);
-  border-color: rgba(11, 63, 222, 0.3);
-  box-shadow: 0 10px 30px -15px rgba(11, 63, 222, 0.15);
+  transform: translateY(-3px);
+  border-color: rgba(43, 92, 255, 0.35);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .glow-glow {
   position: absolute;
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(11, 63, 222, 0.08) 0%, rgba(11, 63, 222, 0) 70%);
+  background: radial-gradient(circle, rgba(43, 92, 255, 0.1) 0%, rgba(43, 92, 255, 0) 70%);
   top: -250px;
   left: 50%;
   transform: translateX(-50%);

@@ -41,7 +41,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
           </span>
         ) : null}
       </summary>
-      <div className="absolute right-0 top-12 z-40 w-[min(20rem,calc(100vw-2rem))] rounded-md border border-border bg-card p-3 shadow-xl">
+      <div className="absolute right-0 top-12 z-40 w-[min(20rem,calc(100vw-2rem))] rounded-md border border-border bg-card p-3 popover-shadow">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold">Notifications</span>
           {unreadCount > 0 ? (

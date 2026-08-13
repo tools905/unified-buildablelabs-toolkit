@@ -1,7 +1,9 @@
 import { ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CreateResourceDialog } from "@/components/resources/create-resource-dialog";
 import { requireUser } from "@/lib/auth/require-user";
 import { listResources, listRoadmaps } from "@/lib/services/resource-service";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
@@ -42,10 +44,12 @@ export default async function ResourcesPage({
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold sm:text-3xl">Resources</h1>
-        <p className="text-muted-foreground">Guides, tools, and learning roadmaps shared by the team.</p>
-      </div>
+      <PageHeader
+        eyebrow="Resources"
+        title="Catalog"
+        description="Guides, tools, and learning roadmaps shared by the team."
+        actions={<CreateResourceDialog roadmaps={roadmaps} />}
+      />
 
       <form className="mb-4 flex flex-wrap gap-2" action="/tools/resources">
         <input
