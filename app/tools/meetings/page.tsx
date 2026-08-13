@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/dashboard/app-shell";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { MeetingCard } from "@/components/meetings/meeting-card";
 import { requireUser } from "@/lib/auth/require-user";
@@ -20,12 +21,11 @@ export default async function MeetingsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold sm:text-3xl">Meetings</h1>
-        <p className="text-muted-foreground">
-          Recap of past meetings, ingested from Granola once a summary is generated.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Meetings"
+        title="Recaps"
+        description="Recap of past meetings, ingested from Granola once a summary is generated."
+      />
 
       {meetings.length === 0 ? (
         <Card>

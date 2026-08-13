@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/dashboard/app-shell";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,10 +15,11 @@ export default async function ToolsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold sm:text-3xl">Tools</h1>
-        <p className="text-muted-foreground">Shared internal tools for BuildableLabs workflows.</p>
-      </div>
+      <PageHeader
+        eyebrow="Catalog"
+        title="Tools"
+        description="Every internal tool available to BuildableLabs, including ones not yet enabled for your workspace."
+      />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-4">
         {tools.map((tool) => (
           <Card key={tool.slug} className="card-hover-effect flex h-full flex-col">

@@ -79,7 +79,7 @@ export function MeetingCard({
           onClick={() => setOpen(false)}
         >
           <div
-            className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg border border-border bg-card shadow-xl"
+            className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg border border-border bg-card popover-shadow"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-border p-5">

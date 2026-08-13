@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/dashboard/app-shell";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { KanbanBoard } from "@/components/tickets/kanban-board";
 import { requireUser } from "@/lib/auth/require-user";
@@ -31,10 +32,11 @@ export default async function TicketsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold sm:text-3xl">Tickets</h1>
-        <p className="text-muted-foreground">Track work across backlog, in progress, and done.</p>
-      </div>
+      <PageHeader
+        eyebrow="Tickets"
+        title="Board"
+        description="Track work across backlog, in progress, and done."
+      />
       {accuracy.totalTickets > 0 ? (
         <div className="mb-6 max-w-xs">
           <StatCard
