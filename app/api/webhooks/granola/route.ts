@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchGranolaNote, verifyGranolaWebhookSignature } from "@/lib/services/granola-client";
 import { upsertMeetingFromGranolaNote } from "@/lib/services/calendar-service";
-import { getWorkspaceByName } from "@/lib/services/workspace-service";
+import { getWorkspaceByName, getWorkspaceMembers } from "@/lib/services/workspace-service";
+import { createTicketsFromMeeting } from "@/lib/services/meeting-parser-service";
 
 const LOG_PREFIX = "[granola-webhook]";
 
@@ -85,6 +86,26 @@ export async function POST(request: Request) {
 
     const meeting = await upsertMeetingFromGranolaNote(admin, workspace.id, note);
     console.log(`${LOG_PREFIX} upserted meeting`, { meetingId: meeting.id, noteId });
+
+    if (!meeting.tickets_extracted_at) {
+      after(async () => {
+        try {
+          const members = await getWorkspaceMembers(admin, workspace.id);
+          const actor = members.find((m: { role: string }) => m.role === "admin");
+          if (!actor) {
+            console.error(`${LOG_PREFIX} skipping ticket extraction: no workspace admin found`, { meetingId: meeting.id });
+            return;
+          }
+          const result = await createTicketsFromMeeting(admin, workspace.id, meeting, actor.user_id);
+          console.log(`${LOG_PREFIX} ticket extraction complete`, { meetingId: meeting.id, createdCount: result.createdCount });
+        } catch (error) {
+          console.error(`${LOG_PREFIX} ticket extraction failed`, { meetingId: meeting.id, error });
+        }
+      });
+    } else {
+      console.log(`${LOG_PREFIX} skipping ticket extraction: already extracted`, { meetingId: meeting.id, extractedAt: meeting.tickets_extracted_at });
+    }
+
     return NextResponse.json({ ok: true, meetingId: meeting.id });
   } catch (error) {
     console.error(`${LOG_PREFIX} failed processing webhook`, { noteId, error });
