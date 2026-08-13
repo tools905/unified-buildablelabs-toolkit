@@ -50,7 +50,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Menu className="h-5 w-5" />
               </summary>
-              <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-border bg-card p-4 shadow-xl">
+              <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-border bg-card p-4 popover-shadow">
                 <SidebarNav admin={admin} />
               </div>
             </details>
@@ -58,8 +58,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </header>
       </div>
       <div className="flex min-h-screen w-full">
-        <aside className="sticky top-0 hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-border bg-card/80 px-5 py-5 lg:block">
-          <div className="mb-6">
+        <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-border bg-card/80 lg:flex">
+          <div className="border-b border-border/60 px-5 py-5">
             <Link href="/dashboard" className="block">
               <div className="text-base font-bold tracking-tight text-foreground">
                 BuildableLabs
@@ -71,9 +71,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               <NotificationBell notifications={notifications} />
             </div>
           </div>
-          <SidebarNav admin={admin} />
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <SidebarNav admin={admin} />
+          </div>
         </aside>
-        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
