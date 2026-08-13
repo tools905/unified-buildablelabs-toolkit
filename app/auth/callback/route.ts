@@ -18,5 +18,13 @@ export async function GET(request: Request) {
     await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
   }
 
-  return NextResponse.redirect(new URL(next, requestUrl.origin));
+  // The LP site's vercel.json proxies /teams/* to this deployment via an
+  // external rewrite, so `requestUrl.origin` here is always this app's own
+  // .vercel.app origin, never the public-facing domain the user is on.
+  // Rebuild the origin from the forwarded headers Vercel's proxy sets.
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
+  const origin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : requestUrl.origin;
+
+  return NextResponse.redirect(new URL(next, origin));
 }
