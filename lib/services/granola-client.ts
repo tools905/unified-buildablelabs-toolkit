@@ -49,6 +49,13 @@ export async function fetchGranolaNote(noteId: string): Promise<GranolaNote> {
   });
 
   if (!response.ok) {
+    const errorBody = await response.text().catch(() => "<unreadable>");
+    console.error("[granola-client] fetchGranolaNote failed", {
+      noteId,
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody,
+    });
     throw new Error(`Granola API error fetching note ${noteId}: ${response.status} ${response.statusText}`);
   }
 
@@ -66,25 +73,45 @@ export function verifyGranolaWebhookSignature(
   rawBody: string,
   headers: { id: string | null; timestamp: string | null; signature: string | null },
 ): boolean {
+  const LOG_PREFIX = "[granola-webhook-signature]";
   const secret = process.env.GRANOLA_WEBHOOK_SIGNING_SECRET;
-  if (!secret) return false;
-  if (!headers.id || !headers.timestamp || !headers.signature) return false;
+  if (!secret) {
+    console.error(`${LOG_PREFIX} rejected: GRANOLA_WEBHOOK_SIGNING_SECRET is not configured`);
+    return false;
+  }
+  if (!headers.id || !headers.timestamp || !headers.signature) {
+    console.error(`${LOG_PREFIX} rejected: missing webhook-id/timestamp/signature header`, headers);
+    return false;
+  }
 
   const timestampSeconds = Number(headers.timestamp);
-  if (!Number.isFinite(timestampSeconds)) return false;
+  if (!Number.isFinite(timestampSeconds)) {
+    console.error(`${LOG_PREFIX} rejected: non-numeric webhook-timestamp`, { timestamp: headers.timestamp });
+    return false;
+  }
   const nowSeconds = Math.floor(Date.now() / 1000);
-  if (Math.abs(nowSeconds - timestampSeconds) > WEBHOOK_TOLERANCE_SECONDS) return false;
+  const driftSeconds = Math.abs(nowSeconds - timestampSeconds);
+  if (driftSeconds > WEBHOOK_TOLERANCE_SECONDS) {
+    console.error(`${LOG_PREFIX} rejected: timestamp outside tolerance`, { driftSeconds, toleranceSeconds: WEBHOOK_TOLERANCE_SECONDS });
+    return false;
+  }
 
   const secretBytes = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
   const signedContent = `${headers.id}.${headers.timestamp}.${rawBody}`;
   const expected = createHmac("sha256", secretBytes).update(signedContent).digest("base64");
   const expectedBuffer = Buffer.from(expected);
 
-  return headers.signature.split(" ").some((candidate) => {
+  const matched = headers.signature.split(" ").some((candidate) => {
     const [version, value] = candidate.split(",");
     if (version !== "v1" || !value) return false;
     const candidateBuffer = Buffer.from(value);
     if (candidateBuffer.length !== expectedBuffer.length) return false;
     return timingSafeEqual(candidateBuffer, expectedBuffer);
   });
+  if (!matched) {
+    console.error(`${LOG_PREFIX} rejected: no signature candidate matched expected HMAC`, {
+      receivedSignature: headers.signature,
+    });
+  }
+  return matched;
 }
