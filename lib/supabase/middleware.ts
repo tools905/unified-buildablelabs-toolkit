@@ -10,6 +10,7 @@ const protectedPrefixes = [
   "/projects",
   "/my-reviews",
   "/onboarding",
+  "/notifications",
 ];
 
 export async function updateSession(request: NextRequest) {
