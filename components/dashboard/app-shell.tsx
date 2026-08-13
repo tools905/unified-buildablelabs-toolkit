@@ -5,30 +5,30 @@ import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { getUserSession } from "@/lib/auth/require-user";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { listNotifications } from "@/lib/services/notification-service";
+import { getUnreadNotificationCount } from "@/lib/services/notification-service";
 
 async function getShellContext() {
   try {
     const { supabase, user } = await getUserSession();
 
-    if (!user) return { admin: false, notifications: [] };
+    if (!user) return { admin: false, unreadCount: 0 };
 
     const workspace = await getCurrentWorkspace(supabase, user.id);
-    if (!workspace) return { admin: false, notifications: [] };
+    if (!workspace) return { admin: false, unreadCount: 0 };
 
-    const [admin, notifications] = await Promise.all([
+    const [admin, unreadCount] = await Promise.all([
       isWorkspaceAdmin(workspace.id, user.id, supabase),
-      listNotifications(supabase, user.id),
+      getUnreadNotificationCount(supabase, user.id),
     ]);
 
-    return { admin, notifications };
+    return { admin, unreadCount };
   } catch {
-    return { admin: false, notifications: [] };
+    return { admin: false, unreadCount: 0 };
   }
 }
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const { admin, notifications } = await getShellContext();
+  const { admin, unreadCount } = await getShellContext();
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,7 +42,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <Badge>{admin ? "Admin" : "Member"}</Badge>
-            <NotificationBell notifications={notifications} />
+            <NotificationBell unreadCount={unreadCount} />
             <details className="relative">
               <summary
                 aria-label="Open navigation"
@@ -68,7 +68,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             <div className="mt-3 flex items-center gap-2">
               <Badge>{admin ? "Admin" : "Member"}</Badge>
-              <NotificationBell notifications={notifications} />
+              <NotificationBell unreadCount={unreadCount} />
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">

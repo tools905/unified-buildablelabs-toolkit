@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -8,6 +9,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { listResources, listRoadmaps } from "@/lib/services/resource-service";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
+import { BASE_PATH } from "@/lib/utils/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +53,7 @@ export default async function ResourcesPage({
         actions={<CreateResourceDialog roadmaps={roadmaps} />}
       />
 
-      <form className="mb-4 flex flex-wrap gap-2" action="/tools/resources">
+      <form className="mb-4 flex flex-wrap gap-2" action={`${BASE_PATH}/tools/resources`}>
         <input
           type="search"
           name="search"
@@ -64,16 +66,16 @@ export default async function ResourcesPage({
       </form>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <a
+        <Link
           href={buildHref({ category: undefined })}
           className={`rounded-full border px-3 py-1 text-xs font-medium ${
             !params.category ? "border-primary bg-primary text-primary-foreground" : "border-border"
           }`}
         >
           All categories
-        </a>
+        </Link>
         {categories.map((category) => (
-          <a
+          <Link
             key={category}
             href={buildHref({ category })}
             className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${
@@ -81,22 +83,22 @@ export default async function ResourcesPage({
             }`}
           >
             {category}
-          </a>
+          </Link>
         ))}
       </div>
 
       {roadmaps.length > 0 ? (
         <div className="mb-6 flex flex-wrap gap-2">
-          <a
+          <Link
             href={buildHref({ roadmap: undefined })}
             className={`rounded-full border px-3 py-1 text-xs font-medium ${
               !params.roadmap ? "border-primary bg-primary text-primary-foreground" : "border-border"
             }`}
           >
             All roadmaps
-          </a>
+          </Link>
           {roadmaps.map((roadmap: { id: string; name: string }) => (
-            <a
+            <Link
               key={roadmap.id}
               href={buildHref({ roadmap: roadmap.id })}
               className={`rounded-full border px-3 py-1 text-xs font-medium ${
@@ -104,7 +106,7 @@ export default async function ResourcesPage({
               }`}
             >
               {roadmap.name}
-            </a>
+            </Link>
           ))}
         </div>
       ) : null}
