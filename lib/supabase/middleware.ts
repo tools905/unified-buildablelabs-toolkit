@@ -59,5 +59,18 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
+  // Handles the exact root ("/", i.e. just the basePath). Without this,
+  // app/page.tsx's own `redirect("/dashboard")` is the only thing that
+  // sends a logged-in visitor onward, and it fires after an await —
+  // Next.js then replays it client-side via an RSC flight-redirect digest
+  // that omits the basePath, sending users to the parent domain's own
+  // root instead of /teams/dashboard. Redirecting here first, with a
+  // clone()'d NextURL, is basePath-correct and preempts that entirely.
+  if (request.nextUrl.pathname === "/" && user) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    return NextResponse.redirect(redirectUrl);
+  }
+
   return response;
 }
