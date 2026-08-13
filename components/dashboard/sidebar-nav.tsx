@@ -4,18 +4,21 @@ import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   BarChart3,
   Bot,
   BookOpen,
   CalendarClock,
   ClipboardCheck,
   FileBarChart,
+  History,
   KanbanSquare,
   LayoutDashboard,
   MessageCircle,
   Newspaper,
   Settings,
   Share2,
+  SlidersHorizontal,
   Users,
   Wrench,
 } from "lucide-react";
@@ -34,7 +37,11 @@ const baseLinks: NavItem[] = [
 ];
 
 const adminLinks: NavItem[] = [
-  { href: "/team", label: "Team", icon: Users },
+  { href: "/team", label: "Team", icon: Users, exact: true },
+  { href: "/team/logs", label: "Workspace Logs", icon: Activity },
+  { href: "/admin", label: "Admin Reports", icon: BarChart3, exact: true },
+  { href: "/admin/audit-logs", label: "Audit Logs", icon: History },
+  { href: "/admin/settings", label: "App Settings", icon: SlidersHorizontal },
   { href: "/admin/tools", label: "Tool Settings", icon: Settings },
 ];
 
@@ -138,7 +145,7 @@ export function SidebarNav({ admin }: { admin: boolean }) {
         <div className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">
           Workspace
         </div>
-        <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-1">
           {globalLinks.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
           ))}
@@ -149,7 +156,7 @@ export function SidebarNav({ admin }: { admin: boolean }) {
           <div className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">
             {activeTool.title}
           </div>
-          <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="grid gap-1">
             {activeToolItems.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
             ))}

@@ -50,7 +50,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Menu className="h-5 w-5" />
               </summary>
-              <div className="absolute right-0 top-12 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-border bg-card p-4 shadow-xl">
+              <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-border bg-card p-4 shadow-xl">
                 <SidebarNav admin={admin} />
               </div>
             </details>
