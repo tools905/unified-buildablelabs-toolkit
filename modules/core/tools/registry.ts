@@ -50,9 +50,9 @@ export const toolkitTools: ToolkitTool[] = [
     adminOnly: false,
   },
   {
-    name: "Resources",
+    name: "Upskill",
     slug: "resources",
-    description: "Browse a shared catalog of guides, tools, and learning roadmaps.",
+    description: "Browse a shared catalog of guides and tools, and test your knowledge with adaptive Q&A.",
     enabled: true,
     adminOnly: false,
   },

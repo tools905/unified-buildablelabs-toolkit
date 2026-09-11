@@ -50,4 +50,22 @@ describe("scoring service", () => {
     const designer = calculateRoleWeightedScore(ratings, "System Designer");
     expect(intern.weightedScore).not.toBe(designer.weightedScore);
   });
+
+  it("returns a null score (not zero) when no ratings were given at all", () => {
+    const allNull = {
+      communication: null,
+      reliability: null,
+      ownership: null,
+      executionQuality: null,
+      collaboration: null,
+      technicalQuality: null,
+      problemSolving: null,
+      leadership: null,
+      systemDesign: null,
+      learningGrowth: null,
+    };
+    const result = calculateRoleWeightedScore(allNull, "Developer");
+    expect(result.weightedScore).toBeNull();
+    expect(result.scorePercentage).toBeNull();
+  });
 });

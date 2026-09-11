@@ -92,7 +92,7 @@ const toolNav: Array<{
   },
   {
     match: "/tools/resources",
-    title: "Resources",
+    title: "Upskill",
     items: [
       { href: "/tools/resources", label: "Browse", icon: BookOpen, exact: true },
       { href: "/tools/resources/admin", label: "Admin", icon: Settings, adminOnly: true },

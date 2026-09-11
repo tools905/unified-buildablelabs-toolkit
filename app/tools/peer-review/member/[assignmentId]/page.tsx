@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { TextField } from "@/app/tools/peer-review/member/[assignmentId]/text-fi
 import { requireUser } from "@/lib/auth/require-user";
 import { getAssignmentForReview } from "@/lib/services/assignment-service";
 import { submitReview } from "@/lib/services/review-service";
+import { getTicketDeliveryStats } from "@/lib/services/ticket-review-service";
 import { one } from "@/lib/utils/relations";
 
 const ratingFields = [
@@ -30,7 +31,14 @@ export default async function AssignmentPage({
   const { supabase, user } = await requireUser();
   const { assignmentId } = await params;
   const assignment = await getAssignmentForReview(supabase, assignmentId, user.id);
+  if (!assignment) notFound();
   const response = one(assignment.review_responses);
+  const deliveryStats = await getTicketDeliveryStats(
+    supabase,
+    assignment.reviewee_id,
+    assignment.review_rounds.scheduled_start_at,
+    assignment.review_rounds.due_at,
+  );
 
   async function submitAction(formData: FormData) {
     "use server";
@@ -65,6 +73,14 @@ export default async function AssignmentPage({
             {assignment.review_rounds?.projects?.name} - {assignment.review_rounds?.title}
           </CardDescription>
         </CardHeader>
+        {deliveryStats.touched > 0 || deliveryStats.overdue > 0 ? (
+          <CardContent className="border-t border-border pt-4 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Ticket activity this round: </span>
+            {deliveryStats.completed} completed, {deliveryStats.verified} verified
+            {deliveryStats.overdue > 0 ? `, ${deliveryStats.overdue} overdue` : ""} (out of{" "}
+            {deliveryStats.touched} touched)
+          </CardContent>
+        ) : null}
         <CardContent>
           <form action={submitAction} className="space-y-5">
             <TextField name="strengths" label="Strengths" defaultValue={response?.strengths} />

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { markOverdueAssignments, sendAdminOverdueSummaries } from "@/lib/services/reminder-service";
+import { closeOverdueRounds } from "@/lib/services/round-service";
 import { assertCronSecret } from "@/lib/utils/cron";
 
 export async function GET(request: Request) {
@@ -10,5 +11,6 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const markedOverdue = await markOverdueAssignments(supabase);
   const adminSummariesSent = await sendAdminOverdueSummaries(supabase);
-  return NextResponse.json({ markedOverdue, adminSummariesSent });
+  const roundsClosed = await closeOverdueRounds(supabase);
+  return NextResponse.json({ markedOverdue, adminSummariesSent, roundsClosed });
 }
