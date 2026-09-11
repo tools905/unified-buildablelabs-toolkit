@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -128,9 +128,9 @@ export default async function NewProjectPage({
                 ))}
               </div>
             </div>
-            <Button className="w-fit" disabled={members.length < minMembers}>
+            <SubmitButton className="w-fit" disabled={members.length < minMembers}>
               Create project
-            </Button>
+            </SubmitButton>
           </form>
         </CardContent>
       </Card>

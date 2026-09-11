@@ -35,8 +35,9 @@ export async function submitReview(
     .select("*, review_rounds(*)")
     .eq("id", assignmentId)
     .eq("reviewer_id", userId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!assignment) throw new Error("Assignment not found.");
   if (assignment.review_rounds?.status !== "active") {
     throw new Error("Reviews can only be submitted while the round is active.");
   }
