@@ -23,7 +23,7 @@ export default async function RoundPage({
   const workspace = await getCurrentWorkspace(supabase, user.id);
   if (!workspace) redirect("/onboarding");
   const [{ data: round }, progress] = await Promise.all([
-    supabase.from("review_rounds").select("*, projects(*)").eq("id", roundId).single(),
+    supabase.from("review_rounds").select("*, projects(*)").eq("id", roundId).maybeSingle(),
     getRoundProgress(supabase, roundId),
   ]);
   if (!round) redirect(`/tools/peer-review/admin/${projectId}`);
@@ -129,7 +129,7 @@ async function requireRoundAdmin(roundId: string, projectId: string) {
     .from("review_rounds")
     .select("project_id, projects!inner(workspace_id)")
     .eq("id", roundId)
-    .single();
+    .maybeSingle();
   if (
     round?.project_id !== projectId ||
     one(round?.projects)?.workspace_id !== workspace.id

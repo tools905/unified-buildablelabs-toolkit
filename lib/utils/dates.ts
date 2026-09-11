@@ -1,4 +1,4 @@
-import { addDays, addHours, isAfter, startOfDay } from "date-fns";
+import { addDays, addHours, isAfter } from "date-fns";
 import type { ReviewCadence } from "@/lib/db/types";
 
 export type PlannedRound = {
@@ -8,9 +8,12 @@ export type PlannedRound = {
   dueAt: Date;
 };
 
+// Uses UTC methods explicitly (not startOfDay/setHours, which read the
+// server's local timezone) so round scheduling is deterministic regardless
+// of what timezone the process happens to run in.
 function atNine(date: Date) {
-  const next = startOfDay(date);
-  next.setHours(9, 0, 0, 0);
+  const next = new Date(date);
+  next.setUTCHours(9, 0, 0, 0);
   return next;
 }
 

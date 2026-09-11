@@ -69,7 +69,7 @@ export default async function ResourcesAdminPage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold sm:text-3xl">Resources Admin</h1>
+        <h1 className="text-2xl font-semibold sm:text-3xl">Upskill Admin</h1>
         <p className="text-muted-foreground">Add resources, manage roadmaps, and edit the catalog.</p>
       </div>
 

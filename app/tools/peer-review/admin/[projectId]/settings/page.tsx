@@ -25,7 +25,7 @@ export default async function ProjectSettingsPage({
   const workspace = await getCurrentWorkspace(supabase, user.id);
   if (!workspace) redirect("/onboarding");
   const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
-  if (!admin || project.workspace_id !== workspace.id) notFound();
+  if (!project || !admin || project.workspace_id !== workspace.id) notFound();
 
   async function updateProjectAction(formData: FormData) {
     "use server";
@@ -34,6 +34,7 @@ export default async function ProjectSettingsPage({
     const actionProject = await getProject(supabase, projectId);
     if (
       !workspace ||
+      !actionProject ||
       actionProject.workspace_id !== workspace.id ||
       !(await isWorkspaceAdmin(workspace.id, user.id, supabase))
     ) {
@@ -56,7 +57,7 @@ export default async function ProjectSettingsPage({
 
     const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
     const actionProject = await getProject(supabase, projectId);
-    if (!admin || actionProject.workspace_id !== workspace.id) {
+    if (!admin || !actionProject || actionProject.workspace_id !== workspace.id) {
       throw new Error("Only workspace admins can delete projects.");
     }
 

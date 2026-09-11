@@ -183,6 +183,45 @@ export async function disputeProgress(
   return ticket;
 }
 
+// Delivery stats scoped to a review round's time window, for showing real
+// work context alongside a peer review's qualitative feedback. Unlike
+// getPerformanceAccuracy below, this is windowed rather than all-time, and
+// isn't scoped to a specific peer-review project since tickets don't carry
+// a project link.
+export async function getTicketDeliveryStats(
+  supabase: SupabaseClient<any>,
+  userId: string,
+  windowStart: string,
+  windowEnd: string,
+) {
+  const { data: touchedTickets, error: touchedError } = await supabase
+    .from("tickets")
+    .select("id, status, review_status")
+    .eq("assigned_to", userId)
+    .gte("updated_at", windowStart)
+    .lte("updated_at", windowEnd);
+  if (touchedError) throw touchedError;
+
+  const touched = touchedTickets ?? [];
+  const completed = touched.filter((t) => t.status === "done").length;
+  const verified = touched.filter((t) => t.review_status === "verified").length;
+
+  const { count: overdueCount, error: overdueError } = await supabase
+    .from("tickets")
+    .select("id", { count: "exact", head: true })
+    .eq("assigned_to", userId)
+    .neq("status", "done")
+    .lt("due_date", windowEnd);
+  if (overdueError) throw overdueError;
+
+  return {
+    touched: touched.length,
+    completed,
+    verified,
+    overdue: overdueCount ?? 0,
+  };
+}
+
 export async function getPerformanceAccuracy(
   supabase: SupabaseClient<any>,
   workspaceId: string,
