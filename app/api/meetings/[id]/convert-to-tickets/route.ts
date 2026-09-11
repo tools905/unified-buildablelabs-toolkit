@@ -51,6 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       tickets: result.tickets,
       preview: result.preview,
       created_count: result.createdCount,
+      duplicates_skipped: "duplicatesSkipped" in result ? result.duplicatesSkipped : 0,
       dry_run: dryRun,
     });
   } catch (error) {

@@ -57,6 +57,21 @@ Meetings (`020_meetings.sql`, extended by `021_meeting_ticket_pipeline.sql`):
 - `tickets.linked_meeting_id` — nullable FK back to the meeting a ticket was
   auto-extracted from (null for manually created tickets)
 
+Linear integration (`022_linear_integration.sql`) — link-only, see
+`docs/LINEAR_INTEGRATION.md` and `docs/PRD_LINEAR_INTEGRATION.md`:
+- `tickets.linear_issue_id`/`linear_issue_identifier`/`linear_issue_url` — the
+  linked Linear issue, if any (unique per workspace via a partial index —
+  one Linear issue maps to at most one ticket)
+- `tickets.linear_link_source`/`linear_link_confidence` — how the link was
+  made (`auto_identifier`, `suggestion_accepted`, `manual`); only identifier
+  matches link automatically, everything else requires a human click
+- `ticket_linear_suggestions` — borderline semantic matches awaiting a
+  human decision (not yet populated by any writer as of this phase — the
+  detection logic that fills this table ships in a later phase)
+- `linear_integration_settings` — one row per workspace: which Linear teams
+  are searchable (also the privacy boundary, since one shared API key sees
+  everything, see `linear-client.ts`) and the suggestion confidence threshold
+
 ## Services (`lib/services`)
 
 - `ticket-service.ts` — ticket CRUD, filtering, bulk operations, comments
@@ -75,6 +90,11 @@ Meetings (`020_meetings.sql`, extended by `021_meeting_ticket_pipeline.sql`):
   sends the recap digest
 - `granola-client.ts` — Granola API fetch + Standard Webhooks signature
   verification
+- `linear-client.ts` — Linear GraphQL API client (issue search, identifier
+  lookup, team list); read-only, no writes to Linear in v1
+- `linear-link-service.ts` — link/unlink a ticket to a Linear issue, workspace
+  Linear settings, and the pure `extractLinearIdentifier()` used for
+  deterministic (Tier 1) matching
 - `notification-service.ts` — generic in-platform notifications (create via
   the admin client since one user notifies another; read/mark-read via the
   caller's own client so RLS still applies)

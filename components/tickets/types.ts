@@ -1,4 +1,4 @@
-import type { TicketReviewStatus, TicketStatus } from "@/lib/db/types";
+import type { LinearLinkSource, TicketReviewStatus, TicketStatus } from "@/lib/db/types";
 
 export type TicketProfile = {
   id: string;
@@ -22,6 +22,11 @@ export type TicketWithRelations = {
   reviewed_at: string | null;
   review_notes: string | null;
   linked_meeting_id: string | null;
+  linear_issue_id: string | null;
+  linear_issue_identifier: string | null;
+  linear_issue_url: string | null;
+  linear_link_source: LinearLinkSource | null;
+  linear_link_confidence: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;
