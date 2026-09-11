@@ -84,7 +84,7 @@ describe("project members management", () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({ data: { workspace_id: "workspace-1" }, error: null }),
+                maybeSingle: vi.fn().mockResolvedValue({ data: { workspace_id: "workspace-1" }, error: null }),
               }),
             }),
           };
@@ -124,7 +124,7 @@ describe("project members management", () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({ data: { workspace_id: "workspace-1" }, error: null }),
+                maybeSingle: vi.fn().mockResolvedValue({ data: { workspace_id: "workspace-1" }, error: null }),
               }),
             }),
           };

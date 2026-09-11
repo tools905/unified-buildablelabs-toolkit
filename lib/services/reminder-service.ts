@@ -115,6 +115,14 @@ export async function sendAdminOverdueSummaries(
       .select("profiles(*)")
       .eq("workspace_id", round.projects?.workspace_id ?? "")
       .eq("role", "admin");
+    const { data: recentSummaryLogs } = await supabase
+      .from("notification_logs")
+      .select("recipient_email")
+      .eq("round_id", round.id)
+      .eq("type", "admin_overdue_summary")
+      .eq("status", "sent")
+      .gte("sent_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+    const recentlyNotified = new Set((recentSummaryLogs ?? []).map((log) => log.recipient_email));
     const pendingMembers = [
       ...new Set(
         (assignments ?? []).map((assignment) => {
@@ -126,7 +134,7 @@ export async function sendAdminOverdueSummaries(
 
     await Promise.all((admins ?? []).map(async (admin) => {
       const profile = one(admin.profiles);
-      if (!profile?.email) return;
+      if (!profile?.email || recentlyNotified.has(profile.email)) return;
       await sendAdminOverdueSummaryEmail(supabase, {
         to: profile.email,
         projectName: round.projects?.name ?? "Peer review project",

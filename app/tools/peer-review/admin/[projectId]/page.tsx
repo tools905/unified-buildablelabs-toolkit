@@ -26,7 +26,7 @@ export default async function ProjectPage({
   const { projectId } = await params;
   const project = await getProject(supabase, projectId);
   const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
-  if (!admin || project.workspace_id !== workspace.id) notFound();
+  if (!project || !admin || project.workspace_id !== workspace.id) notFound();
 
   const workspaceMembers = await getWorkspaceMembers(supabase, workspace.id);
   const activeProjectMembers = (project.project_members ?? []).filter((m: any) => m.is_active);
@@ -47,6 +47,7 @@ export default async function ProjectPage({
     const actionProject = await getProject(supabase, projectId);
     if (
       !workspace ||
+      !actionProject ||
       actionProject.workspace_id !== workspace.id ||
       !(await isWorkspaceAdmin(workspace.id, user.id, supabase))
     ) {
@@ -63,6 +64,7 @@ export default async function ProjectPage({
     const actionProject = await getProject(supabase, projectId);
     if (
       !workspace ||
+      !actionProject ||
       actionProject.workspace_id !== workspace.id ||
       !(await isWorkspaceAdmin(workspace.id, user.id, supabase))
     ) {
@@ -84,6 +86,7 @@ export default async function ProjectPage({
     const actionProject = await getProject(supabase, projectId);
     if (
       !workspace ||
+      !actionProject ||
       actionProject.workspace_id !== workspace.id ||
       !(await isWorkspaceAdmin(workspace.id, user.id, supabase))
     ) {

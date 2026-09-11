@@ -176,6 +176,15 @@ export function calculateRoleWeightedScore(
     ratings,
   );
 
+  const hasAnyRating = ratingCategories.some((category) => typeof ratings[category] === "number");
+  if (!hasAnyRating) {
+    return {
+      weightedScore: null,
+      scorePercentage: null,
+      roleWeights: normalizedWeights,
+    };
+  }
+
   const weightedScore = ratingCategories.reduce((sum, category) => {
     const rating = ratings[category];
     if (typeof rating !== "number") return sum;

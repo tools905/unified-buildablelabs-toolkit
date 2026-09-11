@@ -123,7 +123,9 @@ export default async function ReportPage({
               <CardTitle className="flex flex-wrap items-center justify-between gap-2">
                 <span>{reviewee.revieweeName}</span>
                 <span className="text-base">
-                  {reviewee.weightedScore} / 5 ({reviewee.scorePercentage}%)
+                  {reviewee.weightedScore === null
+                    ? "No ratings submitted"
+                    : `${reviewee.weightedScore} / 5 (${reviewee.scorePercentage}%)`}
                 </span>
               </CardTitle>
             </CardHeader>

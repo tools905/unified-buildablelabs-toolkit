@@ -440,6 +440,39 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["resource_roadmap_mapping"]["Insert"]>;
       };
+      qa_attempts: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          roadmap_id: string;
+          user_id: string;
+          status: string;
+          total_questions: number;
+          turns: Json;
+          score: number | null;
+          summary: Json | null;
+          started_at: string;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          roadmap_id: string;
+          user_id: string;
+          status?: string;
+          total_questions?: number;
+          turns?: Json;
+          score?: number | null;
+          summary?: Json | null;
+          started_at?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["qa_attempts"]["Insert"]>;
+      };
       meetings: {
         Row: {
           id: string;
