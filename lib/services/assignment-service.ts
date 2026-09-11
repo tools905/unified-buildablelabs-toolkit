@@ -64,7 +64,7 @@ export async function getAssignmentForReview(
     .select("*, review_rounds(*, projects(*)), reviewee:profiles!review_assignments_reviewee_id_fkey(*), review_responses(*)")
     .eq("id", assignmentId)
     .eq("reviewer_id", userId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }

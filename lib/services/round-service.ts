@@ -64,15 +64,17 @@ export async function startReviewRound(
     .select("*")
     .in("id", reviewerIds);
 
-  const { count: startEmailCount } = await supabase
+  const { data: sentStartEmails } = await supabase
     .from("notification_logs")
-    .select("id", { count: "exact", head: true })
+    .select("recipient_email")
     .eq("round_id", roundId)
     .eq("type", "round_started")
     .eq("status", "sent");
+  const alreadyNotified = new Set((sentStartEmails ?? []).map((log) => log.recipient_email));
+  const pendingReviewers = (reviewers ?? []).filter((reviewer) => !alreadyNotified.has(reviewer.email));
 
-  if (assignments.length > 0 && !startEmailCount) {
-    await Promise.all((reviewers ?? []).map((reviewer) =>
+  if (assignments.length > 0 && pendingReviewers.length > 0) {
+    await Promise.all(pendingReviewers.map((reviewer) =>
       sendRoundStartedEmail(supabase, {
         to: reviewer.email,
         projectName: updated.projects?.name ?? "Peer review project",
@@ -102,7 +104,7 @@ export async function completeRoundIfReady(
   roundId: string,
 ) {
   const progress = await getRoundProgress(supabase, roundId);
-  if (progress.total > 0 && progress.submitted === progress.total) {
+  if (progress.total > 0 && progress.submitted + progress.skipped === progress.total) {
     const { data, error } = await supabase
       .from("review_rounds")
       .update({ status: "completed", completed_at: new Date().toISOString() })
@@ -131,6 +133,35 @@ export async function closeRound(
   const progress = await getRoundProgress(supabase, roundId);
   await notifyReportReady(supabase, data, progress.completionRate);
   return data;
+}
+
+// Grace period past due_at before an unfinished round is auto-closed, so
+// reviewers effectively get one more full review window to finish late.
+// Reuses each project's own review_due_hours rather than a fixed constant.
+export async function closeOverdueRounds(supabase: SupabaseClient<any>) {
+  const { data: rounds, error } = await supabase
+    .from("review_rounds")
+    .select("id, due_at, projects(review_due_hours)")
+    .eq("status", "active");
+  if (error) throw error;
+
+  const now = Date.now();
+  let closed = 0;
+  for (const round of rounds ?? []) {
+    const graceHours = one(round.projects)?.review_due_hours ?? 48;
+    const closeAfter = new Date(round.due_at).getTime() + graceHours * 60 * 60 * 1000;
+    if (now < closeAfter) continue;
+
+    await closeRound(supabase, round.id);
+    await writeAuditLog(supabase, {
+      action: "review_round.auto_closed",
+      entityType: "review_round",
+      entityId: round.id,
+      metadata: { reason: "overdue_past_grace_period", graceHours },
+    });
+    closed += 1;
+  }
+  return closed;
 }
 
 async function notifyReportReady(
@@ -173,11 +204,12 @@ export async function getRoundProgress(
   const total = assignments?.length ?? 0;
   const submitted = assignments?.filter((a) => a.status === "submitted").length ?? 0;
   const overdue = assignments?.filter((a) => a.status === "overdue").length ?? 0;
-  const pending = total - submitted - overdue;
+  const skipped = assignments?.filter((a) => a.status === "skipped").length ?? 0;
+  const pending = total - submitted - overdue - skipped;
   const missingReviewers = [
     ...new Map(
       (assignments ?? [])
-        .filter((a) => a.status !== "submitted")
+        .filter((a) => a.status !== "submitted" && a.status !== "skipped")
         .map((a) => [a.reviewer_id, one(a.reviewer)]),
     ).values(),
   ];
@@ -186,6 +218,7 @@ export async function getRoundProgress(
     total,
     submitted,
     overdue,
+    skipped,
     pending,
     completionRate: total === 0 ? 0 : Math.round((submitted / total) * 100),
     missingReviewers,
@@ -209,17 +242,19 @@ export async function getRoundProgressMap(
     const total = roundAssignments.length;
     const submitted = roundAssignments.filter((assignment) => assignment.status === "submitted").length;
     const overdue = roundAssignments.filter((assignment) => assignment.status === "overdue").length;
-    const pending = total - submitted - overdue;
+    const skipped = roundAssignments.filter((assignment) => assignment.status === "skipped").length;
+    const pending = total - submitted - overdue - skipped;
     const missingReviewers = [
       ...new Map(
         roundAssignments
-          .filter((assignment) => assignment.status !== "submitted")
+          .filter((assignment) => assignment.status !== "submitted" && assignment.status !== "skipped")
           .map((assignment) => [assignment.reviewer_id, one(assignment.reviewer)]),
       ).values(),
     ];
 
     return [roundId, {
       total,
+      skipped,
       submitted,
       overdue,
       pending,
