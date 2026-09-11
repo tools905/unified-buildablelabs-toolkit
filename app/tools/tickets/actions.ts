@@ -8,6 +8,9 @@ import { requireDefaultWorkspace } from "@/modules/core/workspace/default-worksp
 import { requireEnabledTool } from "@/modules/core/tools/registry";
 import * as ticketService from "@/lib/services/ticket-service";
 import * as ticketReviewService from "@/lib/services/ticket-review-service";
+import * as linearLinkService from "@/lib/services/linear-link-service";
+import { findDuplicateTicket, type DuplicateTicketMatch } from "@/lib/services/duplicate-ticket-service";
+import type { LinearIssue } from "@/lib/services/linear-client";
 import type { TicketStatus } from "@/lib/db/types";
 
 async function requireTicketsContext() {
@@ -29,16 +32,33 @@ function refreshTickets() {
   revalidatePath("/tools/tickets/admin");
 }
 
-export async function createTicketAction(formData: FormData) {
+export async function createTicketAction(
+  formData: FormData,
+): Promise<{ status: "duplicate"; duplicate: DuplicateTicketMatch } | { status: "created" }> {
   const { supabase, user, workspace } = await requireTicketsContext();
+  const title = String(formData.get("title") ?? "");
+  const description = (formData.get("description") as string) || undefined;
+
+  if (formData.get("skipDuplicateCheck") !== "true") {
+    const duplicate = await findDuplicateTicket(supabase, workspace.id, { title, description });
+    if (duplicate) {
+      return { status: "duplicate", duplicate };
+    }
+  }
+
   const dueDateValue = formData.get("dueDate");
-  await ticketService.createTicket(supabase, workspace.id, user.id, {
-    title: String(formData.get("title") ?? ""),
-    description: (formData.get("description") as string) || undefined,
+  const ticket = await ticketService.createTicket(supabase, workspace.id, user.id, {
+    title,
+    description,
     assignedTo: (formData.get("assignedTo") as string) || undefined,
     dueDate: dueDateValue ? new Date(String(dueDateValue)) : undefined,
   });
+  const linked = await linearLinkService.detectAndLinkByIdentifier(supabase, workspace.id, ticket, user.id);
+  if (!linked.linear_issue_id) {
+    await linearLinkService.detectSemanticMatch(supabase, workspace.id, linked, user.id);
+  }
   refreshTickets();
+  return { status: "created" };
 }
 
 export async function updateTicketStatusAction(ticketId: string, status: TicketStatus) {
@@ -53,13 +73,17 @@ export async function updateTicketAction(formData: FormData) {
   const dueDateValue = formData.get("dueDate");
   const assignedToValue = formData.get("assignedTo");
 
-  await ticketService.updateTicket(supabase, workspace.id, ticketId, user.id, {
+  const ticket = await ticketService.updateTicket(supabase, workspace.id, ticketId, user.id, {
     title: (formData.get("title") as string) || undefined,
     description: (formData.get("description") as string) ?? null,
     assignedTo: assignedToValue ? String(assignedToValue) : null,
     status: (formData.get("status") as TicketStatus) || undefined,
     dueDate: dueDateValue ? new Date(String(dueDateValue)) : null,
   });
+  const linked = await linearLinkService.detectAndLinkByIdentifier(supabase, workspace.id, ticket, user.id);
+  if (!linked.linear_issue_id) {
+    await linearLinkService.detectSemanticMatch(supabase, workspace.id, linked, user.id);
+  }
   refreshTickets();
 }
 
@@ -138,5 +162,37 @@ export async function setDefaultReviewerAction(formData: FormData) {
   const { supabase, user, workspace } = await requireTicketsAdminContext();
   const reviewerId = String(formData.get("reviewerId"));
   await ticketReviewService.setDefaultReviewer(supabase, workspace.id, user.id, reviewerId);
+  revalidatePath("/tools/tickets/admin");
+}
+
+export async function searchLinearIssuesAction(query: string): Promise<LinearIssue[]> {
+  const { supabase, workspace } = await requireTicketsContext();
+  return linearLinkService.searchLinearIssuesForWorkspace(supabase, workspace.id, query);
+}
+
+export async function linkLinearIssueAction(ticketId: string, issue: LinearIssue) {
+  const { supabase, user, workspace } = await requireTicketsContext();
+  await linearLinkService.linkTicketToIssue(supabase, workspace.id, ticketId, user.id, issue, "manual");
+  refreshTickets();
+}
+
+export async function unlinkLinearIssueAction(ticketId: string) {
+  const { supabase, user, workspace } = await requireTicketsContext();
+  await linearLinkService.unlinkTicketFromLinear(supabase, workspace.id, ticketId, user.id);
+  refreshTickets();
+}
+
+export async function setLinearSettingsAction(formData: FormData) {
+  const { supabase, user, workspace } = await requireTicketsAdminContext();
+  const teamIdsRaw = String(formData.get("linearTeamIds") ?? "");
+  const linearTeamIds = teamIdsRaw
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const suggestThreshold = Number(formData.get("suggestThreshold") ?? 0.5);
+  await linearLinkService.setLinearSettings(supabase, workspace.id, user.id, {
+    linearTeamIds,
+    suggestThreshold,
+  });
   revalidatePath("/tools/tickets/admin");
 }

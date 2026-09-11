@@ -3,7 +3,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requestIntelligenceJson } from "@/modules/shared/ai";
 import { createNotification } from "@/lib/services/notification-service";
-import { createTicket } from "@/lib/services/ticket-service";
+import { detectAndLinkByIdentifier, detectSemanticMatch } from "@/lib/services/linear-link-service";
+import { findDuplicateTicket } from "@/lib/services/duplicate-ticket-service";
+import { addComment, createTicket } from "@/lib/services/ticket-service";
 import { getWorkspaceMembers } from "@/lib/services/workspace-service";
 
 export type ParsedTicket = {
@@ -139,15 +141,33 @@ export async function createTicketsFromMeeting(
     return { tickets: [], preview: resolved, createdCount: 0 };
   }
 
+  const meetingLabel = meeting.title || meeting.event_title || "a meeting";
   const created: any[] = [];
+  let duplicatesSkipped = 0;
   for (const item of resolved) {
+    const duplicate = await findDuplicateTicket(supabase, workspaceId, { title: item.title });
+    if (duplicate) {
+      duplicatesSkipped += 1;
+      await addComment(
+        supabase,
+        duplicate.ticketId,
+        actorId,
+        `Mentioned again in meeting "${meetingLabel}": "${item.title}"`,
+      );
+      continue;
+    }
+
     const ticket = await createTicket(supabase, workspaceId, actorId, {
       title: item.title,
       assignedTo: item.assigneeId ?? undefined,
       dueDate: item.dueDate ? new Date(item.dueDate) : undefined,
       linkedMeetingId: meeting.id,
     });
-    created.push(ticket);
+    const linked = await detectAndLinkByIdentifier(supabase, workspaceId, ticket, actorId);
+    if (!linked.linear_issue_id) {
+      await detectSemanticMatch(supabase, workspaceId, linked, actorId);
+    }
+    created.push(linked);
   }
 
   await supabase
@@ -159,16 +179,17 @@ export async function createTicketsFromMeeting(
     .eq("id", meeting.id);
 
   const admins = members.filter((m: { role: string }) => m.role === "admin");
+  const duplicateNote = duplicatesSkipped > 0 ? ` (${duplicatesSkipped} duplicate mention(s) added as comments instead)` : "";
   await Promise.all(
     admins.map((admin: { user_id: string }) =>
       createNotification({
         userId: admin.user_id,
         title: "Tickets created from a meeting",
-        message: `${created.length} ticket(s) added to the backlog from "${meeting.title || meeting.event_title || "a meeting"}" — review assignments.`,
+        message: `${created.length} ticket(s) added to the backlog from "${meetingLabel}"${duplicateNote} — review assignments.`,
         type: "meeting_tickets_created",
       }),
     ),
   );
 
-  return { tickets: created, preview: resolved, createdCount: created.length };
+  return { tickets: created, preview: resolved, createdCount: created.length, duplicatesSkipped };
 }
