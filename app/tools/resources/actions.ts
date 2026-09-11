@@ -11,7 +11,7 @@ import type { RESOURCE_CATEGORIES } from "@/lib/validation/resource-schema";
 
 type ResourceCategory = (typeof RESOURCE_CATEGORIES)[number];
 
-async function requireResourcesContext() {
+export async function requireResourcesContext() {
   await requireEnabledTool("resources");
   const { supabase, user } = await requireUser("/tools/resources");
   const workspace = await requireDefaultWorkspace(supabase, user.id);

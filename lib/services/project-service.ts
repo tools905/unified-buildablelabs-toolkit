@@ -83,7 +83,7 @@ export async function getProject(
     .from("projects")
     .select("*, project_members(id, user_id, role_label, is_active, profiles(id, full_name, email)), review_rounds(id, title, round_number, status, scheduled_start_at, started_at, due_at, completed_at, closed_at)")
     .eq("id", projectId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -244,7 +244,7 @@ export async function removeProjectMember(
 
   const project = await getProject(supabase, projectId);
   await writeAuditLog(supabase, {
-    workspaceId: project.workspace_id,
+    workspaceId: project?.workspace_id,
     actorId,
     action: "project.member_removed",
     entityType: "project",
@@ -276,7 +276,7 @@ export async function addProjectMember(
 
   const project = await getProject(supabase, projectId);
   await writeAuditLog(supabase, {
-    workspaceId: project.workspace_id,
+    workspaceId: project?.workspace_id,
     actorId,
     action: "project.member_added",
     entityType: "project",
