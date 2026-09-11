@@ -22,6 +22,7 @@ export type NotificationType =
   | "linkedin_post_summary";
 export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
+export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
@@ -306,6 +307,14 @@ export type Database = {
           reviewed_at: string | null;
           review_notes: string | null;
           linked_meeting_id: string | null;
+          linear_issue_id: string | null;
+          linear_issue_identifier: string | null;
+          linear_issue_url: string | null;
+          linear_link_source: LinearLinkSource | null;
+          linear_link_confidence: number | null;
+          linear_linked_at: string | null;
+          linear_linked_by: string | null;
+          linear_match_checked_at: string | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -326,11 +335,34 @@ export type Database = {
           reviewed_at?: string | null;
           review_notes?: string | null;
           linked_meeting_id?: string | null;
+          linear_issue_id?: string | null;
+          linear_issue_identifier?: string | null;
+          linear_issue_url?: string | null;
+          linear_link_source?: LinearLinkSource | null;
+          linear_link_confidence?: number | null;
+          linear_linked_at?: string | null;
+          linear_linked_by?: string | null;
+          linear_match_checked_at?: string | null;
           created_by: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["tickets"]["Insert"]>;
+      };
+      linear_integration_settings: {
+        Row: {
+          workspace_id: string;
+          linear_team_ids: string[];
+          suggest_threshold: number;
+          updated_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          linear_team_ids?: string[];
+          suggest_threshold?: number;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["linear_integration_settings"]["Insert"]>;
       };
       ticket_review_settings: {
         Row: {
@@ -522,6 +554,7 @@ export type Database = {
       notification_type: NotificationType;
       ticket_status: TicketStatus;
       ticket_review_status: TicketReviewStatus;
+      linear_link_source: LinearLinkSource;
     };
   };
 };
