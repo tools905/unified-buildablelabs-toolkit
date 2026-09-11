@@ -6,14 +6,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createTicketAction } from "@/app/tools/tickets/actions";
+import type { DuplicateTicketMatch } from "@/lib/services/duplicate-ticket-service";
 import type { MemberOption } from "@/components/tickets/types";
 
 export function CreateTicketDialog({ members }: { members: MemberOption[] }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [duplicate, setDuplicate] = useState<DuplicateTicketMatch | null>(null);
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
 
   if (!open) {
     return <Button onClick={() => setOpen(true)}>New ticket</Button>;
+  }
+
+  function close() {
+    setOpen(false);
+    setDuplicate(null);
+    setPendingFormData(null);
   }
 
   return (
@@ -22,9 +31,14 @@ export function CreateTicketDialog({ members }: { members: MemberOption[] }) {
         <h2 className="text-lg font-semibold">New ticket</h2>
         <form
           action={(formData) => {
+            setPendingFormData(formData);
             startTransition(async () => {
-              await createTicketAction(formData);
-              setOpen(false);
+              const result = await createTicketAction(formData);
+              if (result.status === "duplicate") {
+                setDuplicate(result.duplicate);
+              } else {
+                close();
+              }
             });
           }}
           className="mt-4 space-y-4"
@@ -57,14 +71,43 @@ export function CreateTicketDialog({ members }: { members: MemberOption[] }) {
             <Label htmlFor="dueDate">Due date</Label>
             <Input id="dueDate" name="dueDate" type="date" className="mt-1" />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Creating…" : "Create ticket"}
-            </Button>
-          </div>
+          {duplicate ? (
+            <div className="rounded-sm border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <p>
+                A similar ticket already exists: <strong>{duplicate.title}</strong>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{duplicate.reasoning}</p>
+              <div className="mt-2 flex justify-end gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setDuplicate(null)}>
+                  Go back
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => {
+                    if (!pendingFormData) return;
+                    pendingFormData.set("skipDuplicateCheck", "true");
+                    startTransition(async () => {
+                      await createTicketAction(pendingFormData);
+                      close();
+                    });
+                  }}
+                >
+                  Create anyway
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={close}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Creating…" : "Create ticket"}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
     </div>

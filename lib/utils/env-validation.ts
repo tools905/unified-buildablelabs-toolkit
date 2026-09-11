@@ -34,6 +34,9 @@ const envSchema = z.object({
   // Granola (meeting recap ingestion) — optional until configured
   GRANOLA_API_KEY: z.string().min(1).optional(),
   GRANOLA_WEBHOOK_SIGNING_SECRET: z.string().min(1).optional(),
+
+  // Linear (ticket linking) — optional until configured, read-only scope
+  LINEAR_API_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

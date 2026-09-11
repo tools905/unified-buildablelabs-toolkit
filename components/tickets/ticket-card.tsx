@@ -1,6 +1,7 @@
 "use client";
 
 import { format, isPast, isToday } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils/cn";
 import type { TicketWithRelations } from "@/components/tickets/types";
@@ -64,6 +65,9 @@ export function TicketCard({
         <p className="mt-1 truncate text-xs text-muted-foreground">
           From: {ticket.linked_meeting.title || ticket.linked_meeting.event_title || "a meeting"}
         </p>
+      ) : null}
+      {ticket.linear_issue_identifier ? (
+        <Badge className="mt-1.5">{ticket.linear_issue_identifier}</Badge>
       ) : null}
       <div className="mt-2">
         <Progress value={ticket.progress_percent} className="h-1.5" />

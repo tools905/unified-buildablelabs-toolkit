@@ -17,6 +17,7 @@ import {
   updateTicketAction,
 } from "@/app/tools/tickets/actions";
 import { TICKET_COLUMNS, type MemberOption, type TicketWithRelations } from "@/components/tickets/types";
+import { LinearLinkPanel } from "@/components/tickets/linear-link-panel";
 
 type Comment = {
   id: string;
@@ -225,6 +226,8 @@ export function TicketDetail({
               </div>
             ) : null}
           </div>
+
+          <LinearLinkPanel ticket={ticket} />
 
           <div className="rounded-md border border-border bg-muted/20 p-4">
             <h3 className="text-sm font-semibold">Comments</h3>

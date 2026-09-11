@@ -8,9 +8,13 @@ import { requireUser } from "@/lib/auth/require-user";
 import { getWorkspaceMembers, isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { listTickets } from "@/lib/services/ticket-service";
 import { getDefaultReviewer } from "@/lib/services/ticket-review-service";
+import { getLinearSettings } from "@/lib/services/linear-link-service";
+import { isLinearConfigured } from "@/lib/services/linear-client";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
-import { setDefaultReviewerAction } from "@/app/tools/tickets/actions";
+import { setDefaultReviewerAction, setLinearSettingsAction } from "@/app/tools/tickets/actions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +25,11 @@ export default async function TicketsAdminPage() {
   const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
   if (!admin) notFound();
 
-  const [tickets, members, reviewSettings] = await Promise.all([
+  const [tickets, members, reviewSettings, linearSettings] = await Promise.all([
     listTickets(supabase, workspace.id),
     getWorkspaceMembers(supabase, workspace.id),
     getDefaultReviewer(supabase, workspace.id),
+    getLinearSettings(supabase, workspace.id),
   ]);
 
   const memberOptions = members.map((member: { user_id: string; profiles: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] }) => {
@@ -82,6 +87,40 @@ export default async function TicketsAdminPage() {
                 </option>
               ))}
             </select>
+            <Button type="submit" size="sm">
+              Save
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Linear integration</CardTitle>
+          <CardDescription>
+            {isLinearConfigured()
+              ? "Restrict which Linear teams are searchable when linking tickets. Leave blank to search all teams the API key can access."
+              : "LINEAR_API_KEY is not configured — linking is unavailable until it's set."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await setLinearSettingsAction(formData);
+            }}
+            className="flex flex-wrap items-end gap-3"
+          >
+            <div>
+              <Label htmlFor="linearTeamIds">Linear team IDs (comma-separated)</Label>
+              <Input
+                id="linearTeamIds"
+                name="linearTeamIds"
+                defaultValue={(linearSettings?.linear_team_ids ?? []).join(", ")}
+                placeholder="all teams"
+                className="mt-1 w-72"
+              />
+            </div>
+            <input type="hidden" name="suggestThreshold" value={linearSettings?.suggest_threshold ?? 0.5} />
             <Button type="submit" size="sm">
               Save
             </Button>
