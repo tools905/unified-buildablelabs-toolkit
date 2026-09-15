@@ -56,6 +56,11 @@ export async function setLinearSettings(
  * workspace's configured teams (empty = search all teams the API key can
  * see). Never called from the client directly — always behind a server
  * action, since LINEAR_API_KEY must stay server-side.
+ *
+ * Never throws: if LINEAR_API_KEY isn't configured (or the Linear API call
+ * otherwise fails), this returns an empty result instead of letting the
+ * error escape the server action — searching with no key configured should
+ * look like "no results", not a 500.
  */
 export async function searchLinearIssuesForWorkspace(
   supabase: SupabaseClient<any>,
@@ -63,9 +68,13 @@ export async function searchLinearIssuesForWorkspace(
   query: string,
 ): Promise<LinearIssue[]> {
   if (!query.trim()) return [];
-  const settings = await getLinearSettings(supabase, workspaceId);
-  const teamIds = settings?.linear_team_ids ?? [];
-  return searchIssues(query, { teamIds: teamIds.length ? teamIds : undefined, limit: 20 });
+  try {
+    const settings = await getLinearSettings(supabase, workspaceId);
+    const teamIds = settings?.linear_team_ids ?? [];
+    return await searchIssues(query, { teamIds: teamIds.length ? teamIds : undefined, limit: 20 });
+  } catch {
+    return [];
+  }
 }
 
 /**

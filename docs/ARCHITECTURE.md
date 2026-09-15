@@ -58,7 +58,7 @@ Meetings (`020_meetings.sql`, extended by `021_meeting_ticket_pipeline.sql`):
   auto-extracted from (null for manually created tickets)
 
 Linear integration (`022_linear_integration.sql`) — link-only, see
-`docs/LINEAR_INTEGRATION.md` and `docs/PRD_LINEAR_INTEGRATION.md`:
+`../my-docs/LINEAR_INTEGRATION.md` and `../my-docs/PRD_LINEAR_INTEGRATION.md`:
 - `tickets.linear_issue_id`/`linear_issue_identifier`/`linear_issue_url` — the
   linked Linear issue, if any (unique per workspace via a partial index —
   one Linear issue maps to at most one ticket)
