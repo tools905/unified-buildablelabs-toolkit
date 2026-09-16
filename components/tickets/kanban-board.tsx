@@ -8,6 +8,7 @@ import { TicketDetail } from "@/components/tickets/ticket-detail";
 import { TICKET_COLUMNS, type MemberOption, type TicketWithRelations } from "@/components/tickets/types";
 import { updateTicketStatusAction } from "@/app/tools/tickets/actions";
 import type { TicketStatus } from "@/lib/db/types";
+import { cn } from "@/lib/utils/cn";
 
 export function KanbanBoard({
   initialTickets,
@@ -22,6 +23,7 @@ export function KanbanBoard({
   const [search, setSearch] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<TicketStatus | null>(null);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -68,6 +70,7 @@ export function KanbanBoard({
     if (!draggingId) return;
     moveTicket(draggingId, status);
     setDraggingId(null);
+    setDragOverStatus(null);
   }
 
   return (
@@ -101,18 +104,28 @@ export function KanbanBoard({
       <div className="grid gap-4 lg:grid-cols-5">
         {TICKET_COLUMNS.map((column) => {
           const columnTickets = filtered.filter((ticket) => ticket.status === column.status);
+          const isDragOver = dragOverStatus === column.status;
           return (
             <div
               key={column.status}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (dragOverStatus !== column.status) setDragOverStatus(column.status);
+              }}
+              onDragLeave={() => setDragOverStatus((prev) => (prev === column.status ? null : prev))}
               onDrop={() => handleDrop(column.status)}
-              className="min-h-40 rounded-lg border border-border bg-muted/40 p-3"
+              className={cn(
+                "flex h-[calc(100vh-260px)] min-h-[20rem] flex-col rounded-lg border bg-muted/40 p-3 transition-colors",
+                isDragOver ? "border-primary/60 bg-primary/5" : "border-border",
+              )}
             >
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex shrink-0 items-center justify-between">
                 <h2 className="text-sm font-semibold">{column.label}</h2>
-                <span className="text-xs text-muted-foreground">{columnTickets.length}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {columnTickets.length}
+                </span>
               </div>
-              <div className="space-y-2">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {columnTickets.map((ticket) => (
                   <TicketCard
                     key={ticket.id}
@@ -123,10 +136,16 @@ export function KanbanBoard({
                       setDraggingId(ticket.id);
                       event.dataTransfer.effectAllowed = "move";
                     }}
+                    onDragEnd={() => {
+                      setDraggingId(null);
+                      setDragOverStatus(null);
+                    }}
                   />
                 ))}
                 {columnTickets.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No tickets</p>
+                  <p className="rounded-md border border-dashed border-border py-4 text-center text-xs text-muted-foreground">
+                    No tickets
+                  </p>
                 ) : null}
               </div>
             </div>
