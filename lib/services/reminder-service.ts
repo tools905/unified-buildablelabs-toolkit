@@ -5,6 +5,7 @@ import {
   sendReviewReminderEmail,
 } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
+import { formatISTDateTime } from "@/lib/utils/dates";
 import { one } from "@/lib/utils/relations";
 
 export async function sendPendingReviewReminders(
@@ -48,7 +49,7 @@ export async function sendPendingReviewReminders(
       projectName: project.name,
       roundTitle: assignment.review_rounds.title,
       pendingCount: group.length,
-      dueAt: new Date(assignment.review_rounds.due_at).toLocaleString(),
+      dueAt: formatISTDateTime(assignment.review_rounds.due_at),
       url: getAppLink("/tools/peer-review/member"),
       workspaceId: project.workspace_id,
       projectId: assignment.review_rounds.project_id,

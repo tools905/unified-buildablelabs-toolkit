@@ -1,10 +1,11 @@
 import "server-only";
 
-import { endOfWeek, startOfWeek, subDays, subWeeks } from "date-fns";
+import { subDays } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { sendLinkedInPostSummaryEmail } from "@/lib/services/email-service";
+import { endOfISTWeek, startOfISTWeek } from "@/lib/utils/dates";
 import { calculateLinkedInMemberStats, summarizeLinkedInStats } from "./analytics";
 import { LINKEDIN_SCORING_VERSION, scoreLinkedInPost } from "./scoring";
 import type { LinkedInPostKind, LinkedInPostScore, LinkedInTrackedMember } from "./types";
@@ -284,8 +285,9 @@ export async function scoreLinkedInPostById(input: {
     .select("id, post_text, post_url, tracked_member_id, linkedin_tracked_members!inner(id, workspace_id, profile_id, name, email, member_role)")
     .eq("id", input.postId)
     .eq("linkedin_tracked_members.workspace_id", input.workspaceId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!post) throw new Error("Post not found.");
 
   const member = Array.isArray(post.linkedin_tracked_members) ? post.linkedin_tracked_members[0] : post.linkedin_tracked_members;
   const result = await scoreLinkedInPost({ postText: post.post_text, memberRole: member?.member_role ?? null });
@@ -389,9 +391,9 @@ export async function generateLinkedInWeeklyReports(options?: { workspaceId?: st
   if (options?.workspaceId) query = query.eq("id", options.workspaceId);
   const { data: workspaces, error } = await query;
   if (error) throw error;
-  const previousWeek = subWeeks(new Date(), 1);
-  const startDate = startOfWeek(previousWeek, { weekStartsOn: 1 });
-  const endDate = endOfWeek(previousWeek, { weekStartsOn: 1 });
+  const previousWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const startDate = startOfISTWeek(previousWeek);
+  const endDate = endOfISTWeek(previousWeek);
   const reportIds: string[] = [];
   for (const workspace of workspaces ?? []) {
     const { data: settings } = await supabase.from("linkedin_settings").select("weekly_reports_enabled").eq("workspace_id", workspace.id).maybeSingle();

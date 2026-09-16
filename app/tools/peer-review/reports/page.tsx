@@ -32,7 +32,7 @@ export default async function PeerReviewReportsPage() {
       </div>
       <div className="space-y-3">
         {(rounds ?? []).map((round) => (
-          <Card key={round.id}>
+          <Card key={round.id} className="card-hover-effect">
             <CardHeader>
               <CardTitle>{round.title}</CardTitle>
               <CardDescription>{round.projects?.name}</CardDescription>

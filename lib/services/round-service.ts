@@ -3,6 +3,7 @@ import { generateAssignments } from "@/lib/services/assignment-service";
 import { sendReportReadyEmail, sendRoundStartedEmail } from "@/lib/services/email-service";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { getAppLink } from "@/lib/utils/app-url";
+import { formatISTDateTime } from "@/lib/utils/dates";
 import { one } from "@/lib/utils/relations";
 
 export async function startReviewRound(
@@ -79,7 +80,7 @@ export async function startReviewRound(
         to: reviewer.email,
         projectName: updated.projects?.name ?? "Peer review project",
         reviewCount: assignments.filter((a) => a.reviewer_id === reviewer.id).length,
-        dueAt: new Date(updated.due_at).toLocaleString(),
+        dueAt: formatISTDateTime(updated.due_at),
         url: getAppLink("/tools/peer-review/member"),
         workspaceId: updated.projects?.workspace_id ?? "",
         projectId: updated.project_id,

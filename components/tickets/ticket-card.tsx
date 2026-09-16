@@ -1,9 +1,10 @@
 "use client";
 
-import { format, isPast, isToday } from "date-fns";
+import { isPast, isToday } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils/cn";
+import { formatISTShortDate } from "@/lib/utils/dates";
 import type { TicketWithRelations } from "@/components/tickets/types";
 
 function initials(name: string | null | undefined, email: string | undefined) {
@@ -74,7 +75,7 @@ export function TicketCard({
       </div>
       <div className="mt-2 flex items-center justify-between text-xs">
         <span className={dueDateTone(ticket.due_date)}>
-          {ticket.due_date ? format(new Date(ticket.due_date), "MMM d") : "No due date"}
+          {ticket.due_date ? formatISTShortDate(ticket.due_date) : "No due date"}
         </span>
         <span className="text-muted-foreground">{ticket.progress_percent}%</span>
       </div>

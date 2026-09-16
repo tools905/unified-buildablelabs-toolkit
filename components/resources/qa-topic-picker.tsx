@@ -74,7 +74,7 @@ export function QaTopicPicker({
       {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {roadmaps.map((roadmap) => (
-          <Card key={roadmap.id} className="flex h-full flex-col">
+          <Card key={roadmap.id} className="card-hover-effect flex h-full flex-col">
             <CardHeader>
               <CardTitle className="text-base">{roadmap.name}</CardTitle>
               {roadmap.description ? <CardDescription>{roadmap.description}</CardDescription> : null}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/dashboard/confirm-button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +17,7 @@ import {
 } from "@/app/tools/tickets/actions";
 import { TICKET_COLUMNS, type MemberOption, type TicketWithRelations } from "@/components/tickets/types";
 import { LinearLinkPanel } from "@/components/tickets/linear-link-panel";
+import { formatISTShortDateTime } from "@/lib/utils/dates";
 
 type Comment = {
   id: string;
@@ -263,7 +263,7 @@ export function TicketDetail({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                           <span className="font-medium text-foreground">{authorLabel}</span>
-                          <span>{format(new Date(comment.created_at), "MMM d, h:mm a")}</span>
+                          <span>{formatISTShortDateTime(comment.created_at)}</span>
                         </div>
                         <p className="mt-0.5 break-words">{comment.content}</p>
                       </div>

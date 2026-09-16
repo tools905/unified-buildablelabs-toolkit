@@ -96,7 +96,7 @@ export function ResourcesCatalog({ resources, roadmaps, params }: ResourcesCatal
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {resources.map((resource) => (
-          <Card key={resource.id} className="flex h-full flex-col">
+          <Card key={resource.id} className="card-hover-effect flex h-full flex-col">
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">{resource.title}</CardTitle>

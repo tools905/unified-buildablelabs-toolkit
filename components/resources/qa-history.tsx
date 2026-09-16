@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { formatISTDate } from "@/lib/utils/dates";
 
 type QaHistoryAttempt = {
   id: string;
@@ -20,7 +20,7 @@ export function QaHistory({ attempts }: { attempts: QaHistoryAttempt[] }) {
         {completed.slice(0, 3).map((attempt) => (
           <li key={attempt.id} className="text-xs text-muted-foreground">
             {attempt.score}/{attempt.total_questions} ·{" "}
-            {format(new Date(attempt.completed_at ?? attempt.created_at), "MMM d, yyyy")}
+            {formatISTDate(attempt.completed_at ?? attempt.created_at)}
           </li>
         ))}
       </ul>

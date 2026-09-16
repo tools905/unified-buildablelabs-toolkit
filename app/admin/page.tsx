@@ -54,7 +54,7 @@ export default async function AdminPage() {
       </div>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         {tools.map((tool) => (
-          <Card key={tool.slug}>
+          <Card key={tool.slug} className="card-hover-effect">
             <CardHeader>
               <CardTitle>{tool.name}</CardTitle>
               <CardDescription>{tool.description}</CardDescription>
