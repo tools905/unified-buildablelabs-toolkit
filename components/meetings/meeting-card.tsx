@@ -45,7 +45,7 @@ export function MeetingCard({
             setOpen(true);
           }
         }}
-        className="flex cursor-pointer flex-col transition-colors hover:border-primary/50 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="card-hover-effect flex cursor-pointer flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-2">

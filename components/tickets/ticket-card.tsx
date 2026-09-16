@@ -50,7 +50,7 @@ export function TicketCard({
         if (event.key === "Enter") onOpen();
       }}
       className={cn(
-        "flex h-44 cursor-pointer flex-col rounded-lg border border-border bg-card p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
+        "card-shadow card-hover-effect flex h-44 cursor-pointer flex-col rounded-lg border border-border bg-card p-3",
         isDragging && "opacity-50",
       )}
     >
@@ -75,7 +75,7 @@ export function TicketCard({
           <Badge className="mt-1.5">{ticket.linear_issue_identifier}</Badge>
         ) : null}
       </div>
-      <div className="mt-2 shrink-0 border-t border-border/60 pt-2">
+      <div className="mt-2 shrink-0 border-t border-border pt-2">
         <Progress value={ticket.progress_percent} className="h-1.5" />
         <div className="mt-2 flex items-center justify-between text-xs">
           <span className={dueDateTone(ticket.due_date)}>
