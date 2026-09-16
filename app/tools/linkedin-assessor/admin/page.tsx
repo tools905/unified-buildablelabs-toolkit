@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Plus, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { formatISTDateTime } from "@/lib/utils/dates";
 import { LinkedInMemberTable } from "@/components/linkedin-assessor/member-table";
 import { LinkedInScoreOverview } from "@/components/linkedin-assessor/score-overview";
 import { LinkedInMemberScoreBreakdown } from "@/components/linkedin-assessor/member-score-breakdown";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLinkedInDashboardData } from "@/modules/linkedin-assessor";
 import { requireLinkedInAdmin } from "@/modules/linkedin-assessor/context";
@@ -26,7 +28,7 @@ export default async function LinkedInAdminPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <form action={scoreLinkedInAction}>
-            <Button variant="outline"><Sparkles className="h-4 w-4" />Score posts</Button>
+            <SubmitButton variant="outline"><Sparkles className="h-4 w-4" />Score posts</SubmitButton>
           </form>
           <Button asChild><Link href="/tools/linkedin-assessor/admin/members/new"><Plus className="h-4 w-4" />Add profile</Link></Button>
         </div>
@@ -49,7 +51,7 @@ export default async function LinkedInAdminPage() {
             <div key={log.id} className="flex flex-col gap-1 border-b border-border pb-3 text-sm last:border-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium capitalize">{log.status} - {log.job_type.replaceAll("_", " ")}</span>
-                <span className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">{formatISTDateTime(log.created_at)}</span>
               </div>
               <span className="text-muted-foreground">{log.message}</span>
             </div>

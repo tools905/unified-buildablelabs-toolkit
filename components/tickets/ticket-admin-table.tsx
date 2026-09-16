@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/dashboard/confirm-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +11,7 @@ import {
 } from "@/app/tools/tickets/actions";
 import { TICKET_COLUMNS, type MemberOption, type TicketWithRelations } from "@/components/tickets/types";
 import type { TicketStatus } from "@/lib/db/types";
+import { formatISTDate, formatISTInputDate } from "@/lib/utils/dates";
 
 function toCsv(tickets: TicketWithRelations[]) {
   const header = ["Title", "Status", "Assignee", "Progress %", "Due date", "Created at"];
@@ -32,7 +32,7 @@ function downloadCsv(tickets: TicketWithRelations[]) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `tickets-${format(new Date(), "yyyy-MM-dd")}.csv`;
+  link.download = `tickets-${formatISTInputDate(new Date())}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -161,7 +161,7 @@ export function TicketAdminTable({
               <TableCell>{TICKET_COLUMNS.find((c) => c.status === ticket.status)?.label}</TableCell>
               <TableCell>{ticket.assignee?.full_name || ticket.assignee?.email || "Unassigned"}</TableCell>
               <TableCell>{ticket.progress_percent}%</TableCell>
-              <TableCell>{ticket.due_date ? format(new Date(ticket.due_date), "MMM d, yyyy") : "—"}</TableCell>
+              <TableCell>{ticket.due_date ? formatISTDate(ticket.due_date) : "—"}</TableCell>
             </TableRow>
           ))}
           {tickets.length === 0 ? (

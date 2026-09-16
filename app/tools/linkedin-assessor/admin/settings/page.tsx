@@ -1,12 +1,13 @@
-import { format, subDays } from "date-fns";
+import { subDays } from "date-fns";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { AnalysisWindowSlider } from "@/components/linkedin-assessor/analysis-window-slider";
 import { LinkedInScoringExplainer } from "@/components/linkedin-assessor/scoring-explainer";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getLinkedInDashboardData } from "@/modules/linkedin-assessor";
+import { formatISTDate, formatISTInputDate, formatISTShortDate } from "@/lib/utils/dates";
 import { requireLinkedInAdmin } from "@/modules/linkedin-assessor/context";
 import { createAnalysisWindowAction, updateLinkedInSettingsAction } from "../../actions";
 
@@ -27,12 +28,12 @@ export default async function LinkedInSettingsPage() {
           <Check name="weeklyReportsEnabled" label="Generate weekly reports" defaultChecked={settings?.weekly_reports_enabled ?? true} />
           <Check name="memberInsightsEnabled" label="Members can view personal insights" defaultChecked={settings?.member_insights_enabled ?? true} />
           <Check name="memberSubmissionsEnabled" label="Members can submit posts" defaultChecked={settings?.member_submissions_enabled ?? true} />
-          <div className="sm:col-span-2"><Button>Save settings</Button></div>
+          <div className="sm:col-span-2"><SubmitButton>Save settings</SubmitButton></div>
         </form>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Saved comparison periods</CardTitle><CardDescription>The rolling slider controls the live dashboard. Save fixed periods for future comparisons and reporting.</CardDescription></CardHeader><CardContent>
-        <form action={createAnalysisWindowAction} className="grid gap-4 sm:grid-cols-2"><Field className="sm:col-span-2" label="Period name" name="name" defaultValue="Campaign period" /><Field label="Start date" name="startDate" type="date" defaultValue={format(subDays(new Date(), 30), "yyyy-MM-dd")} /><Field label="End date" name="endDate" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} /><div className="sm:col-span-2"><Button>Save period</Button></div></form>
-        <div className="mt-6 space-y-2">{data.windows.map((window) => <div key={window.id} className="flex flex-wrap justify-between gap-2 border-t border-border pt-2 text-sm"><span>{window.name}</span><span className="text-muted-foreground">{format(new Date(window.start_date), "MMM d")} - {format(new Date(window.end_date), "MMM d, yyyy")}</span></div>)}</div>
+        <form action={createAnalysisWindowAction} className="grid gap-4 sm:grid-cols-2"><Field className="sm:col-span-2" label="Period name" name="name" defaultValue="Campaign period" /><Field label="Start date" name="startDate" type="date" defaultValue={formatISTInputDate(subDays(new Date(), 30))} /><Field label="End date" name="endDate" type="date" defaultValue={formatISTInputDate(new Date())} /><div className="sm:col-span-2"><SubmitButton>Save period</SubmitButton></div></form>
+        <div className="mt-6 space-y-2">{data.windows.map((window) => <div key={window.id} className="flex flex-wrap justify-between gap-2 border-t border-border pt-2 text-sm"><span>{window.name}</span><span className="text-muted-foreground">{formatISTShortDate(window.start_date)} - {formatISTDate(window.end_date)}</span></div>)}</div>
       </CardContent></Card>
     </div>
   </AppShell>;

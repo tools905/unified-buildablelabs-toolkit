@@ -3,6 +3,7 @@ import { AppShell } from "@/components/dashboard/app-shell";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
+import { formatISTDateTime } from "@/lib/utils/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function AuditLogsPage() {
             <CardHeader>
               <CardTitle className="text-base">{log.action}</CardTitle>
               <CardDescription>
-                {log.entity_type} - {new Date(log.created_at).toLocaleString()}
+                {log.entity_type} - {formatISTDateTime(log.created_at)}
               </CardDescription>
             </CardHeader>
           </Card>

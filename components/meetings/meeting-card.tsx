@@ -5,6 +5,7 @@ import { ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatISTDate, formatISTDateTime } from "@/lib/utils/dates";
 
 export type MeetingCardData = {
   id: string;
@@ -50,7 +51,7 @@ export function MeetingCard({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <CardTitle className="text-base leading-snug">{title}</CardTitle>
             {meeting.start_time ? (
-              <Badge>{new Date(meeting.start_time).toLocaleDateString()}</Badge>
+              <Badge>{formatISTDate(meeting.start_time)}</Badge>
             ) : null}
           </div>
         </CardHeader>
@@ -87,7 +88,7 @@ export function MeetingCard({
                 <h2 className="text-lg font-semibold">{title}</h2>
                 {meeting.start_time ? (
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {new Date(meeting.start_time).toLocaleString()}
+                    {formatISTDateTime(meeting.start_time)}
                   </p>
                 ) : null}
                 {meeting.attendees.length > 0 ? (

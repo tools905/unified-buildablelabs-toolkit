@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/dashboard/app-shell";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,7 @@ export default async function NewLinkedInMemberPage() {
         <Field label="Volume weight (posting consistency)" name="volumeWeight" type="number" defaultValue={settings?.default_volume_weight ?? 0.45} min="0" max="1" step="0.05" required />
         <Field label="Quality weight (average post score)" name="qualityWeight" type="number" defaultValue={settings?.default_quality_weight ?? 0.55} min="0" max="1" step="0.05" required />
         <p className="text-xs leading-5 text-muted-foreground sm:col-span-2">Weights must total 1.00. A 0.45 / 0.55 split means consistency contributes 45% and average content quality contributes 55% of the final score.</p>
-        <div className="sm:col-span-2"><Button>Create tracked profile</Button></div>
+        <div className="sm:col-span-2"><SubmitButton>Create tracked profile</SubmitButton></div>
       </form>
     </CardContent></Card>
   </AppShell>;

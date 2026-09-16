@@ -6,6 +6,7 @@ import { sendInviteEmail as sendInvite } from "@/lib/services/email-service";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppLink } from "@/lib/utils/app-url";
+import { formatISTDate } from "@/lib/utils/dates";
 
 export async function createInvite(
   supabase: SupabaseClient<any>,
@@ -41,7 +42,7 @@ export async function createInvite(
     workspaceName: data.workspaces?.name ?? "your workspace",
     inviterName: data.profiles?.full_name ?? data.profiles?.email ?? "An admin",
     acceptUrl: getAppLink(`/onboarding?invite=${data.token}`),
-    expiresAt: new Date(data.expires_at).toLocaleDateString(),
+    expiresAt: formatISTDate(data.expires_at),
     workspaceId: data.workspace_id,
   });
 

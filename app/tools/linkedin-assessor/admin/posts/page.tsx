@@ -1,19 +1,22 @@
-import { format } from "date-fns";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { ManualPostForm } from "@/components/linkedin-assessor/manual-post-form";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getLinkedInDashboardData, linkedinArchetypes } from "@/modules/linkedin-assessor";
+import { formatISTDate } from "@/lib/utils/dates";
 import { requireLinkedInAdmin } from "@/modules/linkedin-assessor/context";
 import { overrideLinkedInScoreAction } from "../../actions";
 
 export default async function LinkedInPostsPage() {
   const { supabase, workspace } = await requireLinkedInAdmin();
-  const data = await getLinkedInDashboardData(supabase, workspace.id);
+  // No date range: this page is for finding and correcting any submitted
+  // post, so it must not be limited to the dashboard's rolling analysis
+  // window (older posts need to stay reachable for score overrides).
+  const data = await getLinkedInDashboardData(supabase, workspace.id, { startDate: new Date(0), endDate: new Date() });
 
   return (
     <AppShell>
@@ -37,7 +40,7 @@ export default async function LinkedInPostsPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <CardTitle>{post.member}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{format(new Date(post.postedAt), "MMM d, yyyy")} - {post.postKind.replaceAll("_", " ")} - manual submission</p>
+                  <p className="text-sm text-muted-foreground">{formatISTDate(post.postedAt)} - {post.postKind.replaceAll("_", " ")} - manual submission</p>
                 </div>
                 <div className="flex gap-2"><Badge>{post.archetype.replaceAll("_", " ")}</Badge><Badge>{post.score ?? "Excluded / unscored"}</Badge></div>
               </div>
@@ -70,7 +73,7 @@ export default async function LinkedInPostsPage() {
                   <div className="space-y-2"><Label htmlFor={`archetype-${post.id}`}>Archetype</Label><select id={`archetype-${post.id}`} name="archetype" defaultValue={post.archetype === "unscored" ? "" : post.archetype} className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"><option value="">Keep AI archetype</option>{linkedinArchetypes.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></div>
                   <div className="space-y-2 sm:col-span-2"><Label htmlFor={`notes-${post.id}`}>Admin notes</Label><Textarea id={`notes-${post.id}`} name="adminNotes" defaultValue={post.override?.admin_notes ?? ""} /></div>
                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="excludeFromQualityAverage" defaultChecked={post.override?.exclude_from_quality_average ?? false} />Exclude from quality averages</label>
-                  <div className="sm:text-right"><Button variant="outline">Save override</Button></div>
+                  <div className="sm:text-right"><SubmitButton variant="outline">Save override</SubmitButton></div>
                 </form>
               </details>
             </CardContent>

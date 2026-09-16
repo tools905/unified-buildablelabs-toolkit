@@ -1,29 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0b0e; /* Ink */
+  --background: #0a0b0e; /* Ink — matches the agency site's brand ink exactly */
   --foreground: #f5f6f8; /* Chrome white */
-  --card: #14161d; /* Raised surface */
+  --card: #12141a; /* Raised surface, matches brand --surface-raised */
   --card-foreground: #f5f6f8;
-  --border: #20232c; /* Line */
-  --muted: #1a1d24;
-  --muted-foreground: #8890a3; /* Muted chrome */
-  --primary: #2b5cff; /* Brand blue, lifted for more presence */
+  --border: #252a34; /* Brand --line-light: hairline dividers/borders */
+  --muted: #1a1d24; /* Brand --line */
+  --muted-foreground: #7a8296; /* Brand --muted (quiet chrome text) */
+  --primary: #0b3fde; /* Brand --blue */
+  --primary-hover: #275bff; /* Brand --blue-bright, used on hover */
   --primary-foreground: #ffffff;
   --accent: #7c8cff; /* Secondary accent, violet-lean blue */
   --accent-foreground: #ffffff;
   --destructive: #f43f5e;
   --destructive-foreground: #ffffff;
-  --ring: #2b5cff;
+  --ring: #0b3fde;
 
-  /* Softer, more contemporary corners app-wide (drives rounded-sm/md/lg/xl) */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
+  /* Sharp, hairline-bordered corners app-wide, matching the agency site's
+     structural/technical look (it uses essentially no border-radius). */
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.55);
-  --shadow-card-hover: 0 20px 45px -20px rgba(43, 92, 255, 0.35);
+  --shadow-card-hover: 0 20px 45px -20px rgba(11, 63, 222, 0.35);
   --shadow-popover: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
 }
 
@@ -36,6 +38,7 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
@@ -49,7 +52,7 @@
 
 body {
   background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(43, 92, 255, 0.10) 0%, rgba(43, 92, 255, 0) 60%),
+    radial-gradient(1200px 600px at 15% -10%, rgba(11, 63, 222, 0.10) 0%, rgba(11, 63, 222, 0) 60%),
     radial-gradient(900px 500px at 100% 0%, rgba(124, 140, 255, 0.06) 0%, rgba(124, 140, 255, 0) 55%),
     var(--background);
   color: var(--foreground);
@@ -74,7 +77,7 @@ summary::-webkit-details-marker {
 }
 
 ::selection {
-  background: rgba(43, 92, 255, 0.35);
+  background: rgba(11, 63, 222, 0.35);
   color: var(--foreground);
 }
 
@@ -95,13 +98,15 @@ summary::-webkit-details-marker {
   background: transparent;
 }
 
-/* Small uppercase kicker label, used above page/section titles */
+/* Small uppercase kicker label, used above page/section titles — mono
+   micro-label treatment matching the brand site's section labels. */
 .eyebrow {
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--primary);
+  color: var(--primary-hover);
 }
 
 .card-shadow {
@@ -114,19 +119,56 @@ summary::-webkit-details-marker {
 
 /* Custom premium hover and glow effects */
 .card-hover-effect {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card-hover-effect:hover {
   transform: translateY(-3px);
-  border-color: rgba(43, 92, 255, 0.35);
+  border-color: rgba(11, 63, 222, 0.35);
   box-shadow: var(--shadow-card-hover);
+}
+
+/* Corner accent bars, matching the brand site's case-card treatment: a
+   glowing trace along the top-left and top-right corners that's faintly
+   visible at rest and extends further on hover. */
+.card-hover-effect::before,
+.card-hover-effect::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  background: var(--primary-hover);
+  box-shadow: 0 0 16px rgba(39, 91, 255, 0.68);
+  transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.card-hover-effect::before {
+  left: -1px;
+  top: -1px;
+  right: 60%;
+  height: 2px;
+  transform-origin: left;
+}
+.card-hover-effect::after {
+  right: -1px;
+  top: -1px;
+  bottom: 70%;
+  width: 2px;
+  transform-origin: top;
+}
+.card-hover-effect:hover::before {
+  transform: scaleX(1.65);
+}
+.card-hover-effect:hover::after {
+  transform: scaleY(1.7);
 }
 
 .glow-glow {
   position: absolute;
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(43, 92, 255, 0.1) 0%, rgba(43, 92, 255, 0) 70%);
+  background: radial-gradient(circle, rgba(11, 63, 222, 0.1) 0%, rgba(11, 63, 222, 0) 70%);
   top: -250px;
   left: 50%;
   transform: translateX(-50%);

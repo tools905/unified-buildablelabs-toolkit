@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { AppShell } from "@/components/dashboard/app-shell";
+import { formatISTDate } from "@/lib/utils/dates";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { LinkedInMemberTable } from "@/components/linkedin-assessor/member-table";
 import { LinkedInScoreOverview } from "@/components/linkedin-assessor/score-overview";
 import { ManualPostForm } from "@/components/linkedin-assessor/manual-post-form";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,7 +54,7 @@ export default async function LinkedInAssessorPage() {
             <Card key={post.id}>
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><CardTitle className="text-base">{new Date(post.postedAt).toLocaleDateString()}</CardTitle><CardDescription>{post.postKind.replaceAll("_", " ")} - {post.archetype.replaceAll("_", " ")}</CardDescription></div>
+                  <div><CardTitle className="text-base">{formatISTDate(post.postedAt)}</CardTitle><CardDescription>{post.postKind.replaceAll("_", " ")} - {post.archetype.replaceAll("_", " ")}</CardDescription></div>
                   <span className="text-2xl font-semibold">{post.score ?? "N/A"}</span>
                 </div>
               </CardHeader>
@@ -79,7 +81,7 @@ export default async function LinkedInAssessorPage() {
               <div className="space-y-2"><Label htmlFor="name">Display name</Label><Input id="name" name="name" required /></div>
               <div className="space-y-2"><Label htmlFor="memberRole">Role</Label><select id="memberRole" name="memberRole" defaultValue="other" className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm">{linkedinMemberRoles.map((role) => <option key={role} value={role}>{role.replaceAll("_", " ")}</option>)}</select></div>
               <div className="space-y-2 sm:col-span-2"><Label htmlFor="linkedinProfileUrl">LinkedIn profile URL</Label><Input id="linkedinProfileUrl" name="linkedinProfileUrl" placeholder="linkedin.com/in/profile" required /></div>
-              <div className="sm:col-span-2"><Button>Connect profile</Button></div>
+              <div className="sm:col-span-2"><SubmitButton>Connect profile</SubmitButton></div>
             </form>
           </CardContent>
         </Card>

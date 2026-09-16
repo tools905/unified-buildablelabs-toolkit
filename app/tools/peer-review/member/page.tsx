@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
 import { getMyAssignments } from "@/lib/services/assignment-service";
+import { formatISTDateTime } from "@/lib/utils/dates";
 
 function statusBadgeClass(status: string) {
   switch (status) {
@@ -44,7 +45,7 @@ export default async function MyReviewsPage() {
               <div className="text-sm text-muted-foreground">
                 <div>{assignment.review_rounds?.projects?.name}</div>
                 <div>{assignment.review_rounds?.title}</div>
-                <div>Due {assignment.review_rounds?.due_at ? new Date(assignment.review_rounds.due_at).toLocaleString() : "n/a"}</div>
+                <div>Due {assignment.review_rounds?.due_at ? formatISTDateTime(assignment.review_rounds.due_at) : "n/a"}</div>
               </div>
               <Button
                 asChild

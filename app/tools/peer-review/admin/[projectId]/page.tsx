@@ -12,6 +12,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { getProject, addProjectMember, removeProjectMember } from "@/lib/services/project-service";
 import { getCurrentWorkspace, isWorkspaceAdmin, getWorkspaceMembers } from "@/lib/services/workspace-service";
 import { getRoundProgressMap, startReviewRound } from "@/lib/services/round-service";
+import { formatISTDateTime } from "@/lib/utils/dates";
 
 export default async function ProjectPage({
   params,
@@ -139,7 +140,7 @@ export default async function ProjectPage({
                   <div>
                     <div className="font-medium">{round.title}</div>
                     <div className="text-sm text-muted-foreground">
-                      Due {new Date(round.due_at).toLocaleString()}
+                      Due {formatISTDateTime(round.due_at)}
                     </div>
                     <div className="mt-1 text-sm text-muted-foreground">
                       {progress.submitted} of {progress.total} submitted -{" "}

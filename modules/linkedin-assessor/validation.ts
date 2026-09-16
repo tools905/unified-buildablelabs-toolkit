@@ -3,7 +3,12 @@ import { linkedinArchetypes, linkedinMemberRoles } from "./types";
 
 export function normalizeLinkedInProfileUrl(input: string) {
   const trimmed = input.trim();
-  const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+  } catch {
+    throw new Error("Use a LinkedIn profile URL such as linkedin.com/in/profile.");
+  }
   const host = url.hostname.replace(/^www\./, "").toLowerCase();
   const parts = url.pathname.split("/").filter(Boolean);
   if (!["http:", "https:"].includes(url.protocol) || host !== "linkedin.com" || parts[0] !== "in" || !parts[1]) {

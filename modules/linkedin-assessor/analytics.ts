@@ -81,7 +81,7 @@ export function calculateLinkedInMemberStats(input: {
     averageQualityScore: rounded(averageQuality),
     finalScore: rounded(finalScore),
     bestPostId: ranked[0]?.id ?? null,
-    weakestPostId: ranked.at(-1)?.id ?? null,
+    weakestPostId: ranked.length > 1 ? ranked.at(-1)?.id ?? null : null,
     trend,
     topStrengths: top(strengths),
     improvementFocus: top(weaknesses),
@@ -94,6 +94,12 @@ export function calculateLinkedInLeaderboards(stats: LinkedInMemberStats[]) {
   return { finalScore: by("finalScore"), volume: by("postCount"), quality: by("averageQualityScore") };
 }
 
+function mostCommon(items: string[]) {
+  const counts = new Map<string, number>();
+  for (const item of items) counts.set(item, (counts.get(item) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+
 export function summarizeLinkedInStats(stats: LinkedInMemberStats[]) {
   const totalPosts = stats.reduce((sum, member) => sum + member.postCount, 0);
   const scored = stats.filter((member) => member.averageQualityScore != null);
@@ -102,6 +108,6 @@ export function summarizeLinkedInStats(stats: LinkedInMemberStats[]) {
     averageQuality: scored.length ? rounded(scored.reduce((sum, member) => sum + Number(member.averageQualityScore), 0) / scored.length) : null,
     mostActiveMember: [...stats].sort((a, b) => b.postCount - a.postCount)[0]?.name ?? null,
     highestQualityMember: [...stats].sort((a, b) => Number(b.averageQualityScore ?? -1) - Number(a.averageQualityScore ?? -1))[0]?.name ?? null,
-    recommendedFocus: stats.flatMap((member) => member.improvementFocus)[0] ?? "Add more concrete examples to posts.",
+    recommendedFocus: mostCommon(stats.flatMap((member) => member.improvementFocus)) ?? "Add more concrete examples to posts.",
   };
 }
