@@ -5,6 +5,13 @@ import type { QaAttemptPublic } from "@/lib/services/qa-service";
 export function QaResult({ attempt, onRetake }: { attempt: QaAttemptPublic; onRetake: () => void }) {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      {attempt.endedReason ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {attempt.endedReason === "timeout"
+            ? "Time ran out, so this session was scored with the questions you'd answered."
+            : "This session was ended early after you switched away from the test more than once."}
+        </div>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle>

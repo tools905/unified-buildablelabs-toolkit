@@ -3,9 +3,12 @@ import { generateStructuredAnalysis } from "@/modules/shared/ai";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { listResources } from "@/lib/services/resource-service";
 import {
+  QA_TIME_LIMIT_GRACE_SECONDS,
+  QA_TIME_LIMIT_SECONDS,
   QA_TOTAL_QUESTIONS,
   qaFinalSummarySchema,
   qaGeneratedTurnSchema,
+  type QaEndReason,
   type QaGeneratedTurn,
 } from "@/lib/validation/qa-schema";
 
@@ -32,6 +35,12 @@ export type QaAttemptPublic = {
   turns: QaTurnPublic[];
   score: number | null;
   summary: { improvementSteps: string[] } | null;
+  endedReason: QaEndReason | null;
+  // Exposed so the client can derive the remaining time from the server's own
+  // clock rather than from when the component happened to mount — otherwise
+  // refreshing the page would hand the user a fresh 5 minutes.
+  startedAt: string;
+  timeLimitSeconds: number;
 };
 
 type RoadmapContext = {
@@ -63,7 +72,15 @@ function toPublicAttempt(row: any): QaAttemptPublic {
     turns: turns.map((turn) => (turn.selectedOptionId === null ? omitCorrectOptionId(turn) : turn)),
     score: row.score,
     summary: row.summary,
+    endedReason: row.ended_reason ?? null,
+    startedAt: row.started_at,
+    timeLimitSeconds: QA_TIME_LIMIT_SECONDS,
   };
+}
+
+function hasRunOutOfTime(startedAt: string) {
+  const deadline = new Date(startedAt).getTime() + (QA_TIME_LIMIT_SECONDS + QA_TIME_LIMIT_GRACE_SECONDS) * 1000;
+  return Date.now() > deadline;
 }
 
 function gradeTurn(turn: QaTurnRecord, selectedOptionId: QaOptionId): QaTurnRecord {
@@ -185,7 +202,15 @@ export async function startQaAttempt(
     .eq("status", "in_progress")
     .maybeSingle();
   if (existingError) throw existingError;
-  if (existing) return toPublicAttempt(existing);
+  // An expired attempt has to be closed out rather than resumed: only one
+  // in-progress attempt per user+roadmap is allowed (see the unique index in
+  // the migration), so leaving it open would lock the user out of this topic
+  // for good.
+  if (existing && hasRunOutOfTime(existing.started_at)) {
+    await endQaAttemptEarly(supabase, userId, existing.id, "timeout");
+  } else if (existing) {
+    return toPublicAttempt(existing);
+  }
 
   const roadmapContext = await buildRoadmapContext(supabase, workspaceId, roadmapId);
   const generated = await generateQaTurn({ roadmapContext, priorTurns: [], turnNumber: 1 });
@@ -244,6 +269,13 @@ export async function submitQaAnswer(
     .single();
   if (error) throw error;
   if (attemptRow.status !== "in_progress") throw new Error("This Q&A session is already completed.");
+
+  // Enforced here, not just by the client's countdown — otherwise the limit
+  // would be trivially bypassed by ignoring the timer and answering anyway.
+  if (hasRunOutOfTime(attemptRow.started_at)) {
+    await endQaAttemptEarly(supabase, userId, attemptId, "timeout");
+    throw new Error("Time's up — this session has ended.");
+  }
 
   const turns: QaTurnRecord[] = attemptRow.turns ?? [];
   const pendingIndex = turns.findIndex((turn) => turn.selectedOptionId === null);
@@ -308,6 +340,65 @@ export async function submitQaAnswer(
     entityType: "qa_attempt",
     entityId: attemptId,
     metadata: { score, totalQuestions: QA_TOTAL_QUESTIONS },
+  });
+
+  return toPublicAttempt(completed);
+}
+
+/**
+ * Force-completes an attempt early — either after repeated anti-cheat
+ * violations (tab switch / fullscreen exit) or when the time limit runs out,
+ * both driven by qa-session.tsx. Scores whatever was answered so far;
+ * unanswered questions just don't count toward the score. Skips the AI
+ * improvement-steps call (unlike a normal completion) since an attempt that
+ * ended early doesn't warrant that cost — a fixed message explains why it
+ * ended instead. Idempotent: if the attempt is already completed (e.g. a
+ * duplicate call, or the client and the server both noticing the deadline),
+ * just returns it as-is.
+ */
+export async function endQaAttemptEarly(
+  supabase: SupabaseClient<any>,
+  userId: string,
+  attemptId: string,
+  reason: QaEndReason,
+): Promise<QaAttemptPublic> {
+  const { data: attemptRow, error } = await supabase
+    .from("qa_attempts")
+    .select("*")
+    .eq("id", attemptId)
+    .eq("user_id", userId)
+    .single();
+  if (error) throw error;
+  if (attemptRow.status !== "in_progress") return toPublicAttempt(attemptRow);
+
+  const turns: QaTurnRecord[] = attemptRow.turns ?? [];
+  const score = computeScore(turns);
+
+  const { data: completed, error: completeError } = await supabase
+    .from("qa_attempts")
+    .update({
+      status: "completed",
+      score,
+      summary: {
+        improvementSteps: [
+          "This session ended early, so there isn't enough data for tailored steps — retake it when you can complete all questions in one sitting.",
+        ],
+      },
+      ended_reason: reason,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", attemptId)
+    .select()
+    .single();
+  if (completeError) throw completeError;
+
+  await writeAuditLog(supabase, {
+    workspaceId: attemptRow.workspace_id,
+    actorId: userId,
+    action: `qa_attempt.ended_${reason}`,
+    entityType: "qa_attempt",
+    entityId: attemptId,
+    metadata: { score, totalQuestions: attemptRow.total_questions },
   });
 
   return toPublicAttempt(completed);

@@ -36,6 +36,10 @@ export function QaTopicPicker({
   function handleStart(roadmapId: string) {
     setError(null);
     setPendingRoadmapId(roadmapId);
+    // Requested synchronously inside this click handler — Fullscreen API
+    // requires an active user gesture, which is lost by the time the async
+    // server action below resolves.
+    document.documentElement.requestFullscreen?.().catch(() => {});
     startTransition(async () => {
       try {
         const result = await startQaAttemptAction(roadmapId);
