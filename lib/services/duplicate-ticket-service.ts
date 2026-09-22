@@ -3,8 +3,6 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { scoreSimilarity, tokenize } from "@/lib/utils/text-similarity";
 
-const MAX_CANDIDATES = 50;
-
 // Containment: what fraction of the SHORTER title's words also appear in
 // the longer one. High containment is the "same task, more detail" pattern
 // — 0.85 tolerates one extra/missing word without over-matching.
@@ -34,8 +32,12 @@ export type DuplicateTicketMatch = {
  * both mention "Patient APIs" but describe different work).
  *
  * Only compares against open tickets (not `done`) — finished work doesn't
- * block recreating something for a legitimate follow-up. Never throws — a
- * DB error just means "no duplicate found," never blocking ticket creation.
+ * block recreating something for a legitimate follow-up. Compares against
+ * every open ticket in the workspace, not just recent ones — this is a pure
+ * local token-set comparison with no AI cost, so there's no benefit to
+ * capping candidates by recency (doing so previously let duplicates against
+ * older tickets slip through once 50+ newer tickets existed). Never throws —
+ * a DB error just means "no duplicate found," never blocking ticket creation.
  */
 export async function findDuplicateTicket(
   supabase: SupabaseClient<any>,
@@ -51,9 +53,7 @@ export async function findDuplicateTicket(
       .from("tickets")
       .select("id, title")
       .eq("workspace_id", workspaceId)
-      .neq("status", "done")
-      .order("created_at", { ascending: false })
-      .limit(MAX_CANDIDATES);
+      .neq("status", "done");
     if (excludeTicketId) query = query.neq("id", excludeTicketId);
 
     const { data: candidates, error } = await query;

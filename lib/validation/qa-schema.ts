@@ -2,6 +2,13 @@ import { z } from "zod";
 
 export const QA_OPTION_IDS = ["A", "B", "C", "D"] as const;
 export const QA_TOTAL_QUESTIONS = 6;
+export const QA_TIME_LIMIT_SECONDS = 5 * 60;
+// Clock skew between the user's browser and the server, plus the round trip of
+// the answer itself, shouldn't cost someone an answer they submitted in time.
+export const QA_TIME_LIMIT_GRACE_SECONDS = 10;
+
+export const QA_END_REASONS = ["violation", "timeout"] as const;
+export type QaEndReason = (typeof QA_END_REASONS)[number];
 
 export const qaOptionSchema = z.object({
   id: z.enum(QA_OPTION_IDS),
@@ -44,4 +51,9 @@ export const startQaAttemptSchema = z.object({
 export const submitQaAnswerSchema = z.object({
   attemptId: z.string().uuid(),
   selectedOptionId: z.enum(QA_OPTION_IDS),
+});
+
+export const endQaAttemptSchema = z.object({
+  attemptId: z.string().uuid(),
+  reason: z.enum(QA_END_REASONS),
 });

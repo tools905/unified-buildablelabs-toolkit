@@ -8,6 +8,10 @@ create table public.qa_attempts (
   turns jsonb not null default '[]'::jsonb,
   score integer,
   summary jsonb,
+  -- Set when an attempt is force-completed by the anti-cheat proctoring in
+  -- qa-session.tsx (repeated tab-switch/fullscreen-exit violations), as
+  -- opposed to a normal completion by answering all questions.
+  ended_reason text check (ended_reason in ('violation')),
   started_at timestamptz not null default now(),
   completed_at timestamptz,
   created_at timestamptz not null default now(),

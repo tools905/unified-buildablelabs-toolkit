@@ -451,6 +451,7 @@ export type Database = {
           turns: Json;
           score: number | null;
           summary: Json | null;
+          ended_reason: string | null;
           started_at: string;
           completed_at: string | null;
           created_at: string;
@@ -466,6 +467,7 @@ export type Database = {
           turns?: Json;
           score?: number | null;
           summary?: Json | null;
+          ended_reason?: string | null;
           started_at?: string;
           completed_at?: string | null;
           created_at?: string;
