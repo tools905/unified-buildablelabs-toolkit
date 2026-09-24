@@ -8,6 +8,8 @@
   --border: #252a34; /* Brand --line-light: hairline dividers/borders */
   --muted: #1a1d24; /* Brand --line */
   --muted-foreground: #7a8296; /* Brand --muted (quiet chrome text) */
+  --quiet: #565d6e; /* Brand --quiet: placeholder/lowest-emphasis text */
+  --chrome: #b8becc; /* Brand --chrome: quiet-bright body text */
   --primary: #0b3fde; /* Brand --blue */
   --primary-hover: #275bff; /* Brand --blue-bright, used on hover */
   --primary-foreground: #ffffff;
@@ -37,6 +39,8 @@
   --color-border: var(--border);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-quiet: var(--quiet);
+  --color-chrome: var(--chrome);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
@@ -162,6 +166,42 @@ summary::-webkit-details-marker {
 }
 .card-hover-effect:hover::after {
   transform: scaleY(1.7);
+}
+
+/* Rendered newsletter body — matches the "paper" editor surface, not the
+   app's dark theme, since it previews what the published issue looks like. */
+.newsletter-preview p {
+  margin: 0 0 1em;
+}
+.newsletter-preview p:last-child {
+  margin-bottom: 0;
+}
+.newsletter-preview strong {
+  font-weight: 700;
+}
+.newsletter-preview a {
+  color: #0b3fde;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.newsletter-preview blockquote {
+  margin: 0 0 1em;
+  padding-left: 16px;
+  border-left: 2px solid #c9c0a6;
+  font-style: italic;
+  color: #6b6250;
+}
+.newsletter-preview ul,
+.newsletter-preview ol {
+  margin: 0 0 1em;
+  padding-left: 22px;
+}
+.newsletter-preview ul { list-style: disc; }
+.newsletter-preview ol { list-style: decimal; }
+.newsletter-preview li { display: list-item; }
+.newsletter-preview img {
+  max-width: 100%;
+  margin: 0 0 1em;
 }
 
 .glow-glow {

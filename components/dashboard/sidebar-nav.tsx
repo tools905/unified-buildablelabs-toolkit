@@ -103,6 +103,11 @@ const toolNav: Array<{
     title: "Meetings",
     items: [{ href: "/tools/meetings", label: "Recaps", icon: CalendarClock, exact: true }],
   },
+  {
+    match: "/tools/newsletter",
+    title: "Newsletter",
+    items: [{ href: "/tools/newsletter", label: "Posts", icon: Newspaper, exact: true }],
+  },
 ];
 
 function isActive(pathname: string, item: NavItem) {
