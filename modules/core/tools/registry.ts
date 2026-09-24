@@ -10,7 +10,8 @@ export type ToolkitToolSlug =
   | "hr-bot"
   | "tickets"
   | "resources"
-  | "meetings";
+  | "meetings"
+  | "newsletter";
 
 export type ToolkitTool = {
   name: string;
@@ -60,6 +61,13 @@ export const toolkitTools: ToolkitTool[] = [
     name: "Meetings",
     slug: "meetings",
     description: "Recap of past meetings ingested from Granola, with summaries.",
+    enabled: true,
+    adminOnly: false,
+  },
+  {
+    name: "Newsletter",
+    slug: "newsletter",
+    description: "Write and publish newsletter issues for the agency website.",
     enabled: true,
     adminOnly: false,
   },

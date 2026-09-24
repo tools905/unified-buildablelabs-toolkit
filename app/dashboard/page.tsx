@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   KanbanSquare,
   BookOpen,
+  Newspaper,
   Share2,
   type LucideIcon,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const TOOL_ICONS: Record<ToolkitToolSlug, LucideIcon> = {
   tickets: KanbanSquare,
   resources: BookOpen,
   meetings: CalendarClock,
+  newsletter: Newspaper,
 };
 
 export default async function DashboardPage() {
