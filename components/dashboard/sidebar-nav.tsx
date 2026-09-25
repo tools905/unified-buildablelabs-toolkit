@@ -108,6 +108,11 @@ const toolNav: Array<{
     title: "Newsletter",
     items: [{ href: "/tools/newsletter", label: "Posts", icon: Newspaper, exact: true }],
   },
+  {
+    match: "/tools/content-board",
+    title: "Content Board",
+    items: [{ href: "/tools/content-board", label: "Board", icon: KanbanSquare, exact: true }],
+  },
 ];
 
 function isActive(pathname: string, item: NavItem) {

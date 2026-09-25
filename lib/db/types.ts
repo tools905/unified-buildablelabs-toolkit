@@ -23,6 +23,8 @@ export type NotificationType =
 export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";
+export type ContentPlatform = "instagram" | "linkedin" | "x" | "youtube" | "facebook";
+export type ContentIdeaStatus = "idea" | "approved" | "in_progress" | "posted";
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
@@ -529,6 +531,33 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["ticket_comments"]["Insert"]>;
       };
+      content_ideas: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          platform: ContentPlatform;
+          title: string;
+          description: string | null;
+          status: ContentIdeaStatus;
+          post_url: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          platform: ContentPlatform;
+          title: string;
+          description?: string | null;
+          status?: ContentIdeaStatus;
+          post_url?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["content_ideas"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -555,6 +584,8 @@ export type Database = {
       ticket_status: TicketStatus;
       ticket_review_status: TicketReviewStatus;
       linear_link_source: LinearLinkSource;
+      content_platform: ContentPlatform;
+      content_idea_status: ContentIdeaStatus;
     };
   };
 };
