@@ -11,7 +11,10 @@ export type ToolkitToolSlug =
   | "tickets"
   | "resources"
   | "meetings"
-  | "newsletter";
+  | "newsletter"
+  | "content-board";
+
+export type ToolkitToolGroup = "company" | "content";
 
 export type ToolkitTool = {
   name: string;
@@ -19,6 +22,7 @@ export type ToolkitTool = {
   description: string;
   enabled: boolean;
   adminOnly: boolean;
+  group: ToolkitToolGroup;
 };
 
 export const toolkitTools: ToolkitTool[] = [
@@ -28,6 +32,7 @@ export const toolkitTools: ToolkitTool[] = [
     description: "Create review cycles, collect peer feedback, and generate team reports.",
     enabled: true,
     adminOnly: false,
+    group: "company",
   },
   {
     name: "LinkedIn Assessor",
@@ -35,6 +40,7 @@ export const toolkitTools: ToolkitTool[] = [
     description: "Track LinkedIn posting quality, consistency, and improvement suggestions.",
     enabled: true,
     adminOnly: false,
+    group: "company",
   },
   {
     name: "HR Bot",
@@ -42,6 +48,7 @@ export const toolkitTools: ToolkitTool[] = [
     description: "Answer approved HR, onboarding, policy, and team handbook questions.",
     enabled: true,
     adminOnly: false,
+    group: "company",
   },
   {
     name: "Tickets",
@@ -49,6 +56,7 @@ export const toolkitTools: ToolkitTool[] = [
     description: "Track work as tickets across backlog, in progress, and done.",
     enabled: true,
     adminOnly: false,
+    group: "company",
   },
   {
     name: "Upskill",
@@ -56,6 +64,7 @@ export const toolkitTools: ToolkitTool[] = [
     description: "Browse a shared catalog of guides and tools, and test your knowledge with adaptive Q&A.",
     enabled: true,
     adminOnly: false,
+    group: "company",
   },
   {
     name: "Meetings",
@@ -63,6 +72,7 @@ export const toolkitTools: ToolkitTool[] = [
     description: "Recap of past meetings ingested from Granola, with summaries.",
     enabled: true,
     adminOnly: false,
+    group: "company",
   },
   {
     name: "Newsletter",
@@ -70,6 +80,15 @@ export const toolkitTools: ToolkitTool[] = [
     description: "Write and publish newsletter issues for the agency website.",
     enabled: true,
     adminOnly: false,
+    group: "content",
+  },
+  {
+    name: "Content Board",
+    slug: "content-board",
+    description: "Plan social content from idea to posted across every platform.",
+    enabled: true,
+    adminOnly: false,
+    group: "content",
   },
 ];
 

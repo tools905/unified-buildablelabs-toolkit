@@ -11,11 +11,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
+import { CollapsibleSection } from "@/components/dashboard/collapsible-section";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
-import { listToolkitTools, type ToolkitToolSlug } from "@/modules/core/tools/registry";
+import { listToolkitTools, type ToolkitTool, type ToolkitToolSlug } from "@/modules/core/tools/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +28,42 @@ const TOOL_ICONS: Record<ToolkitToolSlug, LucideIcon> = {
   resources: BookOpen,
   meetings: CalendarClock,
   newsletter: Newspaper,
+  "content-board": KanbanSquare,
 };
+
+function ToolGrid({ tools }: { tools: ToolkitTool[] }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {tools.map((tool) => {
+        const Icon = TOOL_ICONS[tool.slug];
+        return (
+          <Link key={tool.slug} href={`/tools/${tool.slug}`} className="group block">
+            <Card className="card-hover-effect flex h-full items-start gap-4 p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="truncate font-semibold">{tool.name}</h3>
+                  <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
+                </div>
+                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{tool.description}</p>
+              </div>
+            </Card>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
   const workspace = await requireDefaultWorkspace(supabase, user.id);
   const tools = await listToolkitTools();
   const enabledTools = tools.filter((tool) => tool.enabled);
+  const companyTools = enabledTools.filter((tool) => tool.group === "company");
+  const contentTools = enabledTools.filter((tool) => tool.group === "content");
 
   const displayName =
     (user.user_metadata?.full_name as string | undefined)?.split(" ")[0] ||
@@ -48,27 +78,17 @@ export default async function DashboardPage() {
         description="Jump straight into a tool below, or browse the full catalog for everything available to your workspace."
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {enabledTools.map((tool) => {
-          const Icon = TOOL_ICONS[tool.slug];
-          return (
-            <Link key={tool.slug} href={`/tools/${tool.slug}`} className="group block">
-              <Card className="card-hover-effect flex h-full items-start gap-4 p-5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="truncate font-semibold">{tool.name}</h3>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{tool.description}</p>
-                </div>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
+      {companyTools.length > 0 ? (
+        <CollapsibleSection title="Company" count={companyTools.length}>
+          <ToolGrid tools={companyTools} />
+        </CollapsibleSection>
+      ) : null}
+
+      {contentTools.length > 0 ? (
+        <CollapsibleSection title="Content" count={contentTools.length}>
+          <ToolGrid tools={contentTools} />
+        </CollapsibleSection>
+      ) : null}
 
       <div className="mt-8 flex items-center justify-between rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
         <span>Looking for a tool that isn&apos;t enabled yet, or want the full breakdown?</span>
