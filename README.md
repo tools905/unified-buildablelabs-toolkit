@@ -102,9 +102,7 @@ but the product treats this as one internal workspace.
 - `/tools/linkedin-assessor`
 - `/tools/linkedin-assessor/admin`
 - `/tools/linkedin-assessor/admin/posts`
-- `/tools/linkedin-assessor/admin/leaderboards`
 - `/tools/linkedin-assessor/admin/settings`
-- `/tools/linkedin-assessor/reports`
 - `/tools/hr-bot`
 - `/tools/tickets`
 - `/tools/tickets/reviews`

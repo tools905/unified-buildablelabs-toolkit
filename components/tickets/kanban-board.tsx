@@ -101,7 +101,7 @@ export function KanbanBoard({
         <CreateTicketDialog members={members} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-5">
         {TICKET_COLUMNS.map((column) => {
           const columnTickets = filtered.filter((ticket) => ticket.status === column.status);
           const isDragOver = dragOverStatus === column.status;
@@ -115,7 +115,7 @@ export function KanbanBoard({
               onDragLeave={() => setDragOverStatus((prev) => (prev === column.status ? null : prev))}
               onDrop={() => handleDrop(column.status)}
               className={cn(
-                "flex h-[calc(100vh-260px)] min-h-[20rem] flex-col rounded-lg border bg-muted/40 p-3 transition-colors",
+                "flex max-h-[70vh] min-h-[8rem] flex-col rounded-lg border bg-muted/40 p-3 transition-colors lg:h-[calc(100vh-260px)] lg:max-h-none lg:min-h-[20rem]",
                 isDragOver ? "border-primary/60 bg-primary/5" : "border-border",
               )}
             >

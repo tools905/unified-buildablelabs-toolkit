@@ -168,6 +168,26 @@ summary::-webkit-details-marker {
   transform: scaleY(1.7);
 }
 
+/* Content Board side panel entrance. */
+.panel-slide-in {
+  animation: panel-slide-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes panel-slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-slide-in {
+    animation: none;
+  }
+}
+
 /* Rendered newsletter body — matches the "paper" editor surface, not the
    app's dark theme, since it previews what the published issue looks like. */
 .newsletter-preview p {
@@ -214,4 +234,13 @@ summary::-webkit-details-marker {
   transform: translateX(-50%);
   pointer-events: none;
   z-index: 0;
+}
+
+/* A grid with no explicit columns sizes its single column to its widest child,
+   so one wide table or long word pushes the whole page past a phone screen.
+   Let that default column shrink; any grid-cols-* class still overrides this. */
+@layer base {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

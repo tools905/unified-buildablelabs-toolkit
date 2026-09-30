@@ -3,17 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  createLinkedInAnalysisWindow,
   createLinkedInScoreOverride,
   createSelfLinkedInTrackedMember,
   createLinkedInTrackedMember,
-  generateLinkedInWeeklyReports,
   linkedinSettingsSchema,
   linkedinManualPostSchema,
   linkedinScoreOverrideSchema,
   linkedinSelfProfileSchema,
   linkedinTrackedMemberSchema,
-  linkedinWindowSchema,
   scoreLinkedInPostById,
   scoreUnscoredLinkedInPosts,
   submitLinkedInPost,
@@ -26,7 +23,6 @@ import { requireLinkedInContext } from "@/modules/linkedin-assessor/context";
 const refreshLinkedIn = () => {
   revalidatePath("/tools/linkedin-assessor");
   revalidatePath("/tools/linkedin-assessor/admin");
-  revalidatePath("/tools/linkedin-assessor/reports");
 };
 
 export async function createTrackedMemberAction(formData: FormData) {
@@ -61,18 +57,10 @@ export async function scoreLinkedInAction() {
   refreshLinkedIn();
 }
 
-export async function createAnalysisWindowAction(formData: FormData) {
-  const { supabase, user, workspace } = await requireLinkedInAdmin();
-  const parsed = linkedinWindowSchema.parse(Object.fromEntries(formData));
-  await createLinkedInAnalysisWindow(supabase, { workspaceId: workspace.id, actorId: user.id, ...parsed });
-  refreshLinkedIn();
-}
-
 export async function updateLinkedInSettingsAction(formData: FormData) {
   const { supabase, workspace } = await requireLinkedInAdmin();
   const parsed = linkedinSettingsSchema.parse({
     ...Object.fromEntries(formData),
-    weeklyReportsEnabled: formData.get("weeklyReportsEnabled") === "on",
     memberInsightsEnabled: formData.get("memberInsightsEnabled") === "on",
     memberSubmissionsEnabled: formData.get("memberSubmissionsEnabled") === "on",
   });
@@ -141,11 +129,5 @@ export async function connectOwnLinkedInProfileAction(formData: FormData) {
     memberRole: parsed.memberRole,
     linkedinProfileUrl: parsed.linkedinProfileUrl,
   });
-  refreshLinkedIn();
-}
-
-export async function generateLinkedInReportAction() {
-  const { workspace } = await requireLinkedInAdmin();
-  await generateLinkedInWeeklyReports({ workspaceId: workspace.id });
   refreshLinkedIn();
 }

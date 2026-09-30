@@ -134,6 +134,7 @@ Per `cron.schedule(...)` calls actually present in the migrations:
 | `toolkit-meeting-digest-daily` | 08:00 UTC daily | `/api/cron/meeting-digests?type=daily` |
 | `toolkit-meeting-digest-weekly` | 17:00 UTC Friday | `/api/cron/meeting-digests?type=weekly` |
 | `toolkit-process-new-meetings` | 01:30 UTC daily | `/api/cron/process-new-meetings` |
+| `toolkit-content-cleanup` (`029_content_attachments_reviews.sql`) | 02:30 UTC daily | `/api/cron/content-cleanup` (deletes uploaded files of Content Board ideas posted more than 30 days ago) |
 
 `005_scheduler.sql`'s `daily-review-cron` and `011_supabase_cron.sql`'s
 `toolkit-daily` both call `/api/cron/daily` on different schedules and via

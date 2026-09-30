@@ -170,19 +170,9 @@ export async function updateLinkedInTrackedMember(supabase: SupabaseClient<any>,
   return data;
 }
 
-export async function createLinkedInAnalysisWindow(supabase: SupabaseClient<any>, input: { workspaceId: string; actorId: string; name: string; startDate: Date; endDate: Date }) {
-  const { data, error } = await supabase.from("linkedin_analysis_windows").insert({ workspace_id: input.workspaceId, created_by: input.actorId, name: input.name, start_date: input.startDate.toISOString(), end_date: input.endDate.toISOString() }).select("*").single();
-  if (error) throw error;
-  return data;
-}
-
-export async function upsertLinkedInSettings(supabase: SupabaseClient<any>, input: { workspaceId: string; monthlyPostTarget: number; volumeWeight: number; qualityWeight: number; weeklyReportsEnabled: boolean; memberInsightsEnabled: boolean; memberSubmissionsEnabled: boolean; analysisWindowDays: number }) {
+export async function upsertLinkedInSettings(supabase: SupabaseClient<any>, input: { workspaceId: string; memberInsightsEnabled: boolean; memberSubmissionsEnabled: boolean; analysisWindowDays: number }) {
   const { data, error } = await supabase.from("linkedin_settings").upsert({
     workspace_id: input.workspaceId,
-    default_monthly_post_target: input.monthlyPostTarget,
-    default_volume_weight: input.volumeWeight,
-    default_quality_weight: input.qualityWeight,
-    weekly_reports_enabled: input.weeklyReportsEnabled,
     member_insights_enabled: input.memberInsightsEnabled,
     member_submissions_enabled: input.memberSubmissionsEnabled,
     analysis_window_days: input.analysisWindowDays,

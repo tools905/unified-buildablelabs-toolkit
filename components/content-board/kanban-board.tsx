@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { CreateIdeaDialog } from "@/components/content-board/create-idea-dialog";
 import { IdeaCard } from "@/components/content-board/idea-card";
 import { IdeaDetail } from "@/components/content-board/idea-detail";
+import { IdeaPanel } from "@/components/content-board/idea-panel";
 import {
   CONTENT_COLUMNS,
   PLATFORM_META,
@@ -31,7 +32,8 @@ export function KanbanBoard({
   const [proposerFilter, setProposerFilter] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<ContentIdeaStatus | null>(null);
-  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
+  const [panelIdeaId, setPanelIdeaId] = useState<string | null>(null);
+  const [editIdeaId, setEditIdeaId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const ideas = useMemo(() => {
@@ -41,7 +43,8 @@ export function KanbanBoard({
     });
   }, [initialIdeas, optimisticStatus]);
 
-  const selectedIdea = ideas.find((idea) => idea.id === selectedIdeaId) ?? null;
+  const panelIdea = ideas.find((idea) => idea.id === panelIdeaId) ?? null;
+  const editIdea = ideas.find((idea) => idea.id === editIdeaId) ?? null;
 
   const filtered = useMemo(() => {
     return ideas.filter((idea) => {
@@ -109,7 +112,7 @@ export function KanbanBoard({
         <CreateIdeaDialog />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-4">
         {CONTENT_COLUMNS.map((column) => {
           const columnIdeas = filtered.filter((idea) => idea.status === column.status);
           const isDragOver = dragOverStatus === column.status;
@@ -123,7 +126,7 @@ export function KanbanBoard({
               onDragLeave={() => setDragOverStatus((prev) => (prev === column.status ? null : prev))}
               onDrop={() => handleDrop(column.status)}
               className={cn(
-                "flex h-[calc(100vh-260px)] min-h-[20rem] flex-col rounded-lg border bg-muted/40 p-3 transition-colors",
+                "flex max-h-[70vh] min-h-[8rem] flex-col rounded-lg border bg-muted/40 p-3 transition-colors lg:h-[calc(100vh-260px)] lg:max-h-none lg:min-h-[20rem]",
                 isDragOver ? "border-primary/60 bg-primary/5" : "border-border",
               )}
             >
@@ -139,7 +142,7 @@ export function KanbanBoard({
                     key={idea.id}
                     idea={idea}
                     isDragging={draggingId === idea.id}
-                    onOpen={() => setSelectedIdeaId(idea.id)}
+                    onOpen={() => setPanelIdeaId(idea.id)}
                     onDragStart={(event) => {
                       setDraggingId(idea.id);
                       event.dataTransfer.effectAllowed = "move";
@@ -161,7 +164,16 @@ export function KanbanBoard({
         })}
       </div>
 
-      {selectedIdea ? <IdeaDetail idea={selectedIdea} onClose={() => setSelectedIdeaId(null)} /> : null}
+      {panelIdea ? (
+        <IdeaPanel
+          key={panelIdea.id}
+          idea={panelIdea}
+          keyboardActive={!editIdea}
+          onClose={() => setPanelIdeaId(null)}
+          onEdit={() => setEditIdeaId(panelIdea.id)}
+        />
+      ) : null}
+      {editIdea ? <IdeaDetail idea={editIdea} onClose={() => setEditIdeaId(null)} /> : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   Bot,
   BookOpen,
   CalendarClock,
+  CalendarDays,
   ClipboardCheck,
   FileBarChart,
   History,
@@ -67,8 +68,6 @@ const toolNav: Array<{
       { href: "/tools/linkedin-assessor", label: "Overview", icon: Share2, exact: true },
       { href: "/tools/linkedin-assessor/admin", label: "Dashboard", icon: LayoutDashboard, adminOnly: true, exact: true },
       { href: "/tools/linkedin-assessor/admin/posts", label: "Posts", icon: Newspaper, adminOnly: true },
-      { href: "/tools/linkedin-assessor/admin/leaderboards", label: "Leaderboards", icon: BarChart3, adminOnly: true },
-      { href: "/tools/linkedin-assessor/reports", label: "Reports", icon: FileBarChart, adminOnly: true },
       { href: "/tools/linkedin-assessor/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
     ],
   },
@@ -111,7 +110,10 @@ const toolNav: Array<{
   {
     match: "/tools/content-board",
     title: "Content Board",
-    items: [{ href: "/tools/content-board", label: "Board", icon: KanbanSquare, exact: true }],
+    items: [
+      { href: "/tools/content-board", label: "Board", icon: KanbanSquare, exact: true },
+      { href: "/tools/content-board/calendar", label: "Calendar", icon: CalendarDays, exact: true },
+    ],
   },
 ];
 

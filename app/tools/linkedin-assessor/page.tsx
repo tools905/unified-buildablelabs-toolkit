@@ -34,16 +34,15 @@ export default async function LinkedInAssessorPage() {
         {admin ? <Button asChild><Link href="/tools/linkedin-assessor/admin">Manage assessor</Link></Button> : null}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title="Submitted posts" value={data.summary.totalPosts} description={data.window.name} />
-        <StatCard title="Average quality" value={data.summary.averageQuality ?? "N/A"} />
+        <StatCard title="Average score" value={data.summary.averageQuality ?? "N/A"} />
         <StatCard title="Most active" value={data.summary.mostActiveMember ?? "N/A"} />
-        <StatCard title="Profiles paused" value={data.stats.filter((member) => member.trackingStatus === "paused").length} />
       </div>
 
       <div className="mt-6"><LinkedInScoreOverview stats={data.stats} /></div>
       <Card className="mt-6">
-        <CardHeader><CardTitle>{admin ? "Team performance" : "My LinkedIn insights"}</CardTitle><CardDescription>Volume and quality are combined using each tracked profile&apos;s configured weights.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>{admin ? "Team performance" : "My LinkedIn insights"}</CardTitle><CardDescription>Posts submitted and average post score per member.</CardDescription></CardHeader>
         <CardContent><LinkedInMemberTable stats={data.stats} linkMembers={admin} /></CardContent>
       </Card>
 

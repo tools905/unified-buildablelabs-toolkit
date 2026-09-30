@@ -25,6 +25,7 @@ export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";
 export type ContentPlatform = "instagram" | "linkedin" | "x" | "youtube" | "facebook";
 export type ContentIdeaStatus = "idea" | "approved" | "in_progress" | "posted";
+export type ContentAttachmentKind = "image" | "pdf" | "link";
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
@@ -540,6 +541,9 @@ export type Database = {
           description: string | null;
           status: ContentIdeaStatus;
           post_url: string | null;
+          posted_at: string | null;
+          scheduled_for: string | null;
+          reference_links: string[];
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -552,11 +556,68 @@ export type Database = {
           description?: string | null;
           status?: ContentIdeaStatus;
           post_url?: string | null;
+          posted_at?: string | null;
+          scheduled_for?: string | null;
+          reference_links?: string[];
           created_by: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["content_ideas"]["Insert"]>;
+      };
+      content_idea_attachments: {
+        Row: {
+          id: string;
+          idea_id: string;
+          workspace_id: string;
+          kind: ContentAttachmentKind;
+          storage_path: string | null;
+          thumb_path: string | null;
+          url: string | null;
+          file_name: string | null;
+          size_bytes: number | null;
+          sort_order: number;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          idea_id: string;
+          workspace_id: string;
+          kind: ContentAttachmentKind;
+          storage_path?: string | null;
+          thumb_path?: string | null;
+          url?: string | null;
+          file_name?: string | null;
+          size_bytes?: number | null;
+          sort_order?: number;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["content_idea_attachments"]["Insert"]>;
+      };
+      content_idea_review_points: {
+        Row: {
+          id: string;
+          idea_id: string;
+          workspace_id: string;
+          body: string;
+          is_resolved: boolean;
+          resolved_at: string | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          idea_id: string;
+          workspace_id: string;
+          body: string;
+          is_resolved?: boolean;
+          resolved_at?: string | null;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["content_idea_review_points"]["Insert"]>;
       };
     };
     Views: Record<string, never>;
@@ -586,6 +647,7 @@ export type Database = {
       linear_link_source: LinearLinkSource;
       content_platform: ContentPlatform;
       content_idea_status: ContentIdeaStatus;
+      content_attachment_kind: ContentAttachmentKind;
     };
   };
 };
