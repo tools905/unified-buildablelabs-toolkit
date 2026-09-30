@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { KanbanBoard } from "@/components/content-board/kanban-board";
 import { requireUser } from "@/lib/auth/require-user";
 import { getWorkspaceMembers } from "@/lib/services/workspace-service";
-import { listContentIdeas } from "@/lib/services/content-idea-service";
+import { attachCardPreviews, listContentIdeas } from "@/lib/services/content-idea-service";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
 
@@ -14,10 +14,11 @@ export default async function ContentBoardPage() {
   const { supabase, user } = await requireUser("/tools/content-board");
   const workspace = await requireDefaultWorkspace(supabase, user.id);
 
-  const [ideas, members] = await Promise.all([
+  const [rawIdeas, members] = await Promise.all([
     listContentIdeas(supabase, workspace.id),
     getWorkspaceMembers(supabase, workspace.id),
   ]);
+  const ideas = await attachCardPreviews(supabase, rawIdeas);
 
   const memberOptions = members.map(
     (member: {

@@ -1,14 +1,11 @@
 import Link from "next/link";
-import { Plus, Sparkles } from "lucide-react";
+import { ChevronDown, Plus, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { formatISTDateTime } from "@/lib/utils/dates";
-import { LinkedInMemberTable } from "@/components/linkedin-assessor/member-table";
-import { LinkedInScoreOverview } from "@/components/linkedin-assessor/score-overview";
-import { LinkedInMemberScoreBreakdown } from "@/components/linkedin-assessor/member-score-breakdown";
+import { LinkedInPostAssessmentList } from "@/components/linkedin-assessor/post-assessment-list";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/dashboard/submit-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLinkedInDashboardData } from "@/modules/linkedin-assessor";
 import { requireLinkedInAdmin } from "@/modules/linkedin-assessor/context";
 import { scoreLinkedInAction } from "../actions";
@@ -17,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LinkedInAdminPage() {
   const { supabase, workspace } = await requireLinkedInAdmin("/tools/linkedin-assessor/admin");
-  const data = await getLinkedInDashboardData(supabase, workspace.id, { includeLogs: true });
+  const data = await getLinkedInDashboardData(supabase, workspace.id);
 
   return (
     <AppShell>
@@ -34,31 +31,37 @@ export default async function LinkedInAdminPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Tracked profiles" value={data.stats.length} />
-        <StatCard title="Submitted posts" value={data.summary.totalPosts} />
-        <StatCard title="Average quality" value={data.summary.averageQuality ?? "N/A"} />
-        <StatCard title="Profiles paused" value={data.stats.filter((member) => member.trackingStatus === "paused").length} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard title="Members" value={data.stats.length} />
+        <StatCard title="Posts" value={data.summary.totalPosts} description={data.window.name} />
       </div>
 
-      <div className="mt-6"><LinkedInScoreOverview stats={data.stats} /></div>
-      <LinkedInMemberScoreBreakdown stats={data.stats} />
-      <Card className="mt-6"><CardHeader><CardTitle>Tracked members</CardTitle></CardHeader><CardContent><LinkedInMemberTable stats={data.stats} /></CardContent></Card>
       <Card className="mt-6">
-        <CardHeader><CardTitle>Recent processing activity</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {data.logs.slice(0, 10).map((log) => (
-            <div key={log.id} className="flex flex-col gap-1 border-b border-border pb-3 text-sm last:border-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium capitalize">{log.status} - {log.job_type.replaceAll("_", " ")}</span>
-                <span className="text-xs text-muted-foreground">{formatISTDateTime(log.created_at)}</span>
-              </div>
-              <span className="text-muted-foreground">{log.message}</span>
-            </div>
-          ))}
-          {data.logs.length === 0 ? <p className="text-sm text-muted-foreground">No processing activity yet.</p> : null}
-        </CardContent>
+        <CardHeader>
+          <CardTitle>Post assessments</CardTitle>
+          <CardDescription>Newest first. Open a post for the full AI feedback.</CardDescription>
+        </CardHeader>
+        <CardContent><LinkedInPostAssessmentList posts={data.posts} /></CardContent>
       </Card>
+
+      <details className="group mt-6 border border-border bg-card">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          <span>Manage members ({data.stats.length})</span>
+          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="divide-y divide-border border-t border-border">
+          {data.stats.map((member) => (
+            <Link
+              key={member.trackedMemberId}
+              href={`/tools/linkedin-assessor/admin/members/${member.trackedMemberId}`}
+              className="flex items-center justify-between gap-3 px-5 py-3 text-sm hover:bg-muted"
+            >
+              <span className="font-medium">{member.name}</span>
+            </Link>
+          ))}
+          {data.stats.length === 0 ? <p className="px-5 py-6 text-center text-sm text-muted-foreground">No LinkedIn profiles are being tracked yet.</p> : null}
+        </div>
+      </details>
     </AppShell>
   );
 }

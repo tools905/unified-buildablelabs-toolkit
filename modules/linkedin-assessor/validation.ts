@@ -33,31 +33,11 @@ export const linkedinTrackedMemberSchema = z
     path: ["qualityWeight"],
   });
 
-export const linkedinWindowSchema = z
-  .object({
-    name: z.string().trim().min(1),
-    startDate: z.coerce.date(),
-    endDate: z.coerce.date(),
-  })
-  .refine((value) => value.endDate > value.startDate, {
-    message: "End date must be after start date.",
-    path: ["endDate"],
-  });
-
-export const linkedinSettingsSchema = z
-  .object({
-    monthlyPostTarget: z.coerce.number().int().min(1).max(100),
-    volumeWeight: z.coerce.number().min(0).max(1),
-    qualityWeight: z.coerce.number().min(0).max(1),
-    weeklyReportsEnabled: z.coerce.boolean(),
-    memberInsightsEnabled: z.coerce.boolean(),
-    memberSubmissionsEnabled: z.coerce.boolean(),
-    analysisWindowDays: z.coerce.number().int().min(7).max(365),
-  })
-  .refine((value) => Math.abs(value.volumeWeight + value.qualityWeight - 1) < 0.001, {
-    message: "Volume and quality weights must total 1.",
-    path: ["qualityWeight"],
-  });
+export const linkedinSettingsSchema = z.object({
+  memberInsightsEnabled: z.coerce.boolean(),
+  memberSubmissionsEnabled: z.coerce.boolean(),
+  analysisWindowDays: z.coerce.number().int().min(7).max(365),
+});
 
 export const linkedinManualPostSchema = z.object({
   trackedMemberId: z.string().uuid(),

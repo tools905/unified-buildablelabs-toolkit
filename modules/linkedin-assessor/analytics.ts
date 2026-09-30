@@ -89,11 +89,6 @@ export function calculateLinkedInMemberStats(input: {
   };
 }
 
-export function calculateLinkedInLeaderboards(stats: LinkedInMemberStats[]) {
-  const by = (key: "finalScore" | "postCount" | "averageQualityScore") => [...stats].sort((a, b) => Number(b[key] ?? -1) - Number(a[key] ?? -1));
-  return { finalScore: by("finalScore"), volume: by("postCount"), quality: by("averageQualityScore") };
-}
-
 function mostCommon(items: string[]) {
   const counts = new Map<string, number>();
   for (const item of items) counts.set(item, (counts.get(item) ?? 0) + 1);

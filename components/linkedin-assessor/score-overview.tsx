@@ -12,9 +12,9 @@ export function LinkedInScoreOverview({ stats }: { stats: LinkedInMemberStats[] 
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle className="text-base">Final score</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Average score</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {stats.map((member) => <MetricBar key={member.trackedMemberId} label={member.name} value={member.finalScore ?? 0} maximum={100} suffix={member.finalScore == null ? " N/A" : ""} />)}
+          {stats.map((member) => <MetricBar key={member.trackedMemberId} label={member.name} value={member.averageQualityScore ?? 0} maximum={100} suffix="" display={member.averageQualityScore == null ? "N/A" : undefined} />)}
           {stats.length === 0 ? <p className="text-sm text-muted-foreground">Scores appear after members manually submit posts.</p> : null}
         </CardContent>
       </Card>
@@ -22,7 +22,7 @@ export function LinkedInScoreOverview({ stats }: { stats: LinkedInMemberStats[] 
   );
 }
 
-function MetricBar({ label, value, maximum, suffix }: { label: string; value: number; maximum: number; suffix: string }) {
+function MetricBar({ label, value, maximum, suffix, display }: { label: string; value: number; maximum: number; suffix: string; display?: string }) {
   const width = Math.max(2, Math.min(100, (value / Math.max(1, maximum)) * 100));
-  return <div><div className="mb-1 flex items-center justify-between gap-3 text-sm"><span className="truncate">{label}</span><span className="font-medium">{value}{suffix}</span></div><div className="h-2 overflow-hidden rounded-sm bg-muted"><div className="h-full bg-primary" style={{ width: `${width}%` }} /></div></div>;
+  return <div><div className="mb-1 flex items-center justify-between gap-3 text-sm"><span className="truncate">{label}</span><span className="font-medium">{display ?? `${value}${suffix}`}</span></div><div className="h-2 overflow-hidden rounded-sm bg-muted"><div className="h-full bg-primary" style={{ width: `${width}%` }} /></div></div>;
 }

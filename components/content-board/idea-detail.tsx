@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { ConfirmButton } from "@/components/dashboard/confirm-button";
+import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
+import { ReferenceLinksField } from "@/components/content-board/reference-links-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,7 @@ export function IdeaDetail({
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const statusLabel = CONTENT_COLUMNS.find((c) => c.status === idea.status)?.label ?? idea.status;
 
   return (
@@ -42,43 +44,34 @@ export function IdeaDetail({
 
         <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
           <form
-            action={(formData) => {
+            onSubmit={(event) => {
+              // Not a form `action`: React would reset every field after a failed save.
+              event.preventDefault();
+              const formData = new FormData(event.currentTarget);
               formData.set("ideaId", idea.id);
-              startTransition(() => updateIdeaAction(formData));
+              setError(null);
+              startTransition(async () => {
+                const result = await updateIdeaAction(formData);
+                if (result.ok) onClose();
+                else setError(result.error);
+              });
             }}
             className="space-y-4"
           >
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="platform">Platform</Label>
-                <select
-                  id="platform"
-                  name="platform"
-                  defaultValue={idea.platform}
-                  className="mt-1 h-10 w-full rounded-sm border border-border bg-background px-3 text-sm"
-                >
-                  {PLATFORM_OPTIONS.map((platform) => (
-                    <option key={platform} value={platform}>
-                      {PLATFORM_META[platform].label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <select
-                  id="status"
-                  name="status"
-                  defaultValue={idea.status}
-                  className="mt-1 h-10 w-full rounded-sm border border-border bg-background px-3 text-sm"
-                >
-                  {CONTENT_COLUMNS.map((column) => (
-                    <option key={column.status} value={column.status}>
-                      {column.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <Label htmlFor="platform">Platform</Label>
+              <select
+                id="platform"
+                name="platform"
+                defaultValue={idea.platform}
+                className="mt-1 h-10 w-full rounded-sm border border-border bg-background px-3 text-sm"
+              >
+                {PLATFORM_OPTIONS.map((platform) => (
+                  <option key={platform} value={platform}>
+                    {PLATFORM_META[platform].label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <Label htmlFor="title">Title</Label>
@@ -95,29 +88,50 @@ export function IdeaDetail({
               />
             </div>
             <div>
+              <Label htmlFor="scheduledFor">Post on</Label>
+              <Input
+                id="scheduledFor"
+                name="scheduledFor"
+                type="date"
+                defaultValue={idea.scheduled_for ?? ""}
+                className="mt-1"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Clear the date to take it off the calendar.</p>
+            </div>
+            <ReferenceLinksField initial={idea.reference_links ?? []} />
+            <div>
               <Label>Proposed by</Label>
               <p className="mt-1 text-sm text-muted-foreground">
                 {idea.creator?.full_name || idea.creator?.email || "Unknown"}
               </p>
             </div>
-            <div>
-              <Label htmlFor="postUrl">Final post URL</Label>
-              <Input
-                id="postUrl"
-                name="postUrl"
-                type="url"
-                placeholder="https://…"
-                defaultValue={idea.post_url ?? ""}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex items-center justify-between border-t border-border pt-4">
-              <ConfirmButton
-                type="button"
+            {idea.status === "posted" ? (
+              <div>
+                <Label htmlFor="postUrl">Final post URL</Label>
+                <Input
+                  id="postUrl"
+                  name="postUrl"
+                  type="url"
+                  placeholder="https://…"
+                  defaultValue={idea.post_url ?? ""}
+                  className="mt-1"
+                />
+              </div>
+            ) : null}
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+              <InlineConfirmButton
+                label="Delete"
+                question="Delete this idea for good?"
+                confirmLabel="Yes, delete"
+                pendingLabel="Deleting…"
+                pending={pending}
                 variant="destructive"
-                size="sm"
-                message="Delete this idea? This cannot be undone."
-                onClick={() => {
+                onConfirm={() => {
                   const formData = new FormData();
                   formData.set("ideaId", idea.id);
                   startTransition(async () => {
@@ -125,9 +139,7 @@ export function IdeaDetail({
                     onClose();
                   });
                 }}
-              >
-                Delete
-              </ConfirmButton>
+              />
               <Button type="submit" disabled={pending}>
                 {pending ? "Saving…" : "Save changes"}
               </Button>
