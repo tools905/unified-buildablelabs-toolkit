@@ -1,7 +1,10 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, Link2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Link2 } from "lucide-react";
 import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
+import { formatWhen } from "@/components/content-board/activity";
+import { downloadAttachment } from "@/components/content-board/download-attachment";
 import { PdfViewer } from "@/components/content-board/pdf-viewer";
 import { cn } from "@/lib/utils/cn";
 import type { PanelAttachment } from "@/components/content-board/types";
@@ -20,6 +23,7 @@ export function PreviewViewer({
   busy: boolean;
 }) {
   const current = attachments[index];
+  const [downloading, setDownloading] = useState(false);
 
   if (!current) {
     return (
@@ -30,6 +34,7 @@ export function PreviewViewer({
   }
 
   const canStep = attachments.length > 1 && current.kind !== "pdf";
+  const downloadUrl = current.kind !== "link" ? current.url : null;
 
   return (
     <div className="space-y-2">
@@ -110,6 +115,21 @@ export function PreviewViewer({
               Open <ExternalLink className="h-3 w-3" />
             </a>
           ) : null}
+          {downloadUrl ? (
+            <button
+              type="button"
+              disabled={downloading}
+              onClick={async () => {
+                setDownloading(true);
+                await downloadAttachment(downloadUrl, current.fileName);
+                setDownloading(false);
+              }}
+              className="inline-flex h-8 items-center gap-1 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
+            >
+              <Download className="h-3 w-3" />
+              {downloading ? "Downloading…" : "Download"}
+            </button>
+          ) : null}
           <InlineConfirmButton
             label="Remove"
             question="Remove this?"
@@ -120,6 +140,9 @@ export function PreviewViewer({
           />
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Uploaded by {current.uploaderName} · {formatWhen(current.createdAt)}
+      </p>
     </div>
   );
 }

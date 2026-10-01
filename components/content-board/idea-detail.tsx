@@ -11,6 +11,7 @@ import { deleteIdeaAction, updateIdeaAction } from "@/app/tools/content-board/ac
 import {
   CONTENT_COLUMNS,
   PLATFORM_META,
+  platformMeta,
   PLATFORM_OPTIONS,
   type ContentIdeaWithRelations,
 } from "@/components/content-board/types";
@@ -31,7 +32,7 @@ export function IdeaDetail({
       <div className="popover-shadow flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-card">
         <div
           className="flex items-start justify-between gap-3 border-b border-border px-6 py-4"
-          style={{ backgroundColor: `${PLATFORM_META[idea.platform].color}14` }}
+          style={{ backgroundColor: `${platformMeta(idea.platform).color}14` }}
         >
           <div>
             <p className="eyebrow mb-1">{statusLabel}</p>

@@ -148,6 +148,30 @@ export async function updateContentIdea(
   return idea;
 }
 
+export async function setIdeaReviewed(
+  supabase: SupabaseClient<any>,
+  workspaceId: string,
+  ideaId: string,
+  actorId: string,
+  reviewed: boolean,
+) {
+  const { data, error } = await supabase
+    .from("content_ideas")
+    .update(reviewed ? { reviewed_at: new Date().toISOString(), reviewed_by: actorId } : { reviewed_at: null, reviewed_by: null })
+    .eq("id", ideaId)
+    .select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Could not update this idea.");
+
+  await writeAuditLog(supabase, {
+    workspaceId,
+    actorId,
+    action: reviewed ? "content_idea.reviewed" : "content_idea.review_cleared",
+    entityType: "content_idea",
+    entityId: ideaId,
+  });
+}
+
 export async function deleteContentIdea(
   supabase: SupabaseClient<any>,
   workspaceId: string,

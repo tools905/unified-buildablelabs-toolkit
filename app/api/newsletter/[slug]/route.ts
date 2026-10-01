@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceByName } from "@/lib/services/workspace-service";
 import { getAuthorsForPosts, getPublishedPostBySlug } from "@/lib/services/newsletter-service";
 import { renderNewsletterMarkdown } from "@/lib/utils/markdown";
+import { coverImagePayload } from "@/lib/utils/newsletter-cover";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +36,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
       tag: post.tag,
       slug: post.slug,
       publishedAt: post.published_at,
+      coverImage: coverImagePayload(post.cover_image_url, post.cover_brightness, {
+        focusX: post.cover_focus_x ?? 50,
+        focusY: post.cover_focus_y ?? 50,
+        zoom: Number(post.cover_zoom ?? 1),
+        fade: post.cover_fade,
+      }),
       authors: authors.map((author: { full_name: string | null; email: string }) => author.full_name || author.email),
       bodyHtml: renderNewsletterMarkdown(post.body),
     },

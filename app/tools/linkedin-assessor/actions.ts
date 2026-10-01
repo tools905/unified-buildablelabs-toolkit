@@ -36,9 +36,6 @@ export async function createTrackedMemberAction(formData: FormData) {
     email: parsed.email || null,
     memberRole: parsed.memberRole,
     linkedinProfileUrl: parsed.linkedinProfileUrl,
-    monthlyPostTarget: parsed.monthlyPostTarget,
-    volumeWeight: parsed.volumeWeight,
-    qualityWeight: parsed.qualityWeight,
   });
   redirect(`/tools/linkedin-assessor/admin/members/${member.id}`);
 }
@@ -78,9 +75,6 @@ export async function updateTrackedMemberAction(formData: FormData) {
     email: parsed.email || null,
     member_role: parsed.memberRole,
     linkedin_profile_url: parsed.linkedinProfileUrl,
-    monthly_post_target: parsed.monthlyPostTarget,
-    volume_weight: parsed.volumeWeight,
-    quality_weight: parsed.qualityWeight,
   }, user.id);
   refreshLinkedIn();
 }

@@ -18,7 +18,7 @@ describe("LinkedIn Assessor", () => {
     expect(score.strengths.length).toBeGreaterThan(0);
   });
 
-  it("combines volume and quality using member weights", () => {
+  it("averages the scores of a member's posts", () => {
     const stats = calculateLinkedInMemberStats({
       member: {
         id: "member-1", workspace_id: "workspace-1", profile_id: null, name: "Test Member", email: null,
@@ -36,9 +36,8 @@ describe("LinkedIn Assessor", () => {
       startDate: new Date("2026-06-01T00:00:00.000Z"),
       endDate: new Date("2026-06-30T00:00:00.000Z"),
     });
-    expect(stats.volumeScore).toBe(50);
+    expect(stats.postCount).toBe(1);
     expect(stats.averageQualityScore).toBe(80);
-    expect(stats.finalScore).toBe(65);
   });
 
   it("validates manual submissions and rolling window bounds", () => {
@@ -57,6 +56,5 @@ describe("LinkedIn Assessor", () => {
     expect(overridden.bestPostId).toBe("post-1");
     const excluded = calculateLinkedInMemberStats({ member, posts: [{ id: "post-1", posted_at: "2026-06-05T00:00:00.000Z", linkedin_post_scores: baseScore, linkedin_score_overrides: [{ total_score: null, archetype: null, exclude_from_quality_average: true, created_at: "2026-06-06T00:00:00.000Z" }] }], startDate: new Date("2026-06-01"), endDate: new Date("2026-06-30") });
     expect(excluded.averageQualityScore).toBeNull();
-    expect(excluded.finalScore).toBeNull();
   });
 });

@@ -14,6 +14,7 @@ export type ContentAttachmentRow = {
   file_name: string | null;
   size_bytes: number | null;
   sort_order: number;
+  created_by: string;
   created_at: string;
 };
 

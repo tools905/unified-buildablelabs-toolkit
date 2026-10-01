@@ -29,7 +29,19 @@ export async function createDraftAction() {
 
 export async function updatePostAction(
   postId: string,
-  input: { title: string; deck: string; tag: string; body: string; authorIds: string[] },
+  input: {
+    title: string;
+    deck: string;
+    tag: string;
+    body: string;
+    authorIds: string[];
+    coverImageUrl: string | null;
+    coverBrightness: number | null;
+    coverFocusX: number;
+    coverFocusY: number;
+    coverZoom: number;
+    coverFade: "lighter" | "darker" | null;
+  },
 ) {
   const { supabase } = await requireNewsletterContext();
   const post = await newsletterService.updatePost(supabase, postId, input);

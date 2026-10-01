@@ -220,8 +220,12 @@ summary::-webkit-details-marker {
 .newsletter-preview ol { list-style: decimal; }
 .newsletter-preview li { display: list-item; }
 .newsletter-preview img {
+  display: block;
   max-width: 100%;
+  height: auto;
   margin: 0 0 1em;
+  /* A thin frame so a pale picture doesn't disappear into the cream page. */
+  border: 1px solid #dcd5c0;
 }
 
 .glow-glow {
@@ -243,4 +247,21 @@ summary::-webkit-details-marker {
   .grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* The app is dark, but the browser draws its date picker icon dark too, so it vanishes into the
+   field. color-scheme makes the icon and the calendar pop-up light-on-dark. */
+input[type="date"],
+input[type="time"],
+input[type="month"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 1;
 }

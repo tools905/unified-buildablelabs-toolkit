@@ -12,6 +12,12 @@ export type NewsletterPost = {
   title: string;
   deck: string | null;
   tag: string | null;
+  cover_image_url: string | null;
+  cover_brightness: number | null;
+  cover_focus_x: number;
+  cover_focus_y: number;
+  cover_zoom: number;
+  cover_fade: "lighter" | "darker" | null;
   body: string;
   author_ids: string[];
   slug: string | null;
