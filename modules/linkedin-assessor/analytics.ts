@@ -1,4 +1,3 @@
-import { differenceInCalendarDays } from "date-fns";
 import type { LinkedInMemberStats, LinkedInPostScore, LinkedInTrackedMember } from "./types";
 
 type AnalyticsScore = LinkedInPostScore;
@@ -42,15 +41,9 @@ export function calculateLinkedInMemberStats(input: {
       },
     };
   }).filter((post) => post.score);
-  const days = Math.max(1, differenceInCalendarDays(input.endDate, input.startDate) + 1);
-  const periodTarget = input.member.monthly_post_target * (days / 30);
-  const volumeScore = Math.min(input.posts.length / periodTarget, 1) * 100;
   const averageQuality = scored.length
     ? scored.reduce((sum, post) => sum + Number(post.score?.total_score ?? 0), 0) / scored.length
     : null;
-  const finalScore = averageQuality == null
-    ? null
-    : volumeScore * Number(input.member.volume_weight) + averageQuality * Number(input.member.quality_weight);
   const strengths = new Map<string, number>();
   const weaknesses = new Map<string, number>();
   const archetypes: Record<string, number> = {};
@@ -74,12 +67,7 @@ export function calculateLinkedInMemberStats(input: {
     linkedinProfileUrl: input.member.linkedin_profile_url,
     trackingStatus: input.member.tracking_status,
     postCount: input.posts.length,
-    periodTarget: rounded(periodTarget) ?? 0,
-    volumeScore: rounded(volumeScore) ?? 0,
-    volumeWeight: Number(input.member.volume_weight),
-    qualityWeight: Number(input.member.quality_weight),
     averageQualityScore: rounded(averageQuality),
-    finalScore: rounded(finalScore),
     bestPostId: ranked[0]?.id ?? null,
     weakestPostId: ranked.length > 1 ? ranked.at(-1)?.id ?? null : null,
     trend,

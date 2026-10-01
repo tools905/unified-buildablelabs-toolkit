@@ -6,7 +6,7 @@ import { format, isBefore, parseISO, startOfToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { setPostUrlAction } from "@/app/tools/content-board/actions";
 import { cn } from "@/lib/utils/cn";
-import { PLATFORM_META, type ContentIdeaWithRelations } from "@/components/content-board/types";
+import { platformMeta, type ContentIdeaWithRelations } from "@/components/content-board/types";
 
 function initials(name: string | null | undefined, email: string | undefined) {
   const source = name || email || "?";
@@ -97,7 +97,7 @@ export function IdeaCard({
   onDragEnd?: () => void;
   isDragging: boolean;
 }) {
-  const meta = PLATFORM_META[idea.platform];
+  const meta = platformMeta(idea.platform);
   const PlatformIcon = meta.icon;
   const referenceCount = idea.reference_links?.length ?? 0;
   const scheduled = idea.scheduled_for ? parseISO(idea.scheduled_for) : null;
@@ -132,7 +132,7 @@ export function IdeaCard({
           className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
           style={{ backgroundColor: meta.color }}
         >
-          <PlatformIcon className="h-3 w-3" />
+          {PlatformIcon ? <PlatformIcon className="h-3 w-3" /> : null}
           {meta.label}
         </span>
         {idea.creator ? (
@@ -159,7 +159,7 @@ export function IdeaCard({
           {overdue ? " · overdue" : ""}
         </p>
       ) : null}
-      {idea.attachment_count > 0 || idea.review_count > 0 || referenceCount > 0 ? (
+      {idea.attachment_count > 0 || idea.review_count > 0 || idea.reviewed_at || referenceCount > 0 ? (
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {referenceCount > 0 ? (
             <span className="inline-flex items-center gap-1" title={`${referenceCount} reference ${referenceCount === 1 ? "post" : "posts"}`}>
@@ -178,10 +178,15 @@ export function IdeaCard({
               <MessageSquare className="h-3 w-3" />
               {idea.open_review_count} to change
             </span>
-          ) : idea.review_count > 0 ? (
-            <span className="inline-flex items-center gap-1">
+          ) : idea.reviewed_at ? (
+            <span className="inline-flex items-center gap-1" title="Marked as reviewed">
               <Check className="h-3 w-3" />
               Reviewed
+            </span>
+          ) : idea.review_count > 0 ? (
+            <span className="inline-flex items-center gap-1" title="Every review point is done">
+              <Check className="h-3 w-3" />
+              All fixed
             </span>
           ) : null}
         </div>

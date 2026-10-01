@@ -4,6 +4,7 @@ import {
   updateNewsletterPostSchema,
   type UpdateNewsletterPostInput,
 } from "@/lib/validation/newsletter-schema";
+import { isOwnNewsletterImageUrl, NEWSLETTER_BUCKET, unusedNewsletterFiles } from "@/lib/utils/newsletter-cover";
 
 export const NEWSLETTER_POST_SELECT = "*";
 
@@ -88,6 +89,10 @@ export async function updatePost(
 ) {
   const input = updateNewsletterPostSchema.parse(rawInput);
 
+  if (input.coverImageUrl && !isOwnNewsletterImageUrl(input.coverImageUrl, process.env.NEXT_PUBLIC_SUPABASE_URL ?? "", postId)) {
+    throw new Error("The preview image must be uploaded from the editor.");
+  }
+
   const { data, error } = await supabase
     .from("newsletter_posts")
     .update({
@@ -96,6 +101,24 @@ export async function updatePost(
       tag: input.tag || null,
       body: input.body,
       author_ids: input.authorIds,
+      ...(input.coverImageUrl !== undefined
+        ? {
+            cover_image_url: input.coverImageUrl,
+            cover_brightness: input.coverImageUrl ? (input.coverBrightness ?? null) : null,
+            // A removed or replaced image starts again from a centred, unzoomed frame.
+            ...(input.coverImageUrl
+              ? {}
+              : { cover_focus_x: 50, cover_focus_y: 50, cover_zoom: 1, cover_fade: null }),
+          }
+        : {}),
+      ...(input.coverImageUrl
+        ? {
+            ...(input.coverFocusX !== undefined ? { cover_focus_x: input.coverFocusX } : {}),
+            ...(input.coverFocusY !== undefined ? { cover_focus_y: input.coverFocusY } : {}),
+            ...(input.coverZoom !== undefined ? { cover_zoom: input.coverZoom } : {}),
+            ...(input.coverFade !== undefined ? { cover_fade: input.coverFade } : {}),
+          }
+        : {}),
     })
     .eq("id", postId)
     .select(NEWSLETTER_POST_SELECT)
@@ -137,6 +160,8 @@ export async function publishPost(
     .single();
   if (error) throw error;
 
+  await removeUnusedImages(supabase, workspaceId, postId, data.body ?? "", data.cover_image_url);
+
   await writeAuditLog(supabase, {
     workspaceId,
     actorId,
@@ -148,9 +173,39 @@ export async function publishPost(
   return data;
 }
 
+// Best effort: images uploaded for a post but later cut from the story are deleted when it
+// is published. A leftover file is harmless, so this never fails the publish.
+export async function removeUnusedImages(
+  supabase: SupabaseClient<any>,
+  workspaceId: string,
+  postId: string,
+  body: string,
+  coverUrl: string | null,
+) {
+  try {
+    const folder = `${workspaceId}/${postId}`;
+    const { data: files } = await supabase.storage.from(NEWSLETTER_BUCKET).list(folder);
+    const unused = unusedNewsletterFiles((files ?? []).map((file) => file.name), body, coverUrl);
+    if (unused.length) await supabase.storage.from(NEWSLETTER_BUCKET).remove(unused.map((name) => `${folder}/${name}`));
+    return unused.length;
+  } catch {
+    return 0;
+  }
+}
+
 export async function deletePost(supabase: SupabaseClient<any>, postId: string) {
+  const { data: post } = await supabase.from("newsletter_posts").select("workspace_id").eq("id", postId).maybeSingle();
+
   const { error } = await supabase.from("newsletter_posts").delete().eq("id", postId);
   if (error) throw error;
+
+  // Best effort: the post is already gone, so a leftover file must not fail the delete.
+  if (post?.workspace_id) {
+    const folder = `${post.workspace_id}/${postId}`;
+    const { data: files } = await supabase.storage.from(NEWSLETTER_BUCKET).list(folder);
+    const paths = (files ?? []).map((file) => `${folder}/${file.name}`);
+    if (paths.length) await supabase.storage.from(NEWSLETTER_BUCKET).remove(paths);
+  }
 }
 
 // Public-facing reads/writes below run through the service-role client from

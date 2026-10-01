@@ -115,9 +115,6 @@ export async function createLinkedInTrackedMember(
     email?: string | null;
     memberRole: string;
     linkedinProfileUrl: string;
-    monthlyPostTarget: number;
-    volumeWeight: number;
-    qualityWeight: number;
   },
 ) {
   const { data, error } = await supabase.from("linkedin_tracked_members").insert({
@@ -127,9 +124,6 @@ export async function createLinkedInTrackedMember(
     email: input.email || null,
     member_role: input.memberRole,
     linkedin_profile_url: input.linkedinProfileUrl,
-    monthly_post_target: input.monthlyPostTarget,
-    volume_weight: input.volumeWeight,
-    quality_weight: input.qualityWeight,
     created_by: input.actorId,
   }).select("*").single();
   if (error) throw error;
@@ -148,7 +142,6 @@ export async function createSelfLinkedInTrackedMember(input: {
   const supabase = createAdminClient();
   const { data: existing } = await supabase.from("linkedin_tracked_members").select("id").eq("workspace_id", input.workspaceId).eq("profile_id", input.actorId).maybeSingle();
   if (existing) throw new Error("Your toolkit account already has a LinkedIn profile.");
-  const { data: settings } = await supabase.from("linkedin_settings").select("default_monthly_post_target, default_volume_weight, default_quality_weight").eq("workspace_id", input.workspaceId).maybeSingle();
   return createLinkedInTrackedMember(supabase, {
     workspaceId: input.workspaceId,
     actorId: input.actorId,
@@ -157,9 +150,6 @@ export async function createSelfLinkedInTrackedMember(input: {
     email: input.email,
     memberRole: input.memberRole,
     linkedinProfileUrl: input.linkedinProfileUrl,
-    monthlyPostTarget: Number(settings?.default_monthly_post_target ?? 12),
-    volumeWeight: Number(settings?.default_volume_weight ?? 0.45),
-    qualityWeight: Number(settings?.default_quality_weight ?? 0.55),
   });
 }
 

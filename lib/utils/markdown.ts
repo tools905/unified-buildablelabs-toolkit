@@ -1,3 +1,5 @@
+import { splitImageSettings, storyImageStyle } from "@/lib/utils/newsletter-story-image";
+
 // Minimal renderer for the subset of markdown the newsletter editor's
 // toolbar produces (bold/italic/strike/link/image/quote/lists). Shared so
 // the in-app preview and the future public newsletter page render identically.
@@ -8,9 +10,18 @@ function escapeHtml(source: string) {
     .replace(/>/g, "&gt;");
 }
 
+function attribute(value: string) {
+  return value.replace(/"/g, "&quot;");
+}
+
+function renderImage(alt: string, src: string) {
+  const { url, size, align } = splitImageSettings(src);
+  return `<img alt="${attribute(alt)}" src="${attribute(url)}" style="${storyImageStyle(size, align)}" />`;
+}
+
 function renderInline(text: string) {
   return text
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" />')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt: string, src: string) => renderImage(alt, src))
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/~~([^~]+)~~/g, "<del>$1</del>")

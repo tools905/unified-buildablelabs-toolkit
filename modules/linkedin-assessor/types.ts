@@ -75,12 +75,7 @@ export type LinkedInMemberStats = {
   linkedinProfileUrl: string;
   trackingStatus: string;
   postCount: number;
-  periodTarget: number;
-  volumeScore: number;
-  volumeWeight: number;
-  qualityWeight: number;
   averageQualityScore: number | null;
-  finalScore: number | null;
   bestPostId: string | null;
   weakestPostId: string | null;
   trend: "improving" | "stable" | "declining" | "insufficient_data";

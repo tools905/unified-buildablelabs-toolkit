@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceByName } from "@/lib/services/workspace-service";
 import { listPublishedPosts, getAuthorsForPosts } from "@/lib/services/newsletter-service";
+import { coverImagePayload } from "@/lib/utils/newsletter-cover";
 
 // Public, unauthenticated endpoint — the agency marketing site fetches this
 // directly (same-origin in production via a Vercel rewrite, cross-origin in
@@ -42,6 +43,12 @@ export async function GET(request: Request) {
       title: string;
       deck: string | null;
       tag: string | null;
+      cover_image_url: string | null;
+      cover_brightness: number | null;
+      cover_focus_x: number | null;
+      cover_focus_y: number | null;
+      cover_zoom: number | null;
+      cover_fade: "lighter" | "darker" | null;
       body: string;
       slug: string | null;
       author_ids: string[];
@@ -52,6 +59,12 @@ export async function GET(request: Request) {
       tag: post.tag,
       slug: post.slug,
       publishedAt: post.published_at,
+      coverImage: coverImagePayload(post.cover_image_url, post.cover_brightness, {
+        focusX: post.cover_focus_x ?? 50,
+        focusY: post.cover_focus_y ?? 50,
+        zoom: Number(post.cover_zoom ?? 1),
+        fade: post.cover_fade,
+      }),
       readMinutes: wordsPerMinuteReadTime(post.body),
       authors: post.author_ids
         .map((id) => authorsById[id]?.full_name || authorsById[id]?.email)

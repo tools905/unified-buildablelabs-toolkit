@@ -1,7 +1,12 @@
 import { z } from "zod";
-import { MAX_ATTACHMENT_BYTES, MAX_REFERENCE_LINKS } from "@/lib/utils/content-board";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_REFERENCE_LINKS,
+  MAX_REVIEW_POINT_LENGTH,
+  MIN_REVIEW_POINT_LENGTH,
+} from "@/lib/utils/content-board";
 
-export const contentPlatformSchema = z.enum(["instagram", "linkedin", "x", "youtube", "facebook"]);
+export const contentPlatformSchema = z.enum(["instagram", "linkedin", "x", "youtube", "facebook", "blog", "newsletter"]);
 export const contentIdeaStatusSchema = z.enum(["idea", "approved", "in_progress", "posted"]);
 
 // A calendar day like "2026-10-12"; an empty field means "not scheduled".
@@ -80,5 +85,9 @@ export const addLinkAttachmentSchema = z.object({
 
 export const addReviewPointSchema = z.object({
   ideaId: z.string().uuid(),
-  body: z.string().trim().min(2, "Write at least a couple of words.").max(500, "Keep it under 500 characters."),
+  body: z
+    .string()
+    .trim()
+    .min(MIN_REVIEW_POINT_LENGTH, "Write at least a couple of words.")
+    .max(MAX_REVIEW_POINT_LENGTH, `Keep it under ${MAX_REVIEW_POINT_LENGTH} characters.`),
 });

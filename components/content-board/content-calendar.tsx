@@ -21,6 +21,7 @@ import { IdeaDetail } from "@/components/content-board/idea-detail";
 import { IdeaPanel } from "@/components/content-board/idea-panel";
 import {
   PLATFORM_META,
+  platformMeta,
   PLATFORM_OPTIONS,
   type ContentIdeaWithRelations,
 } from "@/components/content-board/types";
@@ -76,7 +77,7 @@ export function ContentCalendar({ ideas }: { ideas: ContentIdeaWithRelations[] }
   );
 
   function renderChip(idea: ContentIdeaWithRelations) {
-    const meta = PLATFORM_META[idea.platform];
+    const meta = platformMeta(idea.platform);
     const Icon = meta.icon;
     const posted = idea.status === "posted";
     const overdue = !posted && idea.scheduled_for ? isBefore(parseISO(idea.scheduled_for), today) : false;
@@ -96,7 +97,7 @@ export function ContentCalendar({ ideas }: { ideas: ContentIdeaWithRelations[] }
           className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white"
           style={{ backgroundColor: meta.color }}
         >
-          <Icon className="h-2.5 w-2.5" />
+          {Icon ? <Icon className="h-2.5 w-2.5" /> : null}
         </span>
         <span className={cn("min-w-0 flex-1 truncate", posted && "line-through")}>{idea.title}</span>
         {posted ? <Check className="h-3 w-3 shrink-0" /> : null}

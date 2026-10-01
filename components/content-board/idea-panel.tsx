@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { ExternalLink, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ActivityTimeline } from "@/components/content-board/activity-timeline";
+import { hasChangesSinceReview } from "@/components/content-board/activity";
 import { AttachmentAdder } from "@/components/content-board/attachment-adder";
 import { PreviewViewer } from "@/components/content-board/preview-viewer";
 import { ReviewPoints } from "@/components/content-board/review-points";
 import {
   CONTENT_COLUMNS,
-  PLATFORM_META,
+  platformMeta,
   type ContentIdeaWithRelations,
   type IdeaPanelData,
   type PanelAttachment,
@@ -39,11 +41,16 @@ export function IdeaPanel({
   const [removing, startRemoving] = useTransition();
 
   const urlCache = useRef(new Map<string, { url: string; at: number }>());
+  // Two quick actions start two reloads; only the newest one may update the screen, otherwise a
+  // slower, older answer could put back a list that is missing the point that was just added.
+  const refreshSeq = useRef(0);
 
   const ideaId = idea.id;
   const refresh = useCallback(() => {
+    const seq = ++refreshSeq.current;
     getIdeaPanelAction(ideaId)
       .then((next) => {
+        if (seq !== refreshSeq.current) return;
         const now = Date.now();
         const attachments = next.attachments.map((item) => {
           if (item.kind === "link" || !item.url) return item;
@@ -56,7 +63,9 @@ export function IdeaPanel({
         setLoadError(false);
         setIndex((value) => Math.min(value, Math.max(0, next.attachments.length - 1)));
       })
-      .catch(() => setLoadError(true));
+      .catch(() => {
+        if (seq === refreshSeq.current) setLoadError(true);
+      });
   }, [ideaId]);
 
   useEffect(() => {
@@ -66,15 +75,33 @@ export function IdeaPanel({
   const attachments = data?.attachments ?? [];
   const currentKind = attachments[index]?.kind;
 
+  // A file dropped just outside the upload box would make the browser open it and leave the app.
+  useEffect(() => {
+    function ignoreFileDrop(event: DragEvent) {
+      if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) event.preventDefault();
+    }
+    window.addEventListener("dragover", ignoreFileDrop);
+    window.addEventListener("drop", ignoreFileDrop);
+    return () => {
+      window.removeEventListener("dragover", ignoreFileDrop);
+      window.removeEventListener("drop", ignoreFileDrop);
+    };
+  }, []);
+
   useEffect(() => {
     if (!keyboardActive) return;
     function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing = Boolean(
+        target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable),
+      );
       if (event.key === "Escape") {
-        onClose();
+        // Escape while typing only leaves the field, so a half-written comment isn't closed away.
+        if (typing && (target as HTMLInputElement).value) (target as HTMLElement).blur();
+        else onClose();
         return;
       }
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
+      if (typing) return;
       if (currentKind === "pdf") return;
       if (event.key === "ArrowLeft") setIndex((value) => Math.max(0, value - 1));
       if (event.key === "ArrowRight") setIndex((value) => Math.min(attachments.length - 1, value + 1));
@@ -95,7 +122,7 @@ export function IdeaPanel({
     });
   }
 
-  const meta = PLATFORM_META[idea.platform];
+  const meta = platformMeta(idea.platform);
   const PlatformIcon = meta.icon;
   const statusLabel = CONTENT_COLUMNS.find((column) => column.status === idea.status)?.label ?? idea.status;
 
@@ -111,7 +138,7 @@ export function IdeaPanel({
               className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
               style={{ backgroundColor: meta.color }}
             >
-              <PlatformIcon className="h-3 w-3" />
+              {PlatformIcon ? <PlatformIcon className="h-3 w-3" /> : null}
               {meta.label}
             </span>
             <span className="eyebrow">{statusLabel}</span>
@@ -170,8 +197,13 @@ export function IdeaPanel({
               points={data.points}
               currentUserId={data.currentUserId}
               isAdmin={data.isAdmin}
+              reviewedAt={data.history.reviewedAt}
+              reviewerName={data.history.reviewerName}
+              changedSinceReview={hasChangesSinceReview(data)}
               onChanged={refresh}
             />
+
+            <ActivityTimeline data={data} />
           </>
         )}
       </div>

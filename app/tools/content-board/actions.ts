@@ -18,20 +18,24 @@ import { ZodError } from "zod";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 import type { IdeaPanelData } from "@/components/content-board/types";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type ActionResult<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 function friendlyMessage(error: unknown) {
   if (error instanceof ZodError) return error.issues[0]?.message ?? "That doesn't look right.";
   if (error instanceof Error) return error.message;
-  if (typeof error === "object" && error && "message" in error) return String((error as { message: unknown }).message);
+  if (typeof error === "object" && error && "message" in error) {
+    const message = String((error as { message: unknown }).message);
+    if (/row-level security/i.test(message)) return "You don't have permission to do that.";
+    return message;
+  }
   return "Something went wrong. Please try again.";
 }
 
-async function toResult(run: () => Promise<void>): Promise<ActionResult> {
+async function toResult<T extends object = object>(run: () => Promise<T | void>): Promise<ActionResult<T>> {
   try {
-    await run();
+    const data = await run();
     refreshContentBoard();
-    return { ok: true };
+    return { ok: true, ...(data ?? {}) } as ActionResult<T>;
   } catch (error) {
     return { ok: false, error: friendlyMessage(error) };
   }
@@ -53,13 +57,15 @@ export async function createIdeaAction(formData: FormData) {
   const { supabase, user, workspace } = await requireContentBoardContext();
 
   return toResult(async () => {
-    await contentIdeaService.createContentIdea(supabase, workspace.id, user.id, {
+    const idea = await contentIdeaService.createContentIdea(supabase, workspace.id, user.id, {
       title: String(formData.get("title") ?? ""),
       description: (formData.get("description") as string) || undefined,
       platform: formData.get("platform") as any,
       scheduledFor: (formData.get("scheduledFor") as string) ?? null,
       referenceLinks: formData.getAll("referenceLinks").map(String),
     });
+    // The dialog uses these to attach any files that were chosen before the idea existed.
+    return { ideaId: idea.id as string, workspaceId: workspace.id };
   });
 }
 
@@ -103,11 +109,27 @@ export async function deleteIdeaAction(formData: FormData) {
 
 export async function getIdeaPanelAction(ideaId: string): Promise<IdeaPanelData> {
   const { supabase, user, workspace } = await requireContentBoardContext();
-  const [attachments, points, admin] = await Promise.all([
+  const [attachments, points, admin, ideaResult] = await Promise.all([
     attachmentService.listAttachments(supabase, ideaId),
     reviewService.listReviewPoints(supabase, ideaId),
     isWorkspaceAdmin(workspace.id, user.id, supabase),
+    supabase
+      .from("content_ideas")
+      .select("created_at, created_by, posted_at, reviewed_at, reviewed_by")
+      .eq("id", ideaId)
+      .single(),
   ]);
+  if (ideaResult.error) throw ideaResult.error;
+  const idea = ideaResult.data;
+
+  const personIds = [
+    ...new Set([idea.created_by, idea.reviewed_by, ...attachments.map((item) => item.created_by)].filter(Boolean)),
+  ] as string[];
+  const { data: people } = await supabase.from("profiles").select("id, full_name, email").in("id", personIds);
+  const nameOf = (id: string | null | undefined) => {
+    const person = people?.find((candidate) => candidate.id === id);
+    return person?.full_name || person?.email || "Unknown";
+  };
   const signed = await attachmentService.signPaths(
     supabase,
     attachments.map((item) => item.storage_path).filter((path): path is string => Boolean(path)),
@@ -117,12 +139,21 @@ export async function getIdeaPanelAction(ideaId: string): Promise<IdeaPanelData>
     workspaceId: workspace.id,
     currentUserId: user.id,
     isAdmin: admin,
+    history: {
+      createdAt: idea.created_at,
+      creatorName: nameOf(idea.created_by),
+      postedAt: idea.posted_at,
+      reviewedAt: idea.reviewed_at,
+      reviewerName: idea.reviewed_by ? nameOf(idea.reviewed_by) : null,
+    },
     attachments: attachments.map((item) => ({
       id: item.id,
       kind: item.kind,
       fileName: item.file_name,
       url: item.kind === "link" ? item.url : item.storage_path ? (signed.get(item.storage_path) ?? null) : null,
       embedUrl: item.kind === "link" && item.url ? toEmbedUrl(item.url) : null,
+      createdAt: item.created_at,
+      uploaderName: nameOf(item.created_by),
     })),
     points: points.map((point) => {
       const author = Array.isArray(point.author) ? point.author[0] : point.author;
@@ -131,6 +162,7 @@ export async function getIdeaPanelAction(ideaId: string): Promise<IdeaPanelData>
         body: point.body,
         isResolved: point.is_resolved,
         createdAt: point.created_at,
+        resolvedAt: point.resolved_at,
         authorId: point.created_by,
         authorName: author?.full_name || author?.email || "Unknown",
       };
@@ -164,6 +196,13 @@ export async function addLinkAttachmentAction(input: { ideaId: string; url: stri
 export async function removeAttachmentAction(attachmentId: string) {
   const { supabase } = await requireContentBoardContext();
   return toResult(() => attachmentService.removeAttachment(supabase, attachmentId));
+}
+
+export async function setIdeaReviewedAction(ideaId: string, reviewed: boolean) {
+  const { supabase, user, workspace } = await requireContentBoardContext();
+  return toResult(async () => {
+    await contentIdeaService.setIdeaReviewed(supabase, workspace.id, ideaId, user.id, reviewed);
+  });
 }
 
 export async function addReviewPointAction(input: { ideaId: string; body: string }) {

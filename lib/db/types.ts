@@ -23,7 +23,7 @@ export type NotificationType =
 export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";
-export type ContentPlatform = "instagram" | "linkedin" | "x" | "youtube" | "facebook";
+export type ContentPlatform = "instagram" | "linkedin" | "x" | "youtube" | "facebook" | "blog" | "newsletter";
 export type ContentIdeaStatus = "idea" | "approved" | "in_progress" | "posted";
 export type ContentAttachmentKind = "image" | "pdf" | "link";
 
@@ -542,6 +542,8 @@ export type Database = {
           status: ContentIdeaStatus;
           post_url: string | null;
           posted_at: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
           scheduled_for: string | null;
           reference_links: string[];
           created_by: string;
@@ -557,6 +559,8 @@ export type Database = {
           status?: ContentIdeaStatus;
           post_url?: string | null;
           posted_at?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
           scheduled_for?: string | null;
           reference_links?: string[];
           created_by: string;
