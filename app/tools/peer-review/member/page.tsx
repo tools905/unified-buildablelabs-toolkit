@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +26,7 @@ export default async function MyReviewsPage() {
   const assignments = await getMyAssignments(supabase, user.id);
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">My reviews</h1>
         <p className="text-muted-foreground">Assigned reviews awaiting your feedback.</p>
@@ -64,6 +63,6 @@ export default async function MyReviewsPage() {
           </Card>
         ))}
       </div>
-    </AppShell>
+    </>
   );
 }

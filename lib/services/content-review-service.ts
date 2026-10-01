@@ -24,6 +24,18 @@ export async function addReviewPoint(
     created_by: input.userId,
   });
   if (error) throw error;
+
+  // The first feedback on an idea moves it from Ideas to the Feedback column. Only an idea still in
+  // Ideas moves: one that is already shortlisted, in progress or posted stays where it is. The
+  // condition is part of the update itself, so two people reviewing at once can't undo each other.
+  const { data: moved, error: moveError } = await supabase
+    .from("content_ideas")
+    .update({ status: "feedback" })
+    .eq("id", input.ideaId)
+    .eq("status", "idea")
+    .select("id");
+  if (moveError) throw moveError;
+  return { movedToFeedback: (moved?.length ?? 0) > 0 };
 }
 
 export async function setReviewPointResolved(supabase: SupabaseClient<any>, pointId: string, resolved: boolean) {

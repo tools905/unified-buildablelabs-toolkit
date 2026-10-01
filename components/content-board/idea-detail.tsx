@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
+import { AssigneePicker } from "@/components/content-board/assignee-picker";
+import { PlatformPicker } from "@/components/content-board/platform-picker";
 import { ReferenceLinksField } from "@/components/content-board/reference-links-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,17 +12,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { deleteIdeaAction, updateIdeaAction } from "@/app/tools/content-board/actions";
 import {
   CONTENT_COLUMNS,
-  PLATFORM_META,
+  ideaPlatforms,
   platformMeta,
-  PLATFORM_OPTIONS,
+  assigneeLabel,
   type ContentIdeaWithRelations,
+  type ContentMemberOption,
 } from "@/components/content-board/types";
 
 export function IdeaDetail({
   idea,
+  members,
+  isAdmin,
+  currentUserId,
   onClose,
 }: {
   idea: ContentIdeaWithRelations;
+  members: ContentMemberOption[];
+  isAdmin: boolean;
+  currentUserId: string;
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -32,7 +41,7 @@ export function IdeaDetail({
       <div className="popover-shadow flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-card">
         <div
           className="flex items-start justify-between gap-3 border-b border-border px-6 py-4"
-          style={{ backgroundColor: `${platformMeta(idea.platform).color}14` }}
+          style={{ backgroundColor: `${platformMeta(ideaPlatforms(idea)[0]).color}14` }}
         >
           <div>
             <p className="eyebrow mb-1">{statusLabel}</p>
@@ -50,6 +59,10 @@ export function IdeaDetail({
               event.preventDefault();
               const formData = new FormData(event.currentTarget);
               formData.set("ideaId", idea.id);
+              if (formData.getAll("platforms").length === 0) {
+                setError("Pick at least one platform.");
+                return;
+              }
               setError(null);
               startTransition(async () => {
                 const result = await updateIdeaAction(formData);
@@ -60,19 +73,8 @@ export function IdeaDetail({
             className="space-y-4"
           >
             <div>
-              <Label htmlFor="platform">Platform</Label>
-              <select
-                id="platform"
-                name="platform"
-                defaultValue={idea.platform}
-                className="mt-1 h-10 w-full rounded-sm border border-border bg-background px-3 text-sm"
-              >
-                {PLATFORM_OPTIONS.map((platform) => (
-                  <option key={platform} value={platform}>
-                    {PLATFORM_META[platform].label}
-                  </option>
-                ))}
-              </select>
+              <Label>Platforms</Label>
+              <PlatformPicker defaultValue={ideaPlatforms(idea)} />
             </div>
             <div>
               <Label htmlFor="title">Title</Label>
@@ -100,6 +102,13 @@ export function IdeaDetail({
               <p className="mt-1 text-xs text-muted-foreground">Clear the date to take it off the calendar.</p>
             </div>
             <ReferenceLinksField initial={idea.reference_links ?? []} />
+            {isAdmin ? (
+              <AssigneePicker
+                members={members}
+                currentUserId={currentUserId}
+                initial={(idea.assignees ?? []).map((assignee) => ({ id: assignee.user_id, label: assigneeLabel(assignee) }))}
+              />
+            ) : null}
             <div>
               <Label>Proposed by</Label>
               <p className="mt-1 text-sm text-muted-foreground">

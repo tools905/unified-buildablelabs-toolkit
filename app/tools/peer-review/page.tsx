@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +36,7 @@ export default async function PeerReviewToolPage() {
     rounds?.filter((round) => ["completed", "closed"].includes(round.status)).length ?? 0;
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold sm:text-3xl">Peer Review</h1>
@@ -98,6 +97,6 @@ export default async function PeerReviewToolPage() {
           </CardContent>
         </Card>
       </div>
-    </AppShell>
+    </>
   );
 }

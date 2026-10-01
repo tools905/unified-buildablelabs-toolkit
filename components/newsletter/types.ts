@@ -17,7 +17,7 @@ export type NewsletterPost = {
   cover_focus_x: number;
   cover_focus_y: number;
   cover_zoom: number;
-  cover_fade: "lighter" | "darker" | null;
+  cover_tone: number | null;
   body: string;
   author_ids: string[];
   slug: string | null;

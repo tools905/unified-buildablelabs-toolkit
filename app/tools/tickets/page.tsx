@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { KanbanBoard } from "@/components/tickets/kanban-board";
@@ -31,7 +30,7 @@ export default async function TicketsPage() {
   });
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Tickets"
         title="Board"
@@ -51,6 +50,6 @@ export default async function TicketsPage() {
         members={memberOptions}
         currentUserId={user.id}
       />
-    </AppShell>
+    </>
   );
 }

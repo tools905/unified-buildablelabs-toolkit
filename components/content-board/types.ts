@@ -8,10 +8,27 @@ export type ContentIdeaProfile = {
   email: string;
 };
 
+// Someone an idea is assigned to. PostgREST may give the embedded profile as one object or a list.
+export type IdeaAssignee = {
+  user_id: string;
+  profile: ContentIdeaProfile | ContentIdeaProfile[] | null;
+};
+
+export function assigneeProfile(assignee: IdeaAssignee): ContentIdeaProfile | null {
+  return Array.isArray(assignee.profile) ? (assignee.profile[0] ?? null) : assignee.profile;
+}
+
+export function assigneeLabel(assignee: IdeaAssignee) {
+  const profile = assigneeProfile(assignee);
+  return profile?.full_name || profile?.email || "Unknown";
+}
+
 export type ContentIdeaWithRelations = {
   id: string;
   workspace_id: string;
   platform: ContentPlatform;
+  // Every platform the idea is planned for. Older rows may have it empty: use ideaPlatforms().
+  platforms?: ContentPlatform[];
   title: string;
   description: string | null;
   status: ContentIdeaStatus;
@@ -23,6 +40,7 @@ export type ContentIdeaWithRelations = {
   created_at: string;
   updated_at: string;
   creator: ContentIdeaProfile | null;
+  assignees: IdeaAssignee[];
   attachment_count: number;
   review_count: number;
   open_review_count: number;
@@ -62,6 +80,7 @@ export type IdeaPanelHistory = {
 export type IdeaPanelData = {
   workspaceId: string;
   currentUserId: string;
+  currentUserName: string;
   isAdmin: boolean;
   history: IdeaPanelHistory;
   attachments: PanelAttachment[];
@@ -71,10 +90,12 @@ export type IdeaPanelData = {
 export type ContentMemberOption = {
   id: string;
   label: string;
+  email?: string;
 };
 
 export const CONTENT_COLUMNS: { status: ContentIdeaStatus; label: string }[] = [
   { status: "idea", label: "Ideas" },
+  { status: "feedback", label: "Feedback" },
   { status: "approved", label: "Shortlisted" },
   { status: "in_progress", label: "In Progress" },
   { status: "posted", label: "Posted" },
@@ -102,6 +123,15 @@ export function platformMeta(platform: string) {
       icon: null,
     }
   );
+}
+
+// The platforms of an idea in a fixed order. Falls back to the single `platform` for rows saved
+// before several platforms were possible.
+export function ideaPlatforms(idea: { platform: string; platforms?: string[] | null }): string[] {
+  const list = idea.platforms?.length ? idea.platforms : [idea.platform];
+  const known = PLATFORM_OPTIONS.filter((option) => list.includes(option));
+  const unknown = list.filter((value) => !PLATFORM_OPTIONS.includes(value as ContentPlatform));
+  return [...known, ...unknown];
 }
 
 export const PLATFORM_OPTIONS: ContentPlatform[] = ["instagram", "linkedin", "x", "youtube", "facebook", "blog", "newsletter"];

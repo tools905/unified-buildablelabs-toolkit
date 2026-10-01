@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { NewsletterEditor } from "@/components/newsletter/newsletter-editor";
 import { requireUser } from "@/lib/auth/require-user";
 import { getWorkspaceMembers, isWorkspaceAdmin } from "@/lib/services/workspace-service";
@@ -43,8 +42,8 @@ export default async function NewsletterWritePage({
   );
 
   return (
-    <AppShell>
+    <>
       <NewsletterEditor post={post} members={memberOptions} canDelete={admin} />
-    </AppShell>
+    </>
   );
 }

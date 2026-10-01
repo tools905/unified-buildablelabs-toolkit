@@ -40,7 +40,7 @@ export async function updatePostAction(
     coverFocusX: number;
     coverFocusY: number;
     coverZoom: number;
-    coverFade: "lighter" | "darker" | null;
+    coverTone: number | null;
   },
 ) {
   const { supabase } = await requireNewsletterContext();

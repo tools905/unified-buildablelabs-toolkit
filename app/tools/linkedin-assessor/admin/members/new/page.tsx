@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +10,7 @@ import { createTrackedMemberAction } from "../../../actions";
 export default async function NewLinkedInMemberPage() {
   const { supabase, workspace } = await requireLinkedInAdmin();
   const members = await getWorkspaceMembers(supabase, workspace.id);
-  return <AppShell><div className="mb-6"><h1 className="text-3xl font-semibold">Add LinkedIn profile</h1><p className="text-muted-foreground">Link a toolkit user when personal member insights should be available.</p></div>
+  return <><div className="mb-6"><h1 className="text-3xl font-semibold">Add LinkedIn profile</h1><p className="text-muted-foreground">Link a toolkit user when personal member insights should be available.</p></div>
     <Card className="max-w-3xl"><CardHeader><CardTitle>Tracking details</CardTitle><CardDescription>LinkedIn Assessor is manual-only: members submit a post URL and the post writing for scoring.</CardDescription></CardHeader><CardContent>
       <form action={createTrackedMemberAction} className="grid gap-5 sm:grid-cols-2">
         <Field label="Name" name="name" required />
@@ -22,7 +21,7 @@ export default async function NewLinkedInMemberPage() {
         <div className="sm:col-span-2"><SubmitButton>Create tracked profile</SubmitButton></div>
       </form>
     </CardContent></Card>
-  </AppShell>;
+  </>;
 }
 
 function Field({ label, name, className, ...props }: { label: string; name: string; className?: string } & React.InputHTMLAttributes<HTMLInputElement>) {

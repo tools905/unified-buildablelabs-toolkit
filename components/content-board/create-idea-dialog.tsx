@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createIdeaAction } from "@/app/tools/content-board/actions";
 import { FileDropZone } from "@/components/content-board/file-drop-zone";
+import { AssigneePicker } from "@/components/content-board/assignee-picker";
 import { ReferenceLinksField } from "@/components/content-board/reference-links-field";
-import { PLATFORM_META, PLATFORM_OPTIONS } from "@/components/content-board/types";
+import { PlatformPicker } from "@/components/content-board/platform-picker";
+import { type ContentMemberOption } from "@/components/content-board/types";
 import { uploadAttachmentFile } from "@/components/content-board/upload-attachment";
 import { ATTACHMENT_ACCEPT, checkAttachmentFile, MAX_ATTACHMENTS_PER_IDEA } from "@/lib/utils/content-board";
 import { cn } from "@/lib/utils/cn";
@@ -18,7 +20,15 @@ function formatSize(bytes: number) {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-export function CreateIdeaDialog() {
+export function CreateIdeaDialog({
+  members,
+  isAdmin,
+  currentUserId,
+}: {
+  members: ContentMemberOption[];
+  isAdmin: boolean;
+  currentUserId: string;
+}) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +86,10 @@ export function CreateIdeaDialog() {
             event.preventDefault();
             if (created) return;
             const formData = new FormData(event.currentTarget);
+            if (formData.getAll("platforms").length === 0) {
+              setError("Pick at least one platform.");
+              return;
+            }
             setError(null);
             startTransition(async () => {
               const result = await createIdeaAction(formData);
@@ -110,23 +124,8 @@ export function CreateIdeaDialog() {
           className="mt-4 space-y-4"
         >
           <div>
-            <Label htmlFor="platform">Platform</Label>
-            <select
-              id="platform"
-              name="platform"
-              required
-              defaultValue=""
-              className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-            >
-              <option value="" disabled>
-                Choose a platform
-              </option>
-              {PLATFORM_OPTIONS.map((platform) => (
-                <option key={platform} value={platform}>
-                  {PLATFORM_META[platform].label}
-                </option>
-              ))}
-            </select>
+            <Label>Platforms</Label>
+            <PlatformPicker />
           </div>
           <div>
             <Label htmlFor="title">What are we posting?</Label>
@@ -141,6 +140,7 @@ export function CreateIdeaDialog() {
             <Input id="scheduledFor" name="scheduledFor" type="date" className="mt-1" />
           </div>
           <ReferenceLinksField />
+          {isAdmin ? <AssigneePicker members={members} currentUserId={currentUserId} /> : null}
 
           <div>
             <Label htmlFor="create-files">Images or PDF (optional)</Label>

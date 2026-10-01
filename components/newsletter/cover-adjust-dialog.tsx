@@ -3,25 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CoverCardPreview } from "@/components/newsletter/cover-image-field";
-import { cn } from "@/lib/utils/cn";
-import { coverTreatment, DEFAULT_COVER_ADJUST, type CoverAdjust, type CoverFade } from "@/lib/utils/newsletter-cover";
+import { coverTreatment, DEFAULT_COVER_ADJUST, MAX_TONE, MIN_TONE, type CoverAdjust } from "@/lib/utils/newsletter-cover";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-const FADES: { value: CoverFade; label: string }[] = [
-  { value: "lighter", label: "Lighter" },
-  { value: null, label: "Auto" },
-  { value: "darker", label: "Darker" },
-];
-
 // A window for framing the preview image: drag it to move, zoom in, and choose how strong
-// the dark fade under the headline is. Two live previews show the story card and the wide
+// dark the picture is under the text. Two live previews show the story card and the wide
 // banner on the article page. Nothing is cut; the original image stays as it is.
 export function CoverAdjustDialog({
   url,
   brightness,
   tag,
   title,
+  deck,
+  byline,
   initial,
   onApply,
   onCancel,
@@ -30,6 +25,8 @@ export function CoverAdjustDialog({
   brightness: number | null;
   tag: string;
   title: string;
+  deck: string;
+  byline: string;
   initial: CoverAdjust;
   onApply: (adjust: CoverAdjust) => void;
   onCancel: () => void;
@@ -75,8 +72,9 @@ export function CoverAdjustDialog({
     }));
   }
 
-  const treatment = coverTreatment(brightness, adjust.fade);
-  const auto = coverTreatment(brightness, null);
+  const autoPercent = Math.round(coverTreatment(brightness, null).overlayOpacity * 100);
+  // While on Auto the slider rests at the automatic value; moving it switches to a manual tone.
+  const tonePercent = adjust.tone ?? autoPercent;
 
   return (
     <div
@@ -138,7 +136,7 @@ export function CoverAdjustDialog({
                 event.preventDefault();
               }}
             >
-              <CoverCardPreview url={url} brightness={brightness} adjust={adjust} tag={tag} title={title} aspect="card" />
+              <CoverCardPreview url={url} brightness={brightness} adjust={adjust} tag={tag} title={title} deck={deck} byline={byline} aspect="card" />
             </div>
           </div>
 
@@ -168,35 +166,48 @@ export function CoverAdjustDialog({
             </div>
 
             <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Dark fade under the headline</p>
-              <div className="grid grid-cols-3 border border-border" role="radiogroup" aria-label="Dark fade">
-                {FADES.map((fade) => (
-                  <button
-                    key={fade.label}
-                    type="button"
-                    role="radio"
-                    aria-checked={adjust.fade === fade.value}
-                    onClick={() => setAdjust((current) => ({ ...current, fade: fade.value }))}
-                    className={cn(
-                      "px-2 py-1.5 text-xs transition-colors",
-                      adjust.fade === fade.value ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-                    )}
-                  >
-                    {fade.label}
-                  </button>
-                ))}
+              <div className="mb-1 flex items-center justify-between">
+                <label htmlFor="cover-tone" className="text-xs font-medium text-muted-foreground">
+                  Tone
+                </label>
+                <span className="font-mono text-xs">{adjust.tone === null ? `Auto · ${autoPercent}%` : `${tonePercent}%`}</span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Auto reads how bright the picture is and fades it {Math.round(auto.overlayOpacity * 100)}%.
-                {adjust.fade ? ` You chose ${adjust.fade}: ${Math.round(treatment.overlayOpacity * 100)}%.` : ""}
-              </p>
+              <input
+                id="cover-tone"
+                type="range"
+                min={MIN_TONE}
+                max={MAX_TONE}
+                step={1}
+                value={tonePercent}
+                aria-valuetext={`${tonePercent}% dark${adjust.tone === null ? ", automatic" : ""}`}
+                onChange={(event) => setAdjust((current) => ({ ...current, tone: Number(event.target.value) }))}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span>Lighter</span>
+                <span>Darker</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={adjust.tone === null ? "default" : "outline"}
+                  aria-pressed={adjust.tone === null}
+                  onClick={() => setAdjust((current) => ({ ...current, tone: null }))}
+                >
+                  Auto
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Auto reads how bright the picture is and darkens it {autoPercent}%. Drag the slider to choose your own.
+                </p>
+              </div>
             </div>
 
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setAdjust((current) => ({ ...DEFAULT_COVER_ADJUST, fade: current.fade }))}
+              onClick={() => setAdjust((current) => ({ ...DEFAULT_COVER_ADJUST, tone: current.tone }))}
             >
               Center and reset zoom
             </Button>

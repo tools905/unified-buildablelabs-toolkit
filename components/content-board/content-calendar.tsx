@@ -21,9 +21,11 @@ import { IdeaDetail } from "@/components/content-board/idea-detail";
 import { IdeaPanel } from "@/components/content-board/idea-panel";
 import {
   PLATFORM_META,
+  ideaPlatforms,
   platformMeta,
   PLATFORM_OPTIONS,
   type ContentIdeaWithRelations,
+  type ContentMemberOption,
 } from "@/components/content-board/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -31,7 +33,17 @@ const WEEK_STARTS_ON = 1; // Monday
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const VISIBLE_PER_DAY = 3;
 
-export function ContentCalendar({ ideas }: { ideas: ContentIdeaWithRelations[] }) {
+export function ContentCalendar({
+  ideas,
+  members,
+  isAdmin,
+  currentUserId,
+}: {
+  ideas: ContentIdeaWithRelations[];
+  members: ContentMemberOption[];
+  isAdmin: boolean;
+  currentUserId: string;
+}) {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [platformFilter, setPlatformFilter] = useState("");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -39,7 +51,7 @@ export function ContentCalendar({ ideas }: { ideas: ContentIdeaWithRelations[] }
   const [editIdeaId, setEditIdeaId] = useState<string | null>(null);
 
   const visibleIdeas = useMemo(
-    () => ideas.filter((idea) => !platformFilter || idea.platform === platformFilter),
+    () => ideas.filter((idea) => !platformFilter || ideaPlatforms(idea).includes(platformFilter)),
     [ideas, platformFilter],
   );
 
@@ -77,8 +89,7 @@ export function ContentCalendar({ ideas }: { ideas: ContentIdeaWithRelations[] }
   );
 
   function renderChip(idea: ContentIdeaWithRelations) {
-    const meta = platformMeta(idea.platform);
-    const Icon = meta.icon;
+    const platformList = ideaPlatforms(idea).map(platformMeta);
     const posted = idea.status === "posted";
     const overdue = !posted && idea.scheduled_for ? isBefore(parseISO(idea.scheduled_for), today) : false;
     return (
@@ -86,18 +97,26 @@ export function ContentCalendar({ ideas }: { ideas: ContentIdeaWithRelations[] }
         key={idea.id}
         type="button"
         onClick={() => setPanelIdeaId(idea.id)}
-        title={`${meta.label} · ${idea.title}${overdue ? " (overdue)" : ""}`}
+        title={`${platformList.map((meta) => meta.label).join(", ")} · ${idea.title}${overdue ? " (overdue)" : ""}`}
         className={cn(
           "flex w-full min-w-0 items-center gap-1.5 rounded-sm border border-border bg-card px-1.5 py-1 text-left text-xs transition-colors hover:border-primary/50",
           posted && "text-muted-foreground",
           overdue && "border-amber-500/60",
         )}
       >
-        <span
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white"
-          style={{ backgroundColor: meta.color }}
-        >
-          {Icon ? <Icon className="h-2.5 w-2.5" /> : null}
+        <span className="flex shrink-0 -space-x-1">
+          {platformList.slice(0, 3).map((meta) => {
+            const Icon = meta.icon;
+            return (
+              <span
+                key={meta.label}
+                className="flex h-4 w-4 items-center justify-center rounded-full border border-card text-white"
+                style={{ backgroundColor: meta.color }}
+              >
+                {Icon ? <Icon className="h-2.5 w-2.5" /> : null}
+              </span>
+            );
+          })}
         </span>
         <span className={cn("min-w-0 flex-1 truncate", posted && "line-through")}>{idea.title}</span>
         {posted ? <Check className="h-3 w-3 shrink-0" /> : null}
@@ -249,7 +268,15 @@ export function ContentCalendar({ ideas }: { ideas: ContentIdeaWithRelations[] }
           onEdit={() => setEditIdeaId(panelIdea.id)}
         />
       ) : null}
-      {editIdea ? <IdeaDetail idea={editIdea} onClose={() => setEditIdeaId(null)} /> : null}
+      {editIdea ? (
+        <IdeaDetail
+          idea={editIdea}
+          members={members}
+          isAdmin={isAdmin}
+          currentUserId={currentUserId}
+          onClose={() => setEditIdeaId(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CalendarDays, Check, ExternalLink, Link as LinkIcon, FileText, ImageIcon, Link2, MessageSquare, Paperclip } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { CalendarDays, Check, Clock, ExternalLink, Link as LinkIcon, FileText, ImageIcon, Link2, MessageSquare, Paperclip, UserCheck } from "lucide-react";
 import { format, isBefore, parseISO, startOfToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { setPostUrlAction } from "@/app/tools/content-board/actions";
 import { cn } from "@/lib/utils/cn";
-import { platformMeta, type ContentIdeaWithRelations } from "@/components/content-board/types";
+import { formatWhen } from "@/components/content-board/activity";
+import { prefetchPanel } from "@/components/content-board/panel-cache";
+import {
+  assigneeLabel,
+  assigneeProfile,
+  ideaPlatforms,
+  platformMeta,
+  type ContentIdeaWithRelations,
+} from "@/components/content-board/types";
 
 function initials(name: string | null | undefined, email: string | undefined) {
   const source = name || email || "?";
@@ -36,6 +44,16 @@ function Thumbnail({ thumbnail }: { thumbnail: NonNullable<ContentIdeaWithRelati
     </div>
   );
 }
+
+// Fixed to IST so the server render and the browser render agree and the time reads the same for everyone.
+const createdFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Kolkata",
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
 
 const isWebUrl = (value: string | null): value is string => Boolean(value && /^https?:\/\//i.test(value));
 
@@ -90,16 +108,20 @@ export function IdeaCard({
   onDragStart,
   onDragEnd,
   isDragging,
+  currentUserId,
 }: {
   idea: ContentIdeaWithRelations;
+  currentUserId: string;
   onOpen: () => void;
   onDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?: () => void;
   isDragging: boolean;
 }) {
-  const meta = platformMeta(idea.platform);
-  const PlatformIcon = meta.icon;
+  const platforms = ideaPlatforms(idea);
   const referenceCount = idea.reference_links?.length ?? 0;
+  const assignees = idea.assignees ?? [];
+  const assignedToMe = assignees.some((assignee) => assignee.user_id === currentUserId);
+  const shownAssignees = assignees.slice(0, 3);
   const scheduled = idea.scheduled_for ? parseISO(idea.scheduled_for) : null;
   const overdue = scheduled !== null && idea.status !== "posted" && isBefore(scheduled, startOfToday());
   // A posted idea with a link opens the live post in a new tab; everything else opens the panel.
@@ -110,6 +132,21 @@ export function IdeaCard({
     else onOpen();
   }
 
+  // Resting the pointer on a card loads its panel ahead of the click, so the click opens it at once.
+  // The short delay stops a quick sweep across the board from loading every card it passes.
+  const warmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function warmUp() {
+    if (postUrl || warmTimer.current) return;
+    warmTimer.current = setTimeout(() => {
+      warmTimer.current = null;
+      prefetchPanel(idea.id);
+    }, 150);
+  }
+  function cancelWarmUp() {
+    if (warmTimer.current) clearTimeout(warmTimer.current);
+    warmTimer.current = null;
+  }
+
   return (
     <div
       role="button"
@@ -118,6 +155,11 @@ export function IdeaCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={activate}
+      onMouseEnter={warmUp}
+      onMouseLeave={cancelWarmUp}
+      onFocus={warmUp}
+      onBlur={cancelWarmUp}
+      onTouchStart={warmUp}
       onKeyDown={(event) => {
         if (event.key === "Enter") activate();
       }}
@@ -128,13 +170,22 @@ export function IdeaCard({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <span
-          className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
-          style={{ backgroundColor: meta.color }}
-        >
-          {PlatformIcon ? <PlatformIcon className="h-3 w-3" /> : null}
-          {meta.label}
-        </span>
+        <div className="flex min-w-0 flex-wrap gap-1">
+          {platforms.map((platform) => {
+            const meta = platformMeta(platform);
+            const PlatformIcon = meta.icon;
+            return (
+              <span
+                key={platform}
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                style={{ backgroundColor: meta.color }}
+              >
+                {PlatformIcon ? <PlatformIcon className="h-3 w-3" /> : null}
+                {meta.label}
+              </span>
+            );
+          })}
+        </div>
         {idea.creator ? (
           <span
             title={`Proposed by ${idea.creator.full_name || idea.creator.email}`}
@@ -146,6 +197,32 @@ export function IdeaCard({
       </div>
       {idea.thumbnail ? <Thumbnail thumbnail={idea.thumbnail} /> : null}
       <p className="mt-2 flex-1 text-sm font-medium leading-snug">{idea.title}</p>
+      {assignees.length > 0 ? (
+        <p
+          className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"
+          title={`Assigned to ${assignees.map(assigneeLabel).join(", ")}`}
+        >
+          <UserCheck className="h-3 w-3 shrink-0" />
+          <span className="flex -space-x-1">
+            {shownAssignees.map((assignee) => {
+              const profile = assigneeProfile(assignee);
+              return (
+                <span
+                  key={assignee.user_id}
+                  className={cn(
+                    "flex h-5 w-5 items-center justify-center rounded-full border border-card text-[9px] font-semibold",
+                    assignee.user_id === currentUserId ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary",
+                  )}
+                >
+                  {initials(profile?.full_name, profile?.email)}
+                </span>
+              );
+            })}
+          </span>
+          {assignees.length > shownAssignees.length ? <span>+{assignees.length - shownAssignees.length}</span> : null}
+          {assignedToMe ? <span className="font-medium text-primary">You</span> : null}
+        </p>
+      ) : null}
       {scheduled ? (
         <p
           className={cn(
@@ -221,6 +298,17 @@ export function IdeaCard({
           View post <ExternalLink className="h-3 w-3" />
         </a>
       ) : null}
+      <time
+        dateTime={idea.created_at}
+        title={`Created ${formatWhen(idea.created_at)}`}
+        className="mt-2 inline-flex items-center gap-1 self-start text-[11px] text-muted-foreground"
+      >
+        <Clock className="h-3 w-3" />
+        {createdFormat
+          .format(new Date(idea.created_at))
+          .replace("Sept", "Sep")
+          .replace(/ (am|pm|AM|PM)$/, (m) => m.toLowerCase())}
+      </time>
     </div>
   );
 }

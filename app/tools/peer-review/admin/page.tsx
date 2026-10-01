@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +19,7 @@ export default async function ProjectsPage() {
   const projects = await listProjects(supabase, workspace.id);
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold sm:text-3xl">Projects</h1>
@@ -51,6 +50,6 @@ export default async function ProjectsPage() {
           </Link>
         ))}
       </div>
-    </AppShell>
+    </>
   );
 }

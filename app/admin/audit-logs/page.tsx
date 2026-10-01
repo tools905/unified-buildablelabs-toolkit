@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
@@ -22,7 +21,7 @@ export default async function AuditLogsPage() {
     : { data: [] };
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Audit Logs</h1>
         <p className="text-muted-foreground">Recent admin and system actions.</p>
@@ -47,6 +46,6 @@ export default async function AuditLogsPage() {
           </Card>
         ) : null}
       </div>
-    </AppShell>
+    </>
   );
 }
