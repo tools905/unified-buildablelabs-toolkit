@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  MAX_ASSIGNEES,
   MAX_ATTACHMENT_BYTES,
   MAX_REFERENCE_LINKS,
   MAX_REVIEW_POINT_LENGTH,
@@ -7,7 +8,13 @@ import {
 } from "@/lib/utils/content-board";
 
 export const contentPlatformSchema = z.enum(["instagram", "linkedin", "x", "youtube", "facebook", "blog", "newsletter"]);
-export const contentIdeaStatusSchema = z.enum(["idea", "approved", "in_progress", "posted"]);
+// The platforms an idea is planned for: at least one, each only once.
+export const platformsSchema = z
+  .array(contentPlatformSchema)
+  .transform((platforms) => [...new Set(platforms)])
+  .pipe(z.array(contentPlatformSchema).min(1, "Pick at least one platform."));
+
+export const contentIdeaStatusSchema = z.enum(["idea", "feedback", "approved", "in_progress", "posted"]);
 
 // A calendar day like "2026-10-12"; an empty field means "not scheduled".
 export const scheduledForSchema = z.preprocess(
@@ -31,12 +38,19 @@ export const referenceLinksSchema = z
       .max(MAX_REFERENCE_LINKS, `Add up to ${MAX_REFERENCE_LINKS} reference links.`),
   );
 
+// The people an idea is assigned to: duplicates collapsed, blanks dropped, real user ids only.
+export const assigneeIdsSchema = z
+  .array(z.string())
+  .transform((ids) => [...new Set(ids.map((id) => id.trim()).filter(Boolean))])
+  .pipe(z.array(z.string().uuid("That isn't a valid person.")).max(MAX_ASSIGNEES, `Assign up to ${MAX_ASSIGNEES} people.`));
+
 export const createContentIdeaSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
   description: z.string().optional(),
-  platform: contentPlatformSchema,
+  platforms: platformsSchema,
   scheduledFor: scheduledForSchema.optional(),
   referenceLinks: referenceLinksSchema.optional(),
+  assigneeIds: assigneeIdsSchema.optional(),
 });
 
 export type CreateContentIdeaInput = z.infer<typeof createContentIdeaSchema>;
@@ -44,7 +58,7 @@ export type CreateContentIdeaInput = z.infer<typeof createContentIdeaSchema>;
 export const updateContentIdeaSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters.").optional(),
   description: z.string().nullable().optional(),
-  platform: contentPlatformSchema.optional(),
+  platforms: platformsSchema.optional(),
   status: contentIdeaStatusSchema.optional(),
   scheduledFor: scheduledForSchema.optional(),
   referenceLinks: referenceLinksSchema.optional(),

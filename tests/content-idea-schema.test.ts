@@ -71,16 +71,16 @@ describe("checkAttachmentFile", () => {
 describe("addReviewPointSchema", () => {
   const ideaId = "5b0a4f6e-3c8e-4f0a-9a43-2f9d1c5e7b11";
 
-  it("trims the text and accepts 2 to 500 characters", () => {
+  it("trims the text and accepts 2 to 3000 characters", () => {
     expect(addReviewPointSchema.parse({ ideaId, body: "  Make the title bigger  " }).body).toBe("Make the title bigger");
-    expect(addReviewPointSchema.safeParse({ ideaId, body: "a".repeat(500) }).success).toBe(true);
+    expect(addReviewPointSchema.safeParse({ ideaId, body: "a".repeat(3000) }).success).toBe(true);
   });
 
   it("rejects text that is too short or too long with a clear message", () => {
     expect(addReviewPointSchema.safeParse({ ideaId, body: " a " }).success).toBe(false);
-    const tooLong = addReviewPointSchema.safeParse({ ideaId, body: "a".repeat(501) });
+    const tooLong = addReviewPointSchema.safeParse({ ideaId, body: "a".repeat(3001) });
     expect(tooLong.success).toBe(false);
-    if (!tooLong.success) expect(tooLong.error.issues[0].message).toMatch(/500/);
+    if (!tooLong.success) expect(tooLong.error.issues[0].message).toMatch(/3000/);
   });
 
   it("keeps line breaks inside a comment", () => {

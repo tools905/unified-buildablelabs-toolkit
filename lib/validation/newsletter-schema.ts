@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_TONE, MIN_TONE } from "@/lib/utils/newsletter-cover";
 
 export const updateNewsletterPostSchema = z.object({
   title: z.string().max(200).default(""),
@@ -14,7 +15,7 @@ export const updateNewsletterPostSchema = z.object({
   coverFocusX: z.number().int().min(0).max(100).optional(),
   coverFocusY: z.number().int().min(0).max(100).optional(),
   coverZoom: z.number().min(1).max(3).optional(),
-  coverFade: z.enum(["lighter", "darker"]).nullable().optional(),
+  coverTone: z.number().int().min(MIN_TONE).max(MAX_TONE).nullable().optional(),
 });
 
 export type UpdateNewsletterPostInput = z.infer<typeof updateNewsletterPostSchema>;

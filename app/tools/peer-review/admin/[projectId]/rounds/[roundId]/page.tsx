@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,7 +51,7 @@ export default async function RoundPage({
   }
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold sm:text-3xl">{round.title}</h1>
@@ -114,7 +113,7 @@ export default async function RoundPage({
           </div>
         </CardContent>
       </Card>
-    </AppShell>
+    </>
   );
 }
 

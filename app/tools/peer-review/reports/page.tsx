@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
@@ -25,7 +24,7 @@ export default async function PeerReviewReportsPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Peer Review Reports</h1>
         <p className="text-muted-foreground">Completed and closed peer-review rounds.</p>
@@ -55,6 +54,6 @@ export default async function PeerReviewReportsPage() {
           </Card>
         ) : null}
       </div>
-    </AppShell>
+    </>
   );
 }

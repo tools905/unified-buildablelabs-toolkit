@@ -1,15 +1,21 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { MeetingCard } from "@/components/meetings/meeting-card";
+import { MeetingCard, type MeetingCardData } from "@/components/meetings/meeting-card";
 import { requireUser } from "@/lib/auth/require-user";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { listMeetings } from "@/lib/services/calendar-service";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
 import { extractTicketsFromMeetingAction } from "@/app/tools/meetings/actions";
+import { toMeetingPreview } from "@/lib/utils/meeting-preview";
 
 export const dynamic = "force-dynamic";
+
+// A meeting as stored, before the long recap text is cut down to a preview for the page.
+type MeetingRow = Omit<MeetingCardData, "summary_preview" | "summary_truncated"> & {
+  summary_markdown: string | null;
+  summary_text: string | null;
+};
 
 export default async function MeetingsPage() {
   await requireEnabledTool("meetings");
@@ -17,10 +23,11 @@ export default async function MeetingsPage() {
   const workspace = await requireDefaultWorkspace(supabase, user.id);
   const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
 
-  const meetings = await listMeetings(supabase, workspace.id);
+  const rows: MeetingRow[] = await listMeetings(supabase, workspace.id);
+  const meetings: MeetingCardData[] = rows.map(toMeetingPreview);
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Meetings"
         title="Recaps"
@@ -35,29 +42,16 @@ export default async function MeetingsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {meetings.map(
-            (meeting: {
-              id: string;
-              title: string | null;
-              event_title: string | null;
-              summary_text: string | null;
-              summary_markdown: string | null;
-              web_url: string | null;
-              start_time: string | null;
-              attendees: { name: string | null; email: string }[];
-              tickets_extracted_at: string | null;
-              extracted_tickets_count: number;
-            }) => (
-              <MeetingCard
-                key={meeting.id}
-                meeting={meeting}
-                admin={admin}
-                extractTicketsAction={extractTicketsFromMeetingAction}
-              />
-            ),
-          )}
+          {meetings.map((meeting) => (
+            <MeetingCard
+              key={meeting.id}
+              meeting={meeting}
+              admin={admin}
+              extractTicketsAction={extractTicketsFromMeetingAction}
+            />
+          ))}
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

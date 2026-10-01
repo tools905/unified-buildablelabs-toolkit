@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ResourcesCatalog } from "@/components/resources/resources-catalog";
 import { QaTopicPicker } from "@/components/resources/qa-topic-picker";
@@ -41,7 +40,7 @@ export default async function ResourcesPage({
   const historyByRoadmapId = Object.fromEntries(historyEntries);
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Upskill"
         title="Catalog & Q&A"
@@ -52,6 +51,6 @@ export default async function ResourcesPage({
         resourcesTab={<ResourcesCatalog resources={resources} roadmaps={roadmaps} params={params} />}
         qaTab={<QaTopicPicker roadmaps={roadmaps} historyByRoadmapId={historyByRoadmapId} isAdmin={isAdmin} />}
       />
-    </AppShell>
+    </>
   );
 }

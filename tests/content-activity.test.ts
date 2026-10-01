@@ -6,6 +6,7 @@ function data(overrides: Partial<IdeaPanelData> = {}): IdeaPanelData {
   return {
     workspaceId: "w",
     currentUserId: "u",
+    currentUserName: "Me",
     isAdmin: false,
     history: {
       createdAt: "2026-09-01T09:00:00Z",

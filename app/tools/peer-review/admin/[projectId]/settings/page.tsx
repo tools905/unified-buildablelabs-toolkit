@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/dashboard/confirm-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,7 +75,7 @@ export default async function ProjectSettingsPage({
   }
 
   return (
-    <AppShell>
+    <>
       <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -152,6 +151,6 @@ export default async function ProjectSettingsPage({
           </CardContent>
         </Card>
       </div>
-    </AppShell>
+    </>
   );
 }

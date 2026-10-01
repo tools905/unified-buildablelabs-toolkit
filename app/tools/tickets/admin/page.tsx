@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +46,7 @@ export default async function TicketsAdminPage() {
   const done = tickets.filter((t: { status: string }) => t.status === "done").length;
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold sm:text-3xl">Tickets Admin</h1>
         <p className="text-muted-foreground">Bulk operations and workspace-wide ticket reporting.</p>
@@ -128,6 +127,6 @@ export default async function TicketsAdminPage() {
         </CardContent>
       </Card>
       <TicketAdminTable tickets={tickets} members={memberOptions} />
-    </AppShell>
+    </>
   );
 }

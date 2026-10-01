@@ -73,7 +73,7 @@ export function NewsletterEditor({
     focusX: post.cover_focus_x ?? DEFAULT_COVER_ADJUST.focusX,
     focusY: post.cover_focus_y ?? DEFAULT_COVER_ADJUST.focusY,
     zoom: Number(post.cover_zoom ?? DEFAULT_COVER_ADJUST.zoom),
-    fade: post.cover_fade ?? null,
+    tone: post.cover_tone ?? null,
   });
   const [adjustingCover, setAdjustingCover] = useState(false);
   const [activeImage, setActiveImage] = useState<{ start: number; end: number; image: StoryImage } | null>(null);
@@ -100,7 +100,7 @@ export function NewsletterEditor({
     coverFocusX: coverAdjust.focusX,
     coverFocusY: coverAdjust.focusY,
     coverZoom: coverAdjust.zoom,
-    coverFade: coverAdjust.fade,
+    coverTone: coverAdjust.tone,
   });
   latest.current = {
     title,
@@ -113,11 +113,13 @@ export function NewsletterEditor({
     coverFocusX: Math.round(coverAdjust.focusX),
     coverFocusY: Math.round(coverAdjust.focusY),
     coverZoom: Math.round(coverAdjust.zoom * 100) / 100,
-    coverFade: coverAdjust.fade,
+    coverTone: coverAdjust.tone,
   };
 
   const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members]);
   const availableMembers = members.filter((m) => !authorIds.includes(m.id));
+  // The byline line of the story card, as the website writes it: authors and read time.
+  const cardByline = `${authorIds.map((id) => membersById[id]?.label).filter(Boolean).join(", ")}${authorIds.length ? " · " : ""}${Math.max(1, Math.round(body.trim().split(/\s+/).filter(Boolean).length / 200))} min read`;
 
   const flushSave = useCallback(async () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -486,6 +488,8 @@ export function NewsletterEditor({
           brightness={coverBrightness}
           tag={tag}
           title={title}
+          deck={deck}
+          byline={cardByline}
           initial={coverAdjust}
           onApply={(next) => {
             setCoverAdjust(next);
@@ -509,7 +513,7 @@ export function NewsletterEditor({
           {previewing ? (
             coverUrl ? (
               <div className="mb-6">
-                <CoverCardPreview url={coverUrl} brightness={coverBrightness} adjust={coverAdjust} tag={tag} title={title} />
+                <CoverCardPreview url={coverUrl} brightness={coverBrightness} adjust={coverAdjust} tag={tag} title={title} deck={deck} byline={cardByline} />
               </div>
             ) : null
           ) : (
@@ -519,6 +523,8 @@ export function NewsletterEditor({
               adjust={coverAdjust}
               tag={tag}
               title={title}
+              deck={deck}
+              byline={cardByline}
               uploading={uploadingCover}
               error={coverError}
               onFile={handleCoverFile}

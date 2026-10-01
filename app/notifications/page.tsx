@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { NotificationList } from "@/components/notifications/notification-list";
 import { requireUser } from "@/lib/auth/require-user";
@@ -11,13 +10,13 @@ export default async function NotificationsPage() {
   const notifications = await listNotifications(supabase, user.id);
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Notifications"
         title="Notifications"
         description="Updates relevant to you across the workspace."
       />
       <NotificationList notifications={notifications} />
-    </AppShell>
+    </>
   );
 }

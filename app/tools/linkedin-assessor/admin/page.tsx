@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ChevronDown, Plus, Sparkles } from "lucide-react";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { LinkedInPostAssessmentList } from "@/components/linkedin-assessor/post-assessment-list";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,7 @@ export default async function LinkedInAdminPage() {
   const data = await getLinkedInDashboardData(supabase, workspace.id);
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold">LinkedIn Admin</h1>
@@ -62,6 +61,6 @@ export default async function LinkedInAdminPage() {
           {data.stats.length === 0 ? <p className="px-5 py-6 text-center text-sm text-muted-foreground">No LinkedIn profiles are being tracked yet.</p> : null}
         </div>
       </details>
-    </AppShell>
+    </>
   );
 }

@@ -2,7 +2,10 @@ export const NEWSLETTER_BUCKET = "newsletter-images";
 export const MAX_NEWSLETTER_IMAGE_INPUT_BYTES = 15 * 1024 * 1024;
 export const NEWSLETTER_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
-export type CoverFade = "lighter" | "darker" | null;
+// Manual tone: how strongly the picture is darkened under the card text, in percent. Below the
+// minimum the text is no longer readable on most pictures; above the maximum the picture vanishes.
+export const MIN_TONE = 20;
+export const MAX_TONE = 95;
 
 // How the preview image is framed. The original file is never cut: the page shows a window
 // onto it, centred on the focus point (0 to 100 across and down) and zoomed in from 1x to 3x.
@@ -10,10 +13,11 @@ export type CoverAdjust = {
   focusX: number;
   focusY: number;
   zoom: number;
-  fade: CoverFade;
+  // null = Auto (from the picture's brightness), otherwise the darkening percentage a person chose.
+  tone: number | null;
 };
 
-export const DEFAULT_COVER_ADJUST: CoverAdjust = { focusX: 50, focusY: 50, zoom: 1, fade: null };
+export const DEFAULT_COVER_ADJUST: CoverAdjust = { focusX: 50, focusY: 50, zoom: 1, tone: null };
 
 export type CoverTreatment = {
   // How strong the dark fade under the card text is (0 to 1).
@@ -29,18 +33,23 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
 // much the page should darken it so light text on top stays readable on the dark theme.
 // Brighter images get a stronger fade and are toned down a little. The original file
 // is never changed; the website applies these two numbers when it draws the card.
-// `fade` lets a person nudge the automatic result: "lighter" or "darker".
-export function coverTreatment(brightness: number | null | undefined, fade: CoverFade = null): CoverTreatment {
+// A manual `tone` (percent) replaces the automatic fade strength; the picture's own
+// brightness adjustment stays automatic.
+export function coverTreatment(brightness: number | null | undefined, tone: number | null = null): CoverTreatment {
   const level = clamp((brightness ?? 50) / 100, 0, 1);
-  const overlay = 0.5 + 0.45 * level;
-  const factor = level > 0.55 ? clamp(1 - (level - 0.55) * 0.9, 0.7, 1) : 1;
-  if (fade === "lighter") {
-    return { overlayOpacity: round2(clamp(overlay - 0.2, 0.3, 0.95)), brightnessFactor: round2(clamp(factor + 0.12, 0.7, 1)) };
+  const factor = round2(level > 0.55 ? clamp(1 - (level - 0.55) * 0.9, 0.7, 1) : 1);
+  if (tone === null) {
+    return { overlayOpacity: round2(clamp(0.5 + 0.45 * level, 0.5, 0.9)), brightnessFactor: factor };
   }
-  if (fade === "darker") {
-    return { overlayOpacity: round2(clamp(overlay + 0.2, 0.3, 0.95)), brightnessFactor: round2(clamp(factor - 0.12, 0.6, 1)) };
-  }
-  return { overlayOpacity: round2(clamp(overlay, 0.5, 0.9)), brightnessFactor: round2(factor) };
+  return { overlayOpacity: round2(clamp(tone, MIN_TONE, MAX_TONE) / 100), brightnessFactor: factor };
+}
+
+// The dark fade drawn over the picture. It stays strong across the whole block of text
+// (headline, summary, byline and link) and only eases off near the top of the card.
+export function coverScrimGradient(overlayOpacity: number) {
+  const o = overlayOpacity;
+  const at = (factor: number) => `rgba(10,11,14,${(o * factor).toFixed(2)})`;
+  return `linear-gradient(to top, ${at(1)} 0%, ${at(0.92)} 40%, ${at(0.68)} 65%, ${at(0.34)} 85%, ${at(0.12)} 100%)`;
 }
 
 export type CoverImagePayload = CoverTreatment & { url: string; focusX: number; focusY: number; zoom: number };
@@ -51,10 +60,10 @@ export function coverImagePayload(
   adjust: Partial<CoverAdjust> = {},
 ): CoverImagePayload | null {
   if (!url) return null;
-  const { focusX, focusY, zoom, fade } = { ...DEFAULT_COVER_ADJUST, ...adjust };
+  const { focusX, focusY, zoom, tone } = { ...DEFAULT_COVER_ADJUST, ...adjust };
   return {
     url,
-    ...coverTreatment(brightness, fade),
+    ...coverTreatment(brightness, tone),
     focusX: clamp(Math.round(focusX), 0, 100),
     focusY: clamp(Math.round(focusY), 0, 100),
     zoom: round2(clamp(zoom, 1, 3)),

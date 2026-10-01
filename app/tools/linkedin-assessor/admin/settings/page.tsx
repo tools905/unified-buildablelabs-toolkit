@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { AnalysisWindowPicker } from "@/components/linkedin-assessor/analysis-window-picker";
 import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +11,7 @@ export default async function LinkedInSettingsPage() {
   const settings = data.settings;
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">LinkedIn Settings</h1>
         <p className="text-muted-foreground">Choose how far back the dashboard looks and what members can do.</p>
@@ -31,7 +30,7 @@ export default async function LinkedInSettingsPage() {
           </form>
         </CardContent>
       </Card>
-    </AppShell>
+    </>
   );
 }
 

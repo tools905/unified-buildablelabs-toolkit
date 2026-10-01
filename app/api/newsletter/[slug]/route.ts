@@ -1,30 +1,33 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getWorkspaceByName } from "@/lib/services/workspace-service";
-import { getAuthorsForPosts, getPublishedPostBySlug } from "@/lib/services/newsletter-service";
+import { getAuthorsForPosts, getPublicWorkspace, getPublishedPostBySlug } from "@/lib/services/newsletter-service";
 import { renderNewsletterMarkdown } from "@/lib/utils/markdown";
 import { coverImagePayload } from "@/lib/utils/newsletter-cover";
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-};
+import {
+  PUBLIC_CORS_HEADERS,
+  PUBLIC_FEED_CACHE_CONTROL,
+  PUBLIC_NOT_FOUND_CACHE_CONTROL,
+  publicFeedHeaders,
+} from "@/lib/utils/public-cache";
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  return new NextResponse(null, { status: 204, headers: PUBLIC_CORS_HEADERS });
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = createAdminClient();
-  const workspace = await getWorkspaceByName(supabase, "BuildableLabs");
+  const workspace = await getPublicWorkspace(supabase);
   if (!workspace) {
-    return NextResponse.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+    return NextResponse.json({ error: "Not found" }, { status: 404, headers: PUBLIC_CORS_HEADERS });
   }
 
   const post = await getPublishedPostBySlug(supabase, workspace.id, slug);
   if (!post) {
-    return NextResponse.json({ error: "Not found" }, { status: 404, headers: CORS_HEADERS });
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: publicFeedHeaders(PUBLIC_NOT_FOUND_CACHE_CONTROL) },
+    );
   }
 
   const authors = await getAuthorsForPosts(supabase, post.author_ids ?? []);
@@ -40,11 +43,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
         focusX: post.cover_focus_x ?? 50,
         focusY: post.cover_focus_y ?? 50,
         zoom: Number(post.cover_zoom ?? 1),
-        fade: post.cover_fade,
+        tone: post.cover_tone,
       }),
       authors: authors.map((author: { full_name: string | null; email: string }) => author.full_name || author.email),
       bodyHtml: renderNewsletterMarkdown(post.body),
     },
-    { headers: CORS_HEADERS },
+    { headers: publicFeedHeaders(PUBLIC_FEED_CACHE_CONTROL) },
   );
 }

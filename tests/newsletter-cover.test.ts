@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   coverImagePayload,
   coverImageStyle,
+  coverScrimGradient,
   coverTreatment,
+  MAX_TONE,
+  MIN_TONE,
   isOwnNewsletterImageUrl,
   newsletterImagePath,
   unusedNewsletterFiles,
@@ -46,31 +49,41 @@ describe("coverTreatment", () => {
   });
 });
 
-describe("coverTreatment manual fade", () => {
-  it("lighter fades less and darker fades more than automatic", () => {
-    const auto = coverTreatment(60);
-    const lighter = coverTreatment(60, "lighter");
-    const darker = coverTreatment(60, "darker");
-    expect(lighter.overlayOpacity).toBeLessThan(auto.overlayOpacity);
-    expect(darker.overlayOpacity).toBeGreaterThan(auto.overlayOpacity);
-    expect(lighter.brightnessFactor).toBeGreaterThanOrEqual(auto.brightnessFactor);
-    expect(darker.brightnessFactor).toBeLessThanOrEqual(auto.brightnessFactor);
+describe("coverTreatment manual tone", () => {
+  it("uses the chosen percentage instead of the automatic fade", () => {
+    expect(coverTreatment(60, 30).overlayOpacity).toBe(0.3);
+    expect(coverTreatment(60, 85).overlayOpacity).toBe(0.85);
+    expect(coverTreatment(10, 85).overlayOpacity).toBe(0.85);
   });
 
-  it("stays within safe limits at the extremes", () => {
-    for (const brightness of [0, 50, 100]) {
-      for (const fade of ["lighter", "darker"] as const) {
-        const { overlayOpacity, brightnessFactor } = coverTreatment(brightness, fade);
-        expect(overlayOpacity).toBeGreaterThanOrEqual(0.3);
-        expect(overlayOpacity).toBeLessThanOrEqual(0.95);
-        expect(brightnessFactor).toBeGreaterThanOrEqual(0.6);
-        expect(brightnessFactor).toBeLessThanOrEqual(1);
-      }
-    }
+  it("keeps the picture's own brightness adjustment automatic", () => {
+    expect(coverTreatment(90, 30).brightnessFactor).toBe(coverTreatment(90, null).brightnessFactor);
+    expect(coverTreatment(90, 95).brightnessFactor).toBe(coverTreatment(90).brightnessFactor);
+  });
+
+  it("stays within the safe limits however extreme the choice", () => {
+    expect(coverTreatment(50, 0).overlayOpacity).toBe(MIN_TONE / 100);
+    expect(coverTreatment(50, 100).overlayOpacity).toBe(MAX_TONE / 100);
+    expect(coverTreatment(50, -40).overlayOpacity).toBe(MIN_TONE / 100);
   });
 
   it("no manual choice equals the automatic result", () => {
     expect(coverTreatment(70, null)).toEqual(coverTreatment(70));
+  });
+});
+
+describe("coverScrimGradient", () => {
+  it("is strongest at the bottom and eases off towards the top", () => {
+    const gradient = coverScrimGradient(0.8);
+    const alphas = [...gradient.matchAll(/rgba\(10,11,14,([\d.]+)\)/g)].map((match) => Number(match[1]));
+    expect(alphas[0]).toBeCloseTo(0.8);
+    expect([...alphas].sort((a, b) => b - a)).toEqual(alphas);
+    expect(alphas[alphas.length - 1]).toBeLessThan(0.2);
+  });
+
+  it("keeps the whole text block well covered, not just the very bottom", () => {
+    const alphas = [...coverScrimGradient(0.6).matchAll(/rgba\(10,11,14,([\d.]+)\)/g)].map((match) => Number(match[1]));
+    expect(alphas[1]).toBeGreaterThanOrEqual(0.5);
   });
 });
 
@@ -83,9 +96,9 @@ describe("coverImagePayload", () => {
     expect(coverImagePayload(url, 40)).toEqual({ url, ...coverTreatment(40), focusX: 50, focusY: 50, zoom: 1 });
   });
 
-  it("carries the framing and the fade choice, kept within range", () => {
-    const payload = coverImagePayload(url, 40, { focusX: 20, focusY: 130, zoom: 9, fade: "darker" });
-    expect(payload).toMatchObject({ focusX: 20, focusY: 100, zoom: 3, ...coverTreatment(40, "darker") });
+  it("carries the framing and the tone choice, kept within range", () => {
+    const payload = coverImagePayload(url, 40, { focusX: 20, focusY: 130, zoom: 9, tone: 80 });
+    expect(payload).toMatchObject({ focusX: 20, focusY: 100, zoom: 3, ...coverTreatment(40, 80) });
   });
 });
 

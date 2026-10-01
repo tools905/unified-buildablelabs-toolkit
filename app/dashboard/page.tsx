@@ -10,7 +10,6 @@ import {
   Share2,
   type LucideIcon,
 } from "lucide-react";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { CollapsibleSection } from "@/components/dashboard/collapsible-section";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
@@ -71,7 +70,7 @@ export default async function DashboardPage() {
     "there";
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow={workspace.name}
         title={`Welcome back, ${displayName}`}
@@ -96,6 +95,6 @@ export default async function DashboardPage() {
           Browse all tools <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-    </AppShell>
+    </>
   );
 }

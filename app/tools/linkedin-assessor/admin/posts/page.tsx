@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { ManualPostForm } from "@/components/linkedin-assessor/manual-post-form";
 import { Badge } from "@/components/ui/badge";
 import { SubmitButton } from "@/components/dashboard/submit-button";
@@ -19,7 +18,7 @@ export default async function LinkedInPostsPage() {
   const data = await getLinkedInDashboardData(supabase, workspace.id, { startDate: new Date(0), endDate: new Date() });
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Submit post</h1>
         <p className="text-muted-foreground">Scored original and collaborative posts, coaching signals, and admin corrections.</p>
@@ -81,7 +80,7 @@ export default async function LinkedInPostsPage() {
         ))}
         {data.posts.length === 0 ? <Card><CardHeader><CardTitle>No posts submitted</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Submit a post URL and writing to start scoring.</CardContent></Card> : null}
       </div>
-    </AppShell>
+    </>
   );
 }
 

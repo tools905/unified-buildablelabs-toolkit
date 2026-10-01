@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RatingSlider } from "@/app/tools/peer-review/member/[assignmentId]/rating-slider";
@@ -63,7 +62,7 @@ export default async function AssignmentPage({
   }
 
   return (
-    <AppShell>
+    <>
       <Card>
         <CardHeader>
           <CardTitle>
@@ -101,7 +100,7 @@ export default async function AssignmentPage({
           </form>
         </CardContent>
       </Card>
-    </AppShell>
+    </>
   );
 }
 

@@ -5,14 +5,16 @@ import { ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getMeetingSummaryAction } from "@/app/tools/meetings/actions";
 import { formatISTDate, formatISTDateTime } from "@/lib/utils/dates";
 
 export type MeetingCardData = {
   id: string;
   title: string | null;
   event_title: string | null;
-  summary_text: string | null;
-  summary_markdown: string | null;
+  // A short start of the recap; the full text is fetched when the card is opened.
+  summary_preview: string | null;
+  summary_truncated: boolean;
   web_url: string | null;
   start_time: string | null;
   attendees: { name: string | null; email: string }[];
@@ -30,19 +32,35 @@ export function MeetingCard({
   extractTicketsAction: (formData: FormData) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [fullSummary, setFullSummary] = useState<string | null>(null);
+  const [loadingFull, setLoadingFull] = useState(false);
+  const [fullError, setFullError] = useState(false);
   const title = meeting.title || meeting.event_title || "Untitled meeting";
-  const summary = meeting.summary_markdown || meeting.summary_text;
+  const preview = meeting.summary_preview;
+  // The card shows the short start; the open card shows the whole recap once it has arrived.
+  const summary = open && fullSummary !== null ? fullSummary : preview;
+
+  function openCard() {
+    setOpen(true);
+    if (!meeting.summary_truncated || fullSummary !== null || loadingFull) return;
+    setLoadingFull(true);
+    setFullError(false);
+    getMeetingSummaryAction(meeting.id)
+      .then((result) => setFullSummary(result.summary ?? preview ?? ""))
+      .catch(() => setFullError(true))
+      .finally(() => setLoadingFull(false));
+  }
 
   return (
     <>
       <Card
         role="button"
         tabIndex={0}
-        onClick={() => setOpen(true)}
+        onClick={openCard}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            setOpen(true);
+            openCard();
           }
         }}
         className="card-hover-effect flex cursor-pointer flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -114,6 +132,15 @@ export function MeetingCard({
               ) : (
                 <p className="text-sm italic text-muted-foreground">No summary yet.</p>
               )}
+              {loadingFull ? <p className="mt-3 text-xs text-muted-foreground">Loading the rest of the recap…</p> : null}
+              {fullError ? (
+                <p role="alert" className="mt-3 text-xs text-destructive">
+                  Couldn&apos;t load the full recap.{" "}
+                  <button type="button" className="underline" onClick={openCard}>
+                    Try again
+                  </button>
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 border-t border-border p-5">

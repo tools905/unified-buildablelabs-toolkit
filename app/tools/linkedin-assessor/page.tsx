@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { formatISTDate } from "@/lib/utils/dates";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { LinkedInMemberTable } from "@/components/linkedin-assessor/member-table";
@@ -21,11 +20,11 @@ export default async function LinkedInAssessorPage() {
   const data = await getLinkedInDashboardData(supabase, workspace.id, { profileId: user.id, memberOnly: !admin });
 
   if (!admin && data.settings?.member_insights_enabled === false) {
-    return <AppShell><div className="mb-6"><h1 className="text-3xl font-semibold">LinkedIn Assessor</h1><p className="text-muted-foreground">Personal LinkedIn coaching insights.</p></div><Card><CardHeader><CardTitle>Personal insights are disabled</CardTitle><CardDescription>An administrator has disabled member-facing LinkedIn results for this workspace.</CardDescription></CardHeader></Card></AppShell>;
+    return <><div className="mb-6"><h1 className="text-3xl font-semibold">LinkedIn Assessor</h1><p className="text-muted-foreground">Personal LinkedIn coaching insights.</p></div><Card><CardHeader><CardTitle>Personal insights are disabled</CardTitle><CardDescription>An administrator has disabled member-facing LinkedIn results for this workspace.</CardDescription></CardHeader></Card></>;
   }
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold">LinkedIn Assessor</h1>
@@ -92,7 +91,7 @@ export default async function LinkedInAssessorPage() {
           <CardContent><ManualPostForm members={data.members.map((member) => ({ id: member.id, name: member.name }))} memberId={data.members[0]?.id} /></CardContent>
         </Card>
       ) : null}
-    </AppShell>
+    </>
   );
 }
 
