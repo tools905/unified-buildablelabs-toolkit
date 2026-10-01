@@ -4,7 +4,6 @@ import {
   MAX_NEWSLETTER_IMAGE_INPUT_BYTES,
   NEWSLETTER_BUCKET,
   NEWSLETTER_IMAGE_TYPES,
-  newsletterImagePath,
 } from "@/lib/utils/newsletter-cover";
 
 export function isImageFile(file: File) {
@@ -26,11 +25,4 @@ export async function uploadNewsletterImage(file: File, workspaceId: string, pos
 
   const { data } = supabase.storage.from(NEWSLETTER_BUCKET).getPublicUrl(path);
   return { url: data.publicUrl, brightness };
-}
-
-// Deletes a file this editor uploaded earlier. Failures are ignored: a leftover file is harmless.
-export async function removeNewsletterImage(url: string) {
-  const path = newsletterImagePath(url);
-  if (!path) return;
-  await createClient().storage.from(NEWSLETTER_BUCKET).remove([path]);
 }

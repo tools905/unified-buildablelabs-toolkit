@@ -4,7 +4,20 @@ import {
   updateNewsletterPostSchema,
   type UpdateNewsletterPostInput,
 } from "@/lib/validation/newsletter-schema";
-import { isOwnNewsletterImageUrl, NEWSLETTER_BUCKET, unusedNewsletterFiles } from "@/lib/utils/newsletter-cover";
+import {
+  isOwnNewsletterImageUrl,
+  NEWSLETTER_BUCKET,
+  newsletterImagePath,
+  unusedNewsletterFiles,
+} from "@/lib/utils/newsletter-cover";
+import {
+  isBlankNewsletterContent,
+  newsletterVersionReferences,
+  pickNewsletterContent,
+  sameNewsletterContent,
+  startsNewSession,
+  type NewsletterVersionKind,
+} from "@/lib/utils/newsletter-versions";
 
 export const NEWSLETTER_POST_SELECT = "*";
 
@@ -86,6 +99,7 @@ export async function updatePost(
   supabase: SupabaseClient<any>,
   postId: string,
   rawInput: UpdateNewsletterPostInput,
+  actorId: string,
 ) {
   const input = updateNewsletterPostSchema.parse(rawInput);
 
@@ -93,33 +107,44 @@ export async function updatePost(
     throw new Error("The preview image must be uploaded from the editor.");
   }
 
+  const patch = {
+    title: input.title,
+    deck: input.deck || null,
+    tag: input.tag || null,
+    body: input.body,
+    author_ids: input.authorIds,
+    ...(input.coverImageUrl !== undefined
+      ? {
+          cover_image_url: input.coverImageUrl,
+          cover_brightness: input.coverImageUrl ? (input.coverBrightness ?? null) : null,
+          // A removed or replaced image starts again from a centred, unzoomed frame.
+          ...(input.coverImageUrl
+            ? {}
+            : { cover_focus_x: 50, cover_focus_y: 50, cover_zoom: 1, cover_fade: null }),
+        }
+      : {}),
+    ...(input.coverImageUrl
+      ? {
+          ...(input.coverFocusX !== undefined ? { cover_focus_x: input.coverFocusX } : {}),
+          ...(input.coverFocusY !== undefined ? { cover_focus_y: input.coverFocusY } : {}),
+          ...(input.coverZoom !== undefined ? { cover_zoom: input.coverZoom } : {}),
+          ...(input.coverFade !== undefined ? { cover_fade: input.coverFade } : {}),
+        }
+      : {}),
+  };
+
+  const previous = await getPost(supabase, postId);
+  const before = pickNewsletterContent(previous);
+  // Opening the editor saves once without any change; that must not count as an edit.
+  if (sameNewsletterContent(before, pickNewsletterContent({ ...previous, ...patch }))) return previous;
+
+  if (startsNewSession(previous, actorId) && !isBlankNewsletterContent(before)) {
+    await keepSessionVersion(supabase, previous, actorId);
+  }
+
   const { data, error } = await supabase
     .from("newsletter_posts")
-    .update({
-      title: input.title,
-      deck: input.deck || null,
-      tag: input.tag || null,
-      body: input.body,
-      author_ids: input.authorIds,
-      ...(input.coverImageUrl !== undefined
-        ? {
-            cover_image_url: input.coverImageUrl,
-            cover_brightness: input.coverImageUrl ? (input.coverBrightness ?? null) : null,
-            // A removed or replaced image starts again from a centred, unzoomed frame.
-            ...(input.coverImageUrl
-              ? {}
-              : { cover_focus_x: 50, cover_focus_y: 50, cover_zoom: 1, cover_fade: null }),
-          }
-        : {}),
-      ...(input.coverImageUrl
-        ? {
-            ...(input.coverFocusX !== undefined ? { cover_focus_x: input.coverFocusX } : {}),
-            ...(input.coverFocusY !== undefined ? { cover_focus_y: input.coverFocusY } : {}),
-            ...(input.coverZoom !== undefined ? { cover_zoom: input.coverZoom } : {}),
-            ...(input.coverFade !== undefined ? { cover_fade: input.coverFade } : {}),
-          }
-        : {}),
-    })
+    .update({ ...patch, updated_by: actorId })
     .eq("id", postId)
     .select(NEWSLETTER_POST_SELECT)
     .single();
@@ -160,6 +185,7 @@ export async function publishPost(
     .single();
   if (error) throw error;
 
+  await insertVersion(supabase, data, "published", actorId);
   await removeUnusedImages(supabase, workspaceId, postId, data.body ?? "", data.cover_image_url);
 
   await writeAuditLog(supabase, {
@@ -174,7 +200,8 @@ export async function publishPost(
 }
 
 // Best effort: images uploaded for a post but later cut from the story are deleted when it
-// is published. A leftover file is harmless, so this never fails the publish.
+// is published, unless an earlier version still shows them. A leftover file is harmless, so
+// this never fails the publish.
 export async function removeUnusedImages(
   supabase: SupabaseClient<any>,
   workspaceId: string,
@@ -185,7 +212,9 @@ export async function removeUnusedImages(
   try {
     const folder = `${workspaceId}/${postId}`;
     const { data: files } = await supabase.storage.from(NEWSLETTER_BUCKET).list(folder);
-    const unused = unusedNewsletterFiles((files ?? []).map((file) => file.name), body, coverUrl);
+    const kept = `${body}
+${await versionReferences(supabase, postId)}`;
+    const unused = unusedNewsletterFiles((files ?? []).map((file) => file.name), kept, coverUrl);
     if (unused.length) await supabase.storage.from(NEWSLETTER_BUCKET).remove(unused.map((name) => `${folder}/${name}`));
     return unused.length;
   } catch {
@@ -205,6 +234,110 @@ export async function deletePost(supabase: SupabaseClient<any>, postId: string) 
     const { data: files } = await supabase.storage.from(NEWSLETTER_BUCKET).list(folder);
     const paths = (files ?? []).map((file) => `${folder}/${file.name}`);
     if (paths.length) await supabase.storage.from(NEWSLETTER_BUCKET).remove(paths);
+  }
+}
+
+// --- Version history -------------------------------------------------------------------
+
+async function insertVersion(
+  supabase: SupabaseClient<any>,
+  post: Record<string, any>,
+  kind: NewsletterVersionKind,
+  actorId: string,
+  extra: { createdAt?: string } = {},
+) {
+  const { data, error } = await supabase
+    .from("newsletter_post_versions")
+    .insert({
+      ...pickNewsletterContent(post),
+      post_id: post.id,
+      workspace_id: post.workspace_id,
+      kind,
+      edited_by: post.updated_by ?? post.created_by,
+      created_by: actorId,
+      ...(extra.createdAt ? { created_at: extra.createdAt } : {}),
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Safety net for when leaving the editor could not keep a version (a crashed browser, a lost
+// connection): the next save after a long pause, or by someone else, keeps the post as it
+// stood before, unless the newest version already holds exactly that.
+async function keepSessionVersion(supabase: SupabaseClient<any>, post: Record<string, any>, actorId: string) {
+  const latest = await latestVersion(supabase, post.id);
+  if (latest && sameNewsletterContent(pickNewsletterContent(latest), pickNewsletterContent(post))) return;
+
+  try {
+    // Stamped with the time of the last save, so the history shows when this text was written.
+    await insertVersion(supabase, post, "session", actorId, { createdAt: post.updated_at });
+  } catch (insertError) {
+    // Another save at the same moment already kept this copy.
+    if ((insertError as { code?: string }).code !== "23505") throw insertError;
+  }
+}
+
+async function latestVersion(supabase: SupabaseClient<any>, postId: string) {
+  const { data, error } = await supabase
+    .from("newsletter_post_versions")
+    .select("*")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function versionReferences(supabase: SupabaseClient<any>, postId: string) {
+  const { data } = await supabase
+    .from("newsletter_post_versions")
+    .select("body, cover_image_url")
+    .eq("post_id", postId);
+  return newsletterVersionReferences(data ?? []);
+}
+
+export async function listVersions(supabase: SupabaseClient<any>, postId: string) {
+  const { data, error } = await supabase
+    .from("newsletter_post_versions")
+    .select("*")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Called when someone leaves the editor after changing the post: saves their last edits and
+// keeps the post as they left it, unless the newest version already holds exactly that.
+export async function keepVersionOnLeave(
+  supabase: SupabaseClient<any>,
+  postId: string,
+  rawInput: UpdateNewsletterPostInput,
+  actorId: string,
+) {
+  const post = await updatePost(supabase, postId, rawInput, actorId);
+  if (isBlankNewsletterContent(pickNewsletterContent(post))) return;
+
+  const latest = await latestVersion(supabase, postId);
+  if (latest && sameNewsletterContent(pickNewsletterContent(latest), pickNewsletterContent(post))) return;
+  await insertVersion(supabase, post, "session", actorId);
+}
+
+// Deletes images the editor dropped from a post, but only those that neither the post nor
+// any of its versions still use. Best effort: a leftover file is harmless.
+export async function removeStaleImages(supabase: SupabaseClient<any>, postId: string, urls: string[]) {
+  try {
+    const post = await getPost(supabase, postId);
+    const inUse = `${post.body ?? ""}\n${post.cover_image_url ?? ""}\n${await versionReferences(supabase, postId)}`;
+    const paths = urls
+      .map((url) => newsletterImagePath(url))
+      .filter((path): path is string => !!path && path.startsWith(`${post.workspace_id}/${postId}/`))
+      .filter((path) => !inUse.includes(path.split("/").pop() ?? path));
+    if (paths.length) await supabase.storage.from(NEWSLETTER_BUCKET).remove(paths);
+  } catch {
+    // Ignored on purpose.
   }
 }
 

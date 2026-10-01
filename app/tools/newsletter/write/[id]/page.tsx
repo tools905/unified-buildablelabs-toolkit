@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NewsletterEditor } from "@/components/newsletter/newsletter-editor";
 import { requireUser } from "@/lib/auth/require-user";
-import { getWorkspaceMembers, isWorkspaceAdmin } from "@/lib/services/workspace-service";
+import { getWorkspaceMembers } from "@/lib/services/workspace-service";
 import * as newsletterService from "@/lib/services/newsletter-service";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
@@ -27,10 +27,7 @@ export default async function NewsletterWritePage({
   }
   if (!post || post.workspace_id !== workspace.id) notFound();
 
-  const [members, admin] = await Promise.all([
-    getWorkspaceMembers(supabase, workspace.id),
-    isWorkspaceAdmin(workspace.id, user.id, supabase),
-  ]);
+  const members = await getWorkspaceMembers(supabase, workspace.id);
 
   const memberOptions = members.map(
     (member: {
@@ -44,7 +41,7 @@ export default async function NewsletterWritePage({
 
   return (
     <AppShell>
-      <NewsletterEditor post={post} members={memberOptions} canDelete={admin} />
+      <NewsletterEditor post={post} members={memberOptions} canDelete={post.created_by === user.id} />
     </AppShell>
   );
 }

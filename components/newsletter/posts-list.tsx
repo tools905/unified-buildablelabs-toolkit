@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { FileText, Search, SlidersHorizontal } from "lucide-react";
+import { FileText, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils/cn";
 import { formatISTShortDate } from "@/lib/utils/dates";
 import { createDraftAction } from "@/app/tools/newsletter/actions";
+import { DeletePostDialog } from "@/components/newsletter/delete-post-dialog";
 import type { NewsletterAuthor, NewsletterPost, NewsletterPostStatus } from "@/components/newsletter/types";
 
 const TABS: { status: NewsletterPostStatus; label: string }[] = [
@@ -35,6 +36,7 @@ export function NewsletterPostsList({
   const [activeTab, setActiveTab] = useState<NewsletterPostStatus>("published");
   const [search, setSearch] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
+  const [deletingPost, setDeletingPost] = useState<NewsletterPost | null>(null);
 
   const counts = useMemo(() => {
     return {
@@ -123,29 +125,52 @@ export function NewsletterPostsList({
       ) : (
         <div className="divide-y divide-muted border-y border-muted">
           {filtered.map((post) => (
-            <Link
-              key={post.id}
-              href={`/tools/newsletter/write/${post.id}`}
-              className="flex items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-muted"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-foreground">{post.title || "Untitled draft"}</p>
-                {post.deck ? (
-                  <p className="mt-0.5 truncate text-sm text-muted-foreground">{post.deck}</p>
-                ) : null}
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-0.5 font-mono text-[11px] text-quiet">
-                {authorNames(post, authorsById) ? <span>{authorNames(post, authorsById)}</span> : null}
-                <span>
-                  {post.status === "published" && post.published_at
-                    ? formatISTShortDate(post.published_at)
-                    : `Updated ${formatISTShortDate(post.updated_at)}`}
-                </span>
-              </div>
-            </Link>
+            <div key={post.id} className="flex items-center transition-colors hover:bg-muted">
+              <Link
+                href={`/tools/newsletter/write/${post.id}`}
+                className="flex min-w-0 flex-1 items-center justify-between gap-4 px-4 py-4"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-foreground">{post.title || "Untitled draft"}</p>
+                  {post.deck ? (
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{post.deck}</p>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-0.5 font-mono text-[11px] text-quiet">
+                  {authorNames(post, authorsById) ? <span>{authorNames(post, authorsById)}</span> : null}
+                  <span>
+                    {post.status === "published" && post.published_at
+                      ? formatISTShortDate(post.published_at)
+                      : `Updated ${formatISTShortDate(post.updated_at)}`}
+                  </span>
+                </div>
+              </Link>
+              {post.created_by === currentUserId ? (
+                <button
+                  type="button"
+                  onClick={() => setDeletingPost(post)}
+                  aria-label={`Delete ${post.title || "untitled draft"}`}
+                  title="Delete"
+                  className="mr-2 grid h-9 w-9 shrink-0 place-items-center text-quiet transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : (
+                <span className="mr-2 w-9 shrink-0" aria-hidden />
+              )}
+            </div>
           ))}
         </div>
       )}
+
+      {deletingPost ? (
+        <DeletePostDialog
+          postId={deletingPost.id}
+          headline={deletingPost.title}
+          published={deletingPost.status === "published"}
+          onCancel={() => setDeletingPost(null)}
+        />
+      ) : null}
     </div>
   );
 }
