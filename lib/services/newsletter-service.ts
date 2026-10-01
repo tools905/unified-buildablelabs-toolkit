@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
+import { getWorkspaceByName } from "@/lib/services/workspace-service";
 import {
   updateNewsletterPostSchema,
   type UpdateNewsletterPostInput,
@@ -82,6 +83,23 @@ export async function listPosts(supabase: SupabaseClient<any>, workspaceId: stri
   return data ?? [];
 }
 
+// The public feed always reads the agency's workspace, which never changes while the app runs.
+// Remember it for a while instead of looking it up on every visit (one database trip saved).
+const PUBLIC_WORKSPACE_TTL_MS = 10 * 60_000;
+let publicWorkspace: { value: Awaited<ReturnType<typeof getWorkspaceByName>>; at: number } | null = null;
+
+export async function getPublicWorkspace(supabase: SupabaseClient<any>, now = Date.now()) {
+  if (publicWorkspace && now - publicWorkspace.at < PUBLIC_WORKSPACE_TTL_MS) return publicWorkspace.value;
+  const workspace = await getWorkspaceByName(supabase, "BuildableLabs");
+  // A missing workspace is not remembered, so the feed recovers as soon as it exists.
+  if (workspace) publicWorkspace = { value: workspace, at: now };
+  return workspace;
+}
+
+export function resetPublicWorkspaceCache() {
+  publicWorkspace = null;
+}
+
 export async function getAuthorsForPosts(
   supabase: SupabaseClient<any>,
   authorIds: string[],
@@ -120,7 +138,7 @@ export async function updatePost(
           // A removed or replaced image starts again from a centred, unzoomed frame.
           ...(input.coverImageUrl
             ? {}
-            : { cover_focus_x: 50, cover_focus_y: 50, cover_zoom: 1, cover_fade: null }),
+            : { cover_focus_x: 50, cover_focus_y: 50, cover_zoom: 1, cover_tone: null }),
         }
       : {}),
     ...(input.coverImageUrl
@@ -128,7 +146,7 @@ export async function updatePost(
           ...(input.coverFocusX !== undefined ? { cover_focus_x: input.coverFocusX } : {}),
           ...(input.coverFocusY !== undefined ? { cover_focus_y: input.coverFocusY } : {}),
           ...(input.coverZoom !== undefined ? { cover_zoom: input.coverZoom } : {}),
-          ...(input.coverFade !== undefined ? { cover_fade: input.coverFade } : {}),
+          ...(input.coverTone !== undefined ? { cover_tone: input.coverTone } : {}),
         }
       : {}),
   };

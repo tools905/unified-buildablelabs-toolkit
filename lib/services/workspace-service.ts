@@ -65,10 +65,15 @@ export async function createWorkspace(
   return workspace;
 }
 
-export const getCurrentWorkspace = cache(async function getCurrentWorkspace(
+type WorkspaceRow = Database["public"]["Tables"]["workspaces"]["Row"];
+
+// The signed-in user's first active workspace together with their role in it, fetched once per
+// request. The role comes back in the same query as the workspace, so nothing has to ask the
+// database a second time whether this person is an admin.
+const getCurrentMembership = cache(async function getCurrentMembership(
   supabase: SupabaseClient<any>,
   userId: string,
-): Promise<Database["public"]["Tables"]["workspaces"]["Row"] | null> {
+): Promise<{ role: WorkspaceRole; workspace: WorkspaceRow } | null> {
   const { data, error } = await supabase
     .from("workspace_members")
     .select("role, workspaces(*)")
@@ -79,9 +84,17 @@ export const getCurrentWorkspace = cache(async function getCurrentWorkspace(
     .maybeSingle();
 
   if (error) throw error;
-  const workspace = data?.workspaces;
-  return Array.isArray(workspace) ? (workspace[0] ?? null) : (workspace ?? null);
+  const embedded = data?.workspaces;
+  const workspace: WorkspaceRow | null = Array.isArray(embedded) ? (embedded[0] ?? null) : (embedded ?? null);
+  return data && workspace ? { role: data.role as WorkspaceRole, workspace } : null;
 });
+
+export async function getCurrentWorkspace(
+  supabase: SupabaseClient<any>,
+  userId: string,
+): Promise<WorkspaceRow | null> {
+  return (await getCurrentMembership(supabase, userId))?.workspace ?? null;
+}
 
 export const getWorkspaceMembership = cache(async function getWorkspaceMembership(
   supabase: SupabaseClient<any>,
@@ -120,6 +133,11 @@ export async function isWorkspaceAdmin(
   userId: string,
   supabase: SupabaseClient<any>,
 ) {
+  // The usual case: asking about the workspace the person is already in. The role is already known
+  // from the workspace lookup, so this costs no extra database trip.
+  const current = await getCurrentMembership(supabase, userId);
+  if (current?.workspace.id === workspaceId) return current.role === "admin";
+
   const membership = await getWorkspaceMembership(supabase, workspaceId, userId);
   return membership?.role === "admin";
 }

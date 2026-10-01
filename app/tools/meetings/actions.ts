@@ -7,6 +7,23 @@ import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { createTicketsFromMeeting } from "@/lib/services/meeting-parser-service";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
+import { fullMeetingSummary } from "@/lib/utils/meeting-preview";
+
+// The full recap of one meeting, fetched when its card is opened (the list only carries a preview).
+export async function getMeetingSummaryAction(meetingId: string): Promise<{ summary: string | null }> {
+  await requireEnabledTool("meetings");
+  const { supabase, user } = await requireUser("/tools/meetings");
+  const workspace = await requireDefaultWorkspace(supabase, user.id);
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("summary_markdown, summary_text")
+    .eq("id", meetingId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle();
+  if (error) throw error;
+  return { summary: data ? fullMeetingSummary(data) : null };
+}
 
 export async function extractTicketsFromMeetingAction(formData: FormData) {
   await requireEnabledTool("tickets");

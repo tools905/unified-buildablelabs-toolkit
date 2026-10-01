@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { NewPostButton } from "@/components/newsletter/new-post-button";
 import { NewsletterPostsList } from "@/components/newsletter/posts-list";
@@ -21,13 +20,13 @@ export default async function NewsletterPage() {
   const authorsById = Object.fromEntries(authors.map((author) => [author.id, author]));
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="The Buildable Labs Times — Newsroom"
         title="Posts"
         actions={<NewPostButton />}
       />
       <NewsletterPostsList initialPosts={posts} authorsById={authorsById} currentUserId={user.id} />
-    </AppShell>
+    </>
   );
 }

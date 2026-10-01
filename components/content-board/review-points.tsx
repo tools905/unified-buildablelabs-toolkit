@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +13,8 @@ import {
 import { formatWhen } from "@/components/content-board/activity";
 import { cn } from "@/lib/utils/cn";
 import { MAX_REVIEW_POINT_LENGTH, MIN_REVIEW_POINT_LENGTH } from "@/lib/utils/content-board";
-import type { PanelReviewPoint } from "@/components/content-board/types";
+import type { ContentIdeaStatus } from "@/lib/db/types";
+import type { IdeaPanelData, PanelReviewPoint } from "@/components/content-board/types";
 
 // An unsent comment is kept per idea, so closing the panel, opening another card or a failed
 // save never throws away what a reviewer has typed.
@@ -38,31 +39,46 @@ function writeDraft(ideaId: string, value: string) {
   }
 }
 
+type SaveResult = { ok: true } | { ok: false; error: string };
+
 export function ReviewPoints({
   ideaId,
   points,
   currentUserId,
+  currentUserName,
+  ideaStatus,
+  onMovedToFeedback,
   isAdmin,
   reviewedAt,
   reviewerName,
   changedSinceReview,
+  applyLocal,
   onChanged,
 }: {
   ideaId: string;
   points: PanelReviewPoint[];
   currentUserId: string;
+  currentUserName: string;
+  // Where the idea is on the board. Feedback on an idea still in Ideas moves it to Feedback.
+  ideaStatus: ContentIdeaStatus;
+  onMovedToFeedback: (moved: boolean) => void;
   isAdmin: boolean;
   reviewedAt: string | null;
   reviewerName: string | null;
   changedSinceReview: boolean;
-  onChanged: () => void;
+  // Changes the panel's data on screen straight away, before the server has answered.
+  applyLocal: (change: (data: IdeaPanelData) => IdeaPanelData) => void;
+  // Called once every save has finished, so the panel can reload the server's version.
+  // `succeeded` is false if any of them failed.
+  onChanged: (succeeded: boolean) => void;
 }) {
   const [body, setBody] = useState(() => (typeof window === "undefined" ? "" : readDraft(ideaId)));
   const bodyRef = useRef(body);
-  // `pending` only updates on the next render, so a very fast double click could send twice.
-  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // Saves still waiting on the server. The panel reloads only when the last one is done, so an
+  // early answer can't put back a list that is missing a change that is still on its way.
+  const saving = useRef(0);
+  const failedInBatch = useRef(false);
 
   const open = points.filter((point) => !point.isResolved);
   const done = points.filter((point) => point.isResolved);
@@ -78,51 +94,119 @@ export function ReviewPoints({
     writeDraft(ideaId, next);
   }
 
-  function run(action: () => Promise<{ ok: true } | { ok: false; error: string }>, onSuccess?: () => void) {
-    if (inFlight.current) return;
-    inFlight.current = true;
+  // Runs a save in the background. `undo` puts the screen back if the save fails.
+  async function save(action: () => Promise<SaveResult>, undo: () => void) {
     setError(null);
-    startTransition(async () => {
-      try {
-        const result = await action();
-        if (!result.ok) {
-          setError(result.error);
-          return;
-        }
-        onSuccess?.();
-        onChanged();
-      } catch {
-        // A dropped connection or a server error: say so instead of failing silently.
-        setError("Couldn't reach the server, so nothing was saved. Please try again.");
-      } finally {
-        inFlight.current = false;
+    saving.current += 1;
+    try {
+      const result = await action();
+      if (!result.ok) {
+        failedInBatch.current = true;
+        undo();
+        setError(result.error);
       }
-    });
+    } catch {
+      // A dropped connection or a server error: say so instead of failing silently.
+      failedInBatch.current = true;
+      undo();
+      setError("Couldn't reach the server, so nothing was saved. Please try again.");
+    } finally {
+      saving.current -= 1;
+      if (saving.current === 0) {
+        const succeeded = !failedInBatch.current;
+        failedInBatch.current = false;
+        onChanged(succeeded);
+      }
+    }
   }
 
   function submit() {
-    if (pending || tooShort || tooLong) return;
+    if (tooShort || tooLong) return;
     const submitted = body;
-    run(
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const optimistic: PanelReviewPoint = {
+      id: tempId,
+      body: submitted.trim(),
+      isResolved: false,
+      createdAt: new Date().toISOString(),
+      resolvedAt: null,
+      authorId: currentUserId,
+      authorName: currentUserName,
+    };
+    applyLocal((data) => ({ ...data, points: [...data.points, optimistic] }));
+    changeBody("");
+    // The server moves an idea out of Ideas on its first feedback; show the card moving right away.
+    const movesIdea = ideaStatus === "idea";
+    if (movesIdea) onMovedToFeedback(true);
+    void save(
       () => addReviewPointAction({ ideaId, body: submitted }),
-      // Keep whatever was typed while the save was in flight.
       () => {
-        if (bodyRef.current === submitted) changeBody("");
+        applyLocal((data) => ({ ...data, points: data.points.filter((point) => point.id !== tempId) }));
+        if (movesIdea) onMovedToFeedback(false);
+        // Give the text back, unless something new has been typed since.
+        if (!bodyRef.current) changeBody(submitted);
       },
+    );
+  }
+
+  function toggleResolved(point: PanelReviewPoint, checked: boolean) {
+    const restore = (data: IdeaPanelData) => ({
+      ...data,
+      points: data.points.map((item) => (item.id === point.id ? point : item)),
+    });
+    applyLocal((data) => ({
+      ...data,
+      points: data.points.map((item) =>
+        item.id === point.id
+          ? { ...item, isResolved: checked, resolvedAt: checked ? new Date().toISOString() : null }
+          : item,
+      ),
+    }));
+    void save(() => setReviewPointResolvedAction(point.id, checked), () => applyLocal(restore));
+  }
+
+  function removePoint(point: PanelReviewPoint) {
+    const index = points.findIndex((item) => item.id === point.id);
+    applyLocal((data) => ({ ...data, points: data.points.filter((item) => item.id !== point.id) }));
+    void save(
+      () => deleteReviewPointAction(point.id),
+      () =>
+        applyLocal((data) => {
+          const next = [...data.points];
+          next.splice(Math.max(0, index), 0, point);
+          return { ...data, points: next };
+        }),
+    );
+  }
+
+  function toggleReviewed() {
+    const marking = reviewedAt === null || changedSinceReview;
+    const before = { reviewedAt, reviewerName };
+    applyLocal((data) => ({
+      ...data,
+      history: marking
+        ? { ...data.history, reviewedAt: new Date().toISOString(), reviewerName: currentUserName }
+        : { ...data.history, reviewedAt: null, reviewerName: null },
+    }));
+    void save(
+      () => setIdeaReviewedAction(ideaId, marking),
+      () => applyLocal((data) => ({ ...data, history: { ...data.history, ...before } })),
     );
   }
 
   function renderPoint(point: PanelReviewPoint) {
     const canDelete = isAdmin || point.authorId === currentUserId;
+    // A point that is still being saved has no real id yet, so it can't be changed until it has one.
+    const unsaved = point.id.startsWith("temp-");
     return (
-      <li key={point.id} className="flex items-start gap-2 py-2">
+      <li key={point.id} className={cn("flex items-start gap-2 py-2", unsaved && "opacity-70")}>
         <input
           type="checkbox"
           className="mt-1 h-4 w-4 shrink-0 accent-primary"
           checked={point.isResolved}
-          disabled={pending}
+          disabled={unsaved}
           aria-label={point.isResolved ? "Mark as still to change" : "Mark as done"}
-          onChange={(event) => run(() => setReviewPointResolvedAction(point.id, event.target.checked))}
+          onChange={(event) => toggleResolved(point, event.target.checked)}
         />
         <div className="min-w-0 flex-1">
           <p className={cn("whitespace-pre-wrap break-words text-sm", point.isResolved && "text-muted-foreground line-through")}>
@@ -137,8 +221,8 @@ export function ReviewPoints({
           <button
             type="button"
             aria-label="Delete this point"
-            disabled={pending}
-            onClick={() => run(() => deleteReviewPointAction(point.id))}
+            disabled={unsaved}
+            onClick={() => removePoint(point)}
             className="p-1 text-muted-foreground transition-colors hover:text-destructive"
           >
             <Trash2 className="h-4 w-4" />
@@ -177,8 +261,7 @@ export function ReviewPoints({
           type="button"
           size="sm"
           variant={reviewedAt && !changedSinceReview ? "ghost" : "default"}
-          disabled={pending}
-          onClick={() => run(() => setIdeaReviewedAction(ideaId, reviewedAt === null || changedSinceReview))}
+          onClick={toggleReviewed}
         >
           {reviewedAt === null ? "Mark as reviewed" : changedSinceReview ? "Review again" : "Undo review"}
         </Button>
@@ -209,12 +292,12 @@ export function ReviewPoints({
                 submit();
               }
             }}
-            rows={2}
+            rows={3}
             className="min-h-[3.5rem] resize-y"
             placeholder="Add a review point…"
             aria-label="New review point"
           />
-          <Button type="submit" size="sm" disabled={pending || tooShort || tooLong}>
+          <Button type="submit" size="sm" disabled={tooShort || tooLong}>
             Add
           </Button>
         </div>

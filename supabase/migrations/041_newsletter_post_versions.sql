@@ -20,7 +20,7 @@ create table public.newsletter_post_versions (
   cover_focus_x smallint not null default 50,
   cover_focus_y smallint not null default 50,
   cover_zoom numeric(3, 2) not null default 1,
-  cover_fade text,
+  cover_tone smallint,
   -- Who wrote this content, and who caused the copy to be kept.
   edited_by uuid references public.profiles(id),
   created_by uuid not null references public.profiles(id),

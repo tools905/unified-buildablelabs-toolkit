@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getWorkspaceByName } from "@/lib/services/workspace-service";
-import { listPublishedPosts, getAuthorsForPosts } from "@/lib/services/newsletter-service";
+import { getAuthorsForPosts, getPublicWorkspace, listPublishedPosts } from "@/lib/services/newsletter-service";
 import { coverImagePayload } from "@/lib/utils/newsletter-cover";
+import { PUBLIC_CORS_HEADERS, PUBLIC_FEED_CACHE_CONTROL, publicFeedHeaders } from "@/lib/utils/public-cache";
 
 // Public, unauthenticated endpoint — the agency marketing site fetches this
 // directly (same-origin in production via a Vercel rewrite, cross-origin in
 // local dev), so it's served through the admin client, bypassing RLS.
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-};
 
 function wordsPerMinuteReadTime(body: string) {
   const words = body.trim().split(/\s+/).filter(Boolean).length;
@@ -18,14 +14,15 @@ function wordsPerMinuteReadTime(body: string) {
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  return new NextResponse(null, { status: 204, headers: PUBLIC_CORS_HEADERS });
 }
 
 export async function GET(request: Request) {
   const supabase = createAdminClient();
-  const workspace = await getWorkspaceByName(supabase, "BuildableLabs");
+  const workspace = await getPublicWorkspace(supabase);
   if (!workspace) {
-    return NextResponse.json({ posts: [], totalPublished: 0 }, { headers: CORS_HEADERS });
+    // Not cached: if the workspace turns up a moment later the feed should recover at once.
+    return NextResponse.json({ posts: [], totalPublished: 0 }, { headers: PUBLIC_CORS_HEADERS });
   }
 
   const url = new URL(request.url);
@@ -48,7 +45,7 @@ export async function GET(request: Request) {
       cover_focus_x: number | null;
       cover_focus_y: number | null;
       cover_zoom: number | null;
-      cover_fade: "lighter" | "darker" | null;
+      cover_tone: number | null;
       body: string;
       slug: string | null;
       author_ids: string[];
@@ -63,7 +60,7 @@ export async function GET(request: Request) {
         focusX: post.cover_focus_x ?? 50,
         focusY: post.cover_focus_y ?? 50,
         zoom: Number(post.cover_zoom ?? 1),
-        fade: post.cover_fade,
+        tone: post.cover_tone,
       }),
       readMinutes: wordsPerMinuteReadTime(post.body),
       authors: post.author_ids
@@ -72,5 +69,5 @@ export async function GET(request: Request) {
     }),
   );
 
-  return NextResponse.json({ posts: payload, totalPublished }, { headers: CORS_HEADERS });
+  return NextResponse.json({ posts: payload, totalPublished }, { headers: publicFeedHeaders(PUBLIC_FEED_CACHE_CONTROL) });
 }

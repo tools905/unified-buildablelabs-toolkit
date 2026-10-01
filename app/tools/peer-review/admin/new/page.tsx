@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +52,7 @@ export default async function NewProjectPage({
   }
 
   return (
-    <AppShell>
+    <>
       <Card>
         <CardHeader>
           <CardTitle>New project</CardTitle>
@@ -134,6 +133,6 @@ export default async function NewProjectPage({
           </form>
         </CardContent>
       </Card>
-    </AppShell>
+    </>
   );
 }

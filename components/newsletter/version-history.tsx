@@ -130,11 +130,11 @@ function CoverChange({ before, after }: { before: NewsletterContent; after: News
     (before.cover_focus_x !== after.cover_focus_x ||
       before.cover_focus_y !== after.cover_focus_y ||
       before.cover_zoom !== after.cover_zoom ||
-      before.cover_fade !== after.cover_fade);
+      before.cover_tone !== after.cover_tone);
   if (!replaced && !reframed) return null;
 
   const summary = reframed
-    ? "Framing or fade adjusted"
+    ? "Framing or tone adjusted"
     : !before.cover_image_url
       ? "Preview image added"
       : !after.cover_image_url
@@ -192,7 +192,7 @@ function Changes({
     before.cover_focus_x !== after.cover_focus_x ||
     before.cover_focus_y !== after.cover_focus_y ||
     before.cover_zoom !== after.cover_zoom ||
-    before.cover_fade !== after.cover_fade;
+    before.cover_tone !== after.cover_tone;
 
   if (!changed) return <p className="text-sm text-muted-foreground">No differences.</p>;
 

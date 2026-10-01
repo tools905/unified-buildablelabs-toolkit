@@ -3,8 +3,11 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { coverImageStyle, coverTreatment, type CoverAdjust } from "@/lib/utils/newsletter-cover";
+import { coverImageStyle, coverScrimGradient, coverTreatment, type CoverAdjust } from "@/lib/utils/newsletter-cover";
 import { isImageFile } from "@/components/newsletter/newsletter-images";
+
+// A soft dark halo behind light text, so it holds up even over a busy part of the picture.
+const CARD_TEXT_SHADOW = "0 1px 2px rgba(10,11,14,.7), 0 2px 18px rgba(10,11,14,.75)";
 
 // The card exactly as the website draws it: image behind the text, with a dark fade
 // whose strength follows how bright the image is, so the text stays readable. The
@@ -15,6 +18,8 @@ export function CoverCardPreview({
   adjust,
   tag,
   title,
+  deck,
+  byline,
   aspect = "wide",
 }: {
   url: string;
@@ -22,10 +27,13 @@ export function CoverCardPreview({
   adjust: CoverAdjust;
   tag: string;
   title: string;
+  // The summary and byline lines of the real card, so their readability can be judged here too.
+  deck?: string;
+  byline?: string;
   // "card" is the story card on the Times page, "banner" the wide picture on an article.
   aspect?: "wide" | "card" | "banner";
 }) {
-  const { overlayOpacity, brightnessFactor } = coverTreatment(brightness, adjust.fade);
+  const { overlayOpacity, brightnessFactor } = coverTreatment(brightness, adjust.tone);
   const showText = Boolean(tag || title) || aspect !== "banner";
   return (
     <div
@@ -47,7 +55,7 @@ export function CoverCardPreview({
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(to top, rgba(10,11,14,${overlayOpacity}) 0%, rgba(10,11,14,${(overlayOpacity * 0.6).toFixed(2)}) 55%, rgba(10,11,14,${(overlayOpacity * 0.3).toFixed(2)}) 100%)`,
+            background: coverScrimGradient(overlayOpacity),
           }}
         />
       )}
@@ -56,8 +64,21 @@ export function CoverCardPreview({
           <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.13em]" style={{ color: "#A9BAFF" }}>
             ■ {tag || "Dispatch"}
           </span>
-          <span className="font-serif text-[26px] leading-tight" style={{ color: "#F5F6F8" }}>
+          <span className="font-serif text-[26px] leading-tight" style={{ color: "#F5F6F8", textShadow: CARD_TEXT_SHADOW }}>
             {title || "Headline"}
+          </span>
+          {deck ? (
+            <span className="line-clamp-3 text-[13px] font-medium leading-relaxed" style={{ color: "#F1F3F8", textShadow: CARD_TEXT_SHADOW }}>
+              {deck}
+            </span>
+          ) : null}
+          {byline ? (
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em]" style={{ color: "#D3D8E4", textShadow: CARD_TEXT_SHADOW }}>
+              {byline}
+            </span>
+          ) : null}
+          <span className="text-xs font-semibold" style={{ color: "#FFFFFF", textShadow: CARD_TEXT_SHADOW }}>
+            Read the issue →
           </span>
         </div>
       ) : null}
@@ -71,6 +92,8 @@ export function CoverImageField({
   adjust,
   tag,
   title,
+  deck,
+  byline,
   uploading,
   error,
   onFile,
@@ -82,6 +105,8 @@ export function CoverImageField({
   adjust: CoverAdjust;
   tag: string;
   title: string;
+  deck?: string;
+  byline?: string;
   uploading: boolean;
   error: string | null;
   onFile: (file: File) => void;
@@ -133,7 +158,7 @@ export function CoverImageField({
         style={{ outline: dragging ? "2px dashed #0B3FDE" : "none", outlineOffset: 4 }}
       >
         {url ? (
-          <CoverCardPreview url={url} brightness={brightness} adjust={adjust} tag={tag} title={title} />
+          <CoverCardPreview url={url} brightness={brightness} adjust={adjust} tag={tag} title={title} deck={deck} byline={byline} />
         ) : (
           <button
             type="button"

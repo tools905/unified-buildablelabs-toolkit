@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
 import { acceptInvite } from "@/lib/services/invite-service";
@@ -29,7 +28,7 @@ export default async function OnboardingPage({
   }
 
   return (
-    <AppShell>
+    <>
       <Card className="max-w-xl">
         <CardHeader>
           <CardTitle>Workspace access required</CardTitle>
@@ -43,6 +42,6 @@ export default async function OnboardingPage({
           </p>
         </CardContent>
       </Card>
-    </AppShell>
+    </>
   );
 }

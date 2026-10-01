@@ -1,6 +1,5 @@
 import React from "react";
 import { redirect } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/require-user";
@@ -81,7 +80,7 @@ export default async function ReportPage({
   }
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">{report.round.title} report</h1>
         <p className="text-muted-foreground">
@@ -167,7 +166,7 @@ export default async function ReportPage({
           </Card>
         ))}
       </div>
-    </AppShell>
+    </>
   );
 }
 

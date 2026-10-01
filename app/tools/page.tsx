@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ export default async function ToolsPage() {
   const tools = await listToolkitTools();
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         eyebrow="Catalog"
         title="Tools"
@@ -40,6 +39,6 @@ export default async function ToolsPage() {
           </Card>
         ))}
       </div>
-    </AppShell>
+    </>
   );
 }

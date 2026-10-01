@@ -1,5 +1,4 @@
 import { formatDistanceToNow } from "date-fns";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,7 @@ export default async function TicketReviewsPage() {
   const queue = await getReviewQueue(supabase, workspace.id, user.id);
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold sm:text-3xl">Pending Reviews</h1>
         <p className="text-muted-foreground">Progress claims assigned to you for verification.</p>
@@ -90,6 +89,6 @@ export default async function TicketReviewsPage() {
           )}
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AppShell } from "@/components/dashboard/app-shell";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +40,7 @@ export default async function AdminPage() {
     ]);
 
   return (
-    <AppShell>
+    <>
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Admin Reports</h1>
         <p className="text-muted-foreground">Toolkit-wide status for the internal BuildableLabs workspace.</p>
@@ -73,6 +72,6 @@ export default async function AdminPage() {
           <CardDescription>{auditLogs ?? 0} logged workspace actions.</CardDescription>
         </CardHeader>
       </Card>
-    </AppShell>
+    </>
   );
 }

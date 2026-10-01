@@ -10,7 +10,7 @@ export const NEWSLETTER_CONTENT_FIELDS = [
   "cover_focus_x",
   "cover_focus_y",
   "cover_zoom",
-  "cover_fade",
+  "cover_tone",
 ] as const;
 
 export type NewsletterContent = {
@@ -24,7 +24,7 @@ export type NewsletterContent = {
   cover_focus_x: number;
   cover_focus_y: number;
   cover_zoom: number;
-  cover_fade: "lighter" | "darker" | null;
+  cover_tone: number | null;
 };
 
 export type NewsletterVersionKind = "session" | "published";
@@ -45,7 +45,7 @@ export function pickNewsletterContent(source: Record<string, unknown>): Newslett
     cover_focus_y: Number(source.cover_focus_y ?? 50),
     // Postgres numeric comes back as a string.
     cover_zoom: Number(source.cover_zoom ?? 1),
-    cover_fade: (source.cover_fade as "lighter" | "darker" | null) ?? null,
+    cover_tone: source.cover_tone === null || source.cover_tone === undefined ? null : Number(source.cover_tone),
   };
 }
 

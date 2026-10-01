@@ -24,7 +24,7 @@ export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" 
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";
 export type ContentPlatform = "instagram" | "linkedin" | "x" | "youtube" | "facebook" | "blog" | "newsletter";
-export type ContentIdeaStatus = "idea" | "approved" | "in_progress" | "posted";
+export type ContentIdeaStatus = "idea" | "feedback" | "approved" | "in_progress" | "posted";
 export type ContentAttachmentKind = "image" | "pdf" | "link";
 
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
@@ -539,6 +539,7 @@ export type Database = {
           id: string;
           workspace_id: string;
           platform: ContentPlatform;
+          platforms: ContentPlatform[];
           title: string;
           description: string | null;
           status: ContentIdeaStatus;
@@ -556,6 +557,7 @@ export type Database = {
           id?: string;
           workspace_id: string;
           platform: ContentPlatform;
+          platforms?: ContentPlatform[];
           title: string;
           description?: string | null;
           status?: ContentIdeaStatus;

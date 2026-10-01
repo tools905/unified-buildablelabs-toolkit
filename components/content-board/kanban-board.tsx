@@ -10,6 +10,7 @@ import {
   CONTENT_COLUMNS,
   PLATFORM_META,
   PLATFORM_OPTIONS,
+  ideaPlatforms,
   type ContentIdeaWithRelations,
   type ContentMemberOption,
 } from "@/components/content-board/types";
@@ -21,15 +22,18 @@ export function KanbanBoard({
   initialIdeas,
   members,
   currentUserId,
+  isAdmin,
 }: {
   initialIdeas: ContentIdeaWithRelations[];
   members: ContentMemberOption[];
   currentUserId: string;
+  isAdmin: boolean;
 }) {
   const [optimisticStatus, setOptimisticStatus] = useState<Record<string, ContentIdeaStatus>>({});
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("");
   const [proposerFilter, setProposerFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<ContentIdeaStatus | null>(null);
   const [panelIdeaId, setPanelIdeaId] = useState<string | null>(null);
@@ -48,9 +52,13 @@ export function KanbanBoard({
 
   const filtered = useMemo(() => {
     return ideas.filter((idea) => {
-      if (platformFilter && idea.platform !== platformFilter) return false;
+      if (platformFilter && !ideaPlatforms(idea).includes(platformFilter)) return false;
       if (proposerFilter === "me" && idea.created_by !== currentUserId) return false;
       if (proposerFilter && proposerFilter !== "me" && idea.created_by !== proposerFilter) return false;
+      const assignedIds = (idea.assignees ?? []).map((assignee) => assignee.user_id);
+      if (assigneeFilter === "me" && !assignedIds.includes(currentUserId)) return false;
+      if (assigneeFilter === "none" && assignedIds.length > 0) return false;
+      if (assigneeFilter && assigneeFilter !== "me" && assigneeFilter !== "none" && !assignedIds.includes(assigneeFilter)) return false;
       if (search) {
         const query = search.toLowerCase();
         const matches =
@@ -59,7 +67,7 @@ export function KanbanBoard({
       }
       return true;
     });
-  }, [ideas, search, platformFilter, proposerFilter, currentUserId]);
+  }, [ideas, search, platformFilter, proposerFilter, assigneeFilter, currentUserId]);
 
   function moveIdea(ideaId: string, status: ContentIdeaStatus) {
     setOptimisticStatus((prev) => ({ ...prev, [ideaId]: status }));
@@ -108,11 +116,27 @@ export function KanbanBoard({
               </option>
             ))}
           </select>
+          <select
+            value={assigneeFilter}
+            onChange={(event) => setAssigneeFilter(event.target.value)}
+            aria-label="Filter by who it is assigned to"
+            className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+          >
+            <option value="">Anyone assigned</option>
+            <option value="me">Assigned to me</option>
+            <option value="none">Unassigned</option>
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>
+                Assigned to {member.label}
+              </option>
+            ))}
+          </select>
         </div>
-        <CreateIdeaDialog />
+        <CreateIdeaDialog members={members} isAdmin={isAdmin} currentUserId={currentUserId} />
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-4">
+      {/* Stacked on small screens; on large ones every column keeps a readable minimum width, and the board scrolls sideways if they do not all fit. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-flow-col lg:grid-cols-none lg:auto-cols-[minmax(12rem,1fr)] lg:overflow-x-auto lg:pb-2">
         {CONTENT_COLUMNS.map((column) => {
           const columnIdeas = filtered.filter((idea) => idea.status === column.status);
           const isDragOver = dragOverStatus === column.status;
@@ -141,6 +165,7 @@ export function KanbanBoard({
                   <IdeaCard
                     key={idea.id}
                     idea={idea}
+                    currentUserId={currentUserId}
                     isDragging={draggingId === idea.id}
                     onOpen={() => setPanelIdeaId(idea.id)}
                     onDragStart={(event) => {
@@ -171,9 +196,26 @@ export function KanbanBoard({
           keyboardActive={!editIdea}
           onClose={() => setPanelIdeaId(null)}
           onEdit={() => setEditIdeaId(panelIdea.id)}
+          onOptimisticStatus={(ideaId, status) =>
+            // Shows the card in its new column at once; the server's answer confirms or corrects it.
+            setOptimisticStatus((previous) => {
+              const next = { ...previous };
+              if (status) next[ideaId] = status;
+              else delete next[ideaId];
+              return next;
+            })
+          }
         />
       ) : null}
-      {editIdea ? <IdeaDetail idea={editIdea} onClose={() => setEditIdeaId(null)} /> : null}
+      {editIdea ? (
+        <IdeaDetail
+          idea={editIdea}
+          members={members}
+          isAdmin={isAdmin}
+          currentUserId={currentUserId}
+          onClose={() => setEditIdeaId(null)}
+        />
+      ) : null}
     </div>
   );
 }
