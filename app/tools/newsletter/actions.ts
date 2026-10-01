@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/require-user";
-import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
 import * as newsletterService from "@/lib/services/newsletter-service";
@@ -43,10 +42,20 @@ export async function updatePostAction(
     coverTone: number | null;
   },
 ) {
-  const { supabase } = await requireNewsletterContext();
-  const post = await newsletterService.updatePost(supabase, postId, input);
+  const { supabase, user } = await requireNewsletterContext();
+  const post = await newsletterService.updatePost(supabase, postId, input, user.id);
   refreshNewsletter(postId);
   return post;
+}
+
+export async function removeStaleImagesAction(postId: string, urls: string[]) {
+  const { supabase } = await requireNewsletterContext();
+  await newsletterService.removeStaleImages(supabase, postId, urls);
+}
+
+export async function listVersionsAction(postId: string) {
+  const { supabase } = await requireNewsletterContext();
+  return newsletterService.listVersions(supabase, postId);
 }
 
 export async function publishPostAction(formData: FormData) {
@@ -58,10 +67,11 @@ export async function publishPostAction(formData: FormData) {
 }
 
 export async function deletePostAction(formData: FormData) {
-  const { supabase, workspace, user } = await requireNewsletterContext();
-  const admin = await isWorkspaceAdmin(workspace.id, user.id, supabase);
-  if (!admin) throw new Error("Only admins can delete posts.");
+  const { supabase, user } = await requireNewsletterContext();
   const postId = String(formData.get("postId"));
+  // Drafts and published posts alike, but only by the person who created the post.
+  const post = await newsletterService.getPost(supabase, postId);
+  if (post.created_by !== user.id) throw new Error("Only the person who created this post can delete it.");
   await newsletterService.deletePost(supabase, postId);
   refreshNewsletter();
   redirect("/tools/newsletter");

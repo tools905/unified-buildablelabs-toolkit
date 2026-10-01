@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import {
   ChevronLeft,
+  History,
   Image as ImageIcon,
   Link as LinkIcon,
   List,
@@ -12,8 +13,8 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SubmitButton } from "@/components/dashboard/submit-button";
 import { cn } from "@/lib/utils/cn";
+import { BASE_PATH } from "@/lib/utils/app-url";
 import { renderNewsletterMarkdown } from "@/lib/utils/markdown";
 import { CoverAdjustDialog } from "@/components/newsletter/cover-adjust-dialog";
 import { CoverCardPreview, CoverImageField } from "@/components/newsletter/cover-image-field";
@@ -25,11 +26,49 @@ import {
   STORY_IMAGE_SIZES,
   type StoryImage,
 } from "@/lib/utils/newsletter-story-image";
-import { isImageFile, removeNewsletterImage, uploadNewsletterImage } from "@/components/newsletter/newsletter-images";
-import { deletePostAction, publishPostAction, updatePostAction } from "@/app/tools/newsletter/actions";
+import { isImageFile, uploadNewsletterImage } from "@/components/newsletter/newsletter-images";
+import { VersionHistory } from "@/components/newsletter/version-history";
+import { DeletePostDialog } from "@/components/newsletter/delete-post-dialog";
+import { pickNewsletterContent, sameNewsletterContent } from "@/lib/utils/newsletter-versions";
+import {
+  publishPostAction,
+  removeStaleImagesAction,
+  updatePostAction,
+} from "@/app/tools/newsletter/actions";
 import type { NewsletterMemberOption, NewsletterPost } from "@/components/newsletter/types";
 
 type SaveState = "saved" | "saving" | "unsaved";
+
+type EditorValues = {
+  title: string;
+  deck: string;
+  tag: string;
+  body: string;
+  authorIds: string[];
+  coverImageUrl: string | null;
+  coverBrightness: number | null;
+  coverFocusX: number;
+  coverFocusY: number;
+  coverZoom: number;
+  coverTone: number | null;
+};
+
+// The editor's fields in the shape versions are stored and compared in.
+function editorContent(values: EditorValues) {
+  return pickNewsletterContent({
+    title: values.title,
+    deck: values.deck,
+    tag: values.tag,
+    body: values.body,
+    author_ids: values.authorIds,
+    cover_image_url: values.coverImageUrl,
+    cover_brightness: values.coverBrightness,
+    cover_focus_x: values.coverFocusX,
+    cover_focus_y: values.coverFocusY,
+    cover_zoom: values.coverZoom,
+    cover_tone: values.coverTone,
+  });
+}
 
 function wrapSelection(textarea: HTMLTextAreaElement, before: string, after = before) {
   const { selectionStart, selectionEnd, value } = textarea;
@@ -82,6 +121,10 @@ export function NewsletterEditor({
   const [imageError, setImageError] = useState<string | null>(null);
   const [coverError, setCoverError] = useState<string | null>(null);
   const [draggingBody, setDraggingBody] = useState(false);
+  const [showingHistory, setShowingHistory] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Set once the post is being deleted, so closing the editor doesn't try to save it.
+  const deleting = useRef(false);
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const bodyFileInput = useRef<HTMLInputElement>(null);
@@ -89,7 +132,7 @@ export function NewsletterEditor({
   // Files that were replaced or removed. They are deleted once the post has been saved
   // without them, so a published post never points at a file that is already gone.
   const staleImages = useRef<string[]>([]);
-  const latest = useRef({
+  const latest = useRef<EditorValues>({
     title,
     deck,
     tag,
@@ -116,6 +159,10 @@ export function NewsletterEditor({
     coverTone: coverAdjust.tone,
   };
 
+  // The post as this visit found it, or as it was when a version was last kept on leaving.
+  // Leaving keeps a new version only when the post differs from this.
+  const leaveBaseline = useRef(pickNewsletterContent(post));
+
   const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members]);
   const availableMembers = members.filter((m) => !authorIds.includes(m.id));
   // The byline line of the story card, as the website writes it: authors and read time.
@@ -127,7 +174,8 @@ export function NewsletterEditor({
     await updatePostAction(post.id, latest.current);
     const stale = staleImages.current.filter((url) => url !== latest.current.coverImageUrl);
     staleImages.current = [];
-    stale.forEach((url) => void removeNewsletterImage(url));
+    // The server keeps any file an earlier version still shows.
+    if (stale.length) void removeStaleImagesAction(post.id, stale);
     setSaveState("saved");
   }, [post.id]);
 
@@ -142,6 +190,32 @@ export function NewsletterEditor({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, deck, tag, body, authorIds, coverUrl, coverBrightness, coverAdjust]);
+
+  // Leaving the editor (another page, closing the tab, reloading) saves the last edits and keeps
+  // a version, but only if something changed during this visit.
+  const keepVersionOnLeave = useCallback(() => {
+    if (deleting.current) return;
+    const values = latest.current;
+    const content = editorContent(values);
+    if (sameNewsletterContent(content, leaveBaseline.current)) return;
+    leaveBaseline.current = content;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    // A plain fetch does not add the app's base path the way links and server actions do.
+    void fetch(`${BASE_PATH}/tools/newsletter/write/${post.id}/leave`, {
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    }).catch(() => {});
+  }, [post.id]);
+
+  useEffect(() => {
+    window.addEventListener("pagehide", keepVersionOnLeave);
+    return () => {
+      window.removeEventListener("pagehide", keepVersionOnLeave);
+      keepVersionOnLeave();
+    };
+  }, [keepVersionOnLeave]);
 
   // A file dropped outside a drop area would make the browser leave the editor and open the file.
   useEffect(() => {
@@ -313,14 +387,20 @@ export function NewsletterEditor({
           </div>
         </div>
         <div className="flex gap-2.5">
-          {canDelete && post.status === "draft" ? (
-            <form action={deletePostAction}>
-              <input type="hidden" name="postId" value={post.id} />
-              <SubmitButton variant="ghost" className="text-destructive hover:bg-destructive/10">
-                Delete
-              </SubmitButton>
-            </form>
+          {canDelete ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-destructive hover:bg-destructive/10"
+              onClick={() => setConfirmingDelete(true)}
+            >
+              Delete
+            </Button>
           ) : null}
+          <Button type="button" variant="ghost" onClick={() => setShowingHistory(true)}>
+            <History className="mr-1.5 h-3.5 w-3.5" />
+            History
+          </Button>
           <Button type="button" variant="outline" onClick={() => setPreviewing((value) => !value)}>
             {previewing ? "Edit" : "Preview"}
           </Button>
@@ -480,6 +560,41 @@ export function NewsletterEditor({
           </div>
           {activeImage.image.size === "full" ? <span className="text-muted-foreground">Choose Small or Medium to align it.</span> : null}
         </div>
+      ) : null}
+
+      {confirmingDelete ? (
+        <DeletePostDialog
+          postId={post.id}
+          headline={title}
+          published={post.status === "published"}
+          onCancel={() => setConfirmingDelete(false)}
+          onDelete={() => {
+            deleting.current = true;
+            if (saveTimer.current) clearTimeout(saveTimer.current);
+          }}
+        />
+      ) : null}
+
+      {showingHistory ? (
+        <VersionHistory
+          postId={post.id}
+          current={editorContent({
+            title,
+            deck,
+            tag,
+            body,
+            authorIds,
+            coverImageUrl: coverUrl,
+            coverBrightness,
+            coverFocusX: Math.round(coverAdjust.focusX),
+            coverFocusY: Math.round(coverAdjust.focusY),
+            coverZoom: Math.round(coverAdjust.zoom * 100) / 100,
+            coverTone: coverAdjust.tone,
+          })}
+          memberName={(id) => membersById[id]?.label ?? "Former member"}
+          beforeAction={flushSave}
+          onClose={() => setShowingHistory(false)}
+        />
       ) : null}
 
       {adjustingCover && coverUrl ? (

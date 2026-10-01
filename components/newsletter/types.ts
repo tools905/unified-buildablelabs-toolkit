@@ -27,6 +27,28 @@ export type NewsletterPost = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  updated_by: string | null;
+};
+
+export type NewsletterPostVersion = {
+  id: string;
+  post_id: string;
+  workspace_id: string;
+  kind: "session" | "published";
+  title: string;
+  deck: string | null;
+  tag: string | null;
+  body: string;
+  author_ids: string[];
+  cover_image_url: string | null;
+  cover_brightness: number | null;
+  cover_focus_x: number;
+  cover_focus_y: number;
+  cover_zoom: number | string;
+  cover_tone: number | null;
+  edited_by: string | null;
+  created_by: string;
+  created_at: string;
 };
 
 export type NewsletterMemberOption = {
