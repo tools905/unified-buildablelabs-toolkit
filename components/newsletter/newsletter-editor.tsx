@@ -4,18 +4,28 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import {
   ChevronLeft,
+  Code,
+  Heading2,
+  Heading3,
   History,
   Image as ImageIcon,
   Link as LinkIcon,
   List,
   ListOrdered,
   Quote,
+  SquareCode,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { BASE_PATH } from "@/lib/utils/app-url";
 import { renderNewsletterMarkdown } from "@/lib/utils/markdown";
+import { CapsuleFields, checkOriginalUrl } from "@/components/newsletter/capsule-fields";
+import { PlatformPreview } from "@/components/capsule/platform-preview";
+import { PublishMenu } from "@/components/capsule/publish-menu";
+import { browserStorage, createFakeCapsuleApi } from "@/lib/capsule/fake-api";
+import { PreviewSwitch, type PreviewTarget } from "@/components/capsule/preview-switch";
+import { previewAtom } from "@/lib/capsule/preview";
 import { CoverAdjustDialog } from "@/components/newsletter/cover-adjust-dialog";
 import { CoverCardPreview, CoverImageField } from "@/components/newsletter/cover-image-field";
 import { DEFAULT_COVER_ADJUST, type CoverAdjust } from "@/lib/utils/newsletter-cover";
@@ -44,6 +54,9 @@ type EditorValues = {
   deck: string;
   tag: string;
   body: string;
+  tags: string[];
+  // Left out while the typed link is invalid, so it can never stop the rest of the post saving.
+  originalUrl?: string;
   authorIds: string[];
   coverImageUrl: string | null;
   coverBrightness: number | null;
@@ -88,6 +101,38 @@ function prefixLines(textarea: HTMLTextAreaElement, makePrefix: (lineIndex: numb
   return { next, caretStart: lineStart, caretEnd: lineStart + lines.join("\n").length };
 }
 
+// Makes the lines under the cursor a heading of the given level; pressing it again takes it off.
+function toggleHeading(textarea: HTMLTextAreaElement, level: 2 | 3) {
+  const { selectionStart, selectionEnd, value } = textarea;
+  const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+  const lineEnd = value.indexOf("\n", selectionEnd);
+  const blockEnd = lineEnd === -1 ? value.length : lineEnd;
+  const mark = "#".repeat(level);
+  const lines = value
+    .slice(lineStart, blockEnd)
+    .split("\n")
+    .map((line) => {
+      const plain = line.replace(/^#{1,6}\s+/, "");
+      return line.startsWith(`${mark} `) ? plain : `${mark} ${plain}`;
+    });
+  const next = `${value.slice(0, lineStart)}${lines.join("\n")}${value.slice(blockEnd)}`;
+  return { next, caretStart: lineStart, caretEnd: lineStart + lines.join("\n").length };
+}
+
+// Wraps the selection in a ``` block on its own lines, with a blank line either side.
+function codeBlock(textarea: HTMLTextAreaElement) {
+  const { selectionStart, selectionEnd, value } = textarea;
+  const selected = value.slice(selectionStart, selectionEnd);
+  const before = value.slice(0, selectionStart);
+  const after = value.slice(selectionEnd);
+  const lead = before && !before.endsWith("\n\n") ? (before.endsWith("\n") ? "\n" : "\n\n") : "";
+  const trail = !after ? "\n" : after.startsWith("\n\n") ? "" : after.startsWith("\n") ? "\n" : "\n\n";
+  const opening = `${lead}\`\`\`\n`;
+  const next = `${before}${opening}${selected}\n\`\`\`${trail}${after}`;
+  const caret = before.length + opening.length;
+  return { next, caretStart: caret, caretEnd: caret + selected.length };
+}
+
 export function NewsletterEditor({
   post,
   members,
@@ -101,11 +146,14 @@ export function NewsletterEditor({
   const [deck, setDeck] = useState(post.deck ?? "");
   const [tag, setTag] = useState(post.tag ?? "");
   const [body, setBody] = useState(post.body);
+  const [tags, setTags] = useState<string[]>(post.tags ?? []);
+  const [originalUrl, setOriginalUrl] = useState(post.original_url ?? "");
   const [authorIds, setAuthorIds] = useState<string[]>(post.author_ids);
   const [addingAuthor, setAddingAuthor] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [isPublishing, startPublishing] = useTransition();
   const [previewing, setPreviewing] = useState(false);
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget>("website");
   const [coverUrl, setCoverUrl] = useState<string | null>(post.cover_image_url);
   const [coverBrightness, setCoverBrightness] = useState<number | null>(post.cover_brightness);
   const [coverAdjust, setCoverAdjust] = useState<CoverAdjust>({
@@ -137,6 +185,8 @@ export function NewsletterEditor({
     deck,
     tag,
     body,
+    tags,
+    originalUrl: undefined as string | undefined,
     authorIds,
     coverImageUrl: coverUrl,
     coverBrightness,
@@ -150,6 +200,9 @@ export function NewsletterEditor({
     deck,
     tag,
     body,
+    tags,
+    // A half-typed or wrong link is not sent, so it can never stop the rest of the post saving.
+    originalUrl: checkOriginalUrl(originalUrl).valid ? originalUrl : undefined,
     authorIds,
     coverImageUrl: coverUrl,
     coverBrightness,
@@ -165,6 +218,38 @@ export function NewsletterEditor({
 
   const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members]);
   const availableMembers = members.filter((m) => !authorIds.includes(m.id));
+  // The post as the capsule engine sees it (see lib/capsule/types.ts).
+  const draft = useMemo(
+    () => ({
+      id: post.id,
+      title,
+      subtitle: deck,
+      tags,
+      body,
+      canonicalUrl: checkOriginalUrl(originalUrl).valid ? originalUrl.trim() : "",
+    }),
+    [post.id, title, deck, tags, body, originalUrl],
+  );
+
+  // The Medium and Substack versions, built only while previewing. They come from the same converters
+  // that seal the post, so what is previewed here is what gets copied later.
+  const platformAtoms = useMemo(() => {
+    if (!previewing) return null;
+    return { medium: previewAtom("medium", draft), substack: previewAtom("substack", draft) };
+  }, [previewing, draft]);
+
+  // Stand-in for the server until the real seal and status endpoints are connected.
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+  const capsuleApi = useMemo(
+    // The getter only runs later, from the menu's click handlers, never while rendering.
+    // eslint-disable-next-line react-hooks/refs
+    () => createFakeCapsuleApi({ getDraft: () => draftRef.current, storage: browserStorage }),
+    [],
+  );
+
   // The byline line of the story card, as the website writes it: authors and read time.
   const cardByline = `${authorIds.map((id) => membersById[id]?.label).filter(Boolean).join(", ")}${authorIds.length ? " · " : ""}${Math.max(1, Math.round(body.trim().split(/\s+/).filter(Boolean).length / 200))} min read`;
 
@@ -404,16 +489,27 @@ export function NewsletterEditor({
           <Button type="button" variant="outline" onClick={() => setPreviewing((value) => !value)}>
             {previewing ? "Edit" : "Preview"}
           </Button>
+          <PublishMenu api={capsuleApi} draft={draft} beforeSeal={flushSave} />
           <Button type="button" onClick={handlePublish} disabled={isPublishing}>
             {post.status === "published" ? "Republish" : "Publish"}
           </Button>
         </div>
       </div>
 
+      {previewing ? (
+        <PreviewSwitch
+          value={previewTarget}
+          onChange={setPreviewTarget}
+          warningCounts={{
+            medium: platformAtoms?.medium.warnings.length ?? 0,
+            substack: platformAtoms?.substack.warnings.length ?? 0,
+          }}
+        />
+      ) : null}
       <div
         className={cn(
           "flex items-center gap-3.5 border-b border-muted px-6 py-3 sm:px-8",
-          previewing && "pointer-events-none opacity-40",
+          previewing && "hidden",
         )}
       >
         <button
@@ -439,6 +535,43 @@ export function NewsletterEditor({
           aria-label="Strikethrough"
         >
           S
+        </button>
+        <div className="h-5 w-px bg-border" />
+        <button
+          type="button"
+          onClick={() => applyToBody((t) => toggleHeading(t, 2))}
+          className="grid h-[34px] w-[34px] place-items-center text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Heading"
+          title="Heading"
+        >
+          <Heading2 className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyToBody((t) => toggleHeading(t, 3))}
+          className="grid h-[34px] w-[34px] place-items-center text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Subheading"
+          title="Subheading"
+        >
+          <Heading3 className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyToBody((t) => wrapSelection(t, "`"))}
+          className="grid h-[34px] w-[34px] place-items-center text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Inline code"
+          title="Inline code"
+        >
+          <Code className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyToBody(codeBlock)}
+          className="grid h-[34px] w-[34px] place-items-center text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Code block"
+          title="Code block"
+        >
+          <SquareCode className="h-4 w-4" />
         </button>
         <div className="h-5 w-px bg-border" />
         <button
@@ -583,6 +716,7 @@ export function NewsletterEditor({
             deck,
             tag,
             body,
+            tags,
             authorIds,
             coverImageUrl: coverUrl,
             coverBrightness,
@@ -614,6 +748,9 @@ export function NewsletterEditor({
         />
       ) : null}
 
+      {previewing && previewTarget !== "website" && platformAtoms ? (
+        <PlatformPreview atom={platformAtoms[previewTarget]} />
+      ) : (
       <div className="flex flex-1 justify-center overflow-y-auto py-9">
         <div
           className="w-full max-w-[760px] px-8"
@@ -748,6 +885,9 @@ export function NewsletterEditor({
               )
             ) : null}
           </div>
+          {!previewing ? (
+            <CapsuleFields tags={tags} onTagsChange={setTags} originalUrl={originalUrl} onOriginalUrlChange={setOriginalUrl} />
+          ) : null}
           <div className="my-6 h-px" style={{ background: "#DCD5C0" }} />
           {previewing ? (
             <div
@@ -794,6 +934,7 @@ export function NewsletterEditor({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

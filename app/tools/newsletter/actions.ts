@@ -33,6 +33,8 @@ export async function updatePostAction(
     deck: string;
     tag: string;
     body: string;
+    tags: string[];
+    originalUrl?: string;
     authorIds: string[];
     coverImageUrl: string | null;
     coverBrightness: number | null;
