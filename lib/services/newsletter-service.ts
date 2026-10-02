@@ -113,6 +113,18 @@ export async function getAuthorsForPosts(
   return data ?? [];
 }
 
+// True when a save changes the Medium/Substack details (tags, original link) of a post.
+export function changesCapsuleDetails(
+  previous: { tags?: string[] | null; original_url?: string | null },
+  patch: { tags?: string[]; original_url?: string | null },
+) {
+  const tagsChanged =
+    patch.tags !== undefined &&
+    (patch.tags.length !== (previous.tags ?? []).length || patch.tags.some((tag, i) => tag !== (previous.tags ?? [])[i]));
+  const linkChanged = patch.original_url !== undefined && (patch.original_url ?? null) !== (previous.original_url ?? null);
+  return tagsChanged || linkChanged;
+}
+
 export async function updatePost(
   supabase: SupabaseClient<any>,
   postId: string,
@@ -131,6 +143,8 @@ export async function updatePost(
     tag: input.tag || null,
     body: input.body,
     author_ids: input.authorIds,
+    ...(input.tags !== undefined ? { tags: input.tags } : {}),
+    ...(input.originalUrl !== undefined ? { original_url: input.originalUrl } : {}),
     ...(input.coverImageUrl !== undefined
       ? {
           cover_image_url: input.coverImageUrl,
@@ -153,10 +167,14 @@ export async function updatePost(
 
   const previous = await getPost(supabase, postId);
   const before = pickNewsletterContent(previous);
+  const contentSame = sameNewsletterContent(before, pickNewsletterContent({ ...previous, ...patch }));
+  // Tags and the original link aren't part of what a reader sees, so they aren't versioned, but a change
+  // to them is still a change that has to be saved.
+  const detailsChanged = changesCapsuleDetails(previous, patch);
   // Opening the editor saves once without any change; that must not count as an edit.
-  if (sameNewsletterContent(before, pickNewsletterContent({ ...previous, ...patch }))) return previous;
+  if (contentSame && !detailsChanged) return previous;
 
-  if (startsNewSession(previous, actorId) && !isBlankNewsletterContent(before)) {
+  if (!contentSame && startsNewSession(previous, actorId) && !isBlankNewsletterContent(before)) {
     await keepSessionVersion(supabase, previous, actorId);
   }
 
