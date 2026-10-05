@@ -35,6 +35,7 @@ export async function createContentIdea(
       workspace_id: workspaceId,
       title: input.title,
       description: input.description ?? null,
+      caption: input.caption?.trim() || null,
       platform: input.platforms[0],
       platforms: input.platforms,
       ...(input.scheduledFor ? { scheduled_for: input.scheduledFor } : {}),
@@ -223,6 +224,7 @@ export async function updateContentIdea(
   const update: Record<string, unknown> = {};
   if (input.title !== undefined) update.title = input.title;
   if (input.description !== undefined) update.description = input.description;
+  if (input.caption !== undefined) update.caption = input.caption?.trim() || null;
   if (input.platforms !== undefined) {
     update.platforms = input.platforms;
     update.platform = input.platforms[0];

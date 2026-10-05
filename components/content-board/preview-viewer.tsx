@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Link2 } from "lucide-react";
 import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
 import { formatWhen } from "@/components/content-board/activity";
-import { downloadAttachment } from "@/components/content-board/download-attachment";
+import { useDownloadUrl } from "@/components/content-board/use-download-url";
 import { PdfViewer } from "@/components/content-board/pdf-viewer";
 import { cn } from "@/lib/utils/cn";
 import type { PanelAttachment } from "@/components/content-board/types";
@@ -23,7 +22,7 @@ export function PreviewViewer({
   busy: boolean;
 }) {
   const current = attachments[index];
-  const [downloading, setDownloading] = useState(false);
+  const download = useDownloadUrl(current && current.kind !== "link" ? current.id : null);
 
   if (!current) {
     return (
@@ -116,19 +115,34 @@ export function PreviewViewer({
             </a>
           ) : null}
           {downloadUrl ? (
-            <button
-              type="button"
-              disabled={downloading}
-              onClick={async () => {
-                setDownloading(true);
-                await downloadAttachment(downloadUrl, current.fileName);
-                setDownloading(false);
-              }}
-              className="inline-flex h-8 items-center gap-1 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
-            >
-              <Download className="h-3 w-3" />
-              {downloading ? "Downloading…" : "Download"}
-            </button>
+            download.url ? (
+              // A plain link: the storage server answers it with a "save as" header, so the browser
+              // downloads the file itself. That works on phones and in in-app browsers, where a script
+              // saving a fetched copy often does nothing.
+              <a
+                href={download.url}
+                rel="noopener"
+                className="inline-flex h-10 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground sm:h-8 sm:px-2 sm:text-xs"
+              >
+                <Download className="h-4 w-4 sm:h-3 sm:w-3" />
+                Download
+              </a>
+            ) : download.error ? (
+              <button
+                type="button"
+                onClick={download.retry}
+                title={download.error}
+                className="inline-flex h-10 items-center gap-1.5 px-3 text-sm text-destructive sm:h-8 sm:px-2 sm:text-xs"
+              >
+                <Download className="h-4 w-4 sm:h-3 sm:w-3" />
+                Couldn&apos;t prepare it. Retry
+              </button>
+            ) : (
+              <span aria-busy="true" className="inline-flex h-10 items-center gap-1.5 px-3 text-sm text-muted-foreground opacity-60 sm:h-8 sm:px-2 sm:text-xs">
+                <Download className="h-4 w-4 sm:h-3 sm:w-3" />
+                Preparing…
+              </span>
+            )
           ) : null}
           <InlineConfirmButton
             label="Remove"

@@ -31,6 +31,8 @@ export type ContentIdeaWithRelations = {
   platforms?: ContentPlatform[];
   title: string;
   description: string | null;
+  // The post text as it would appear under the images; null until someone writes it.
+  caption: string | null;
   status: ContentIdeaStatus;
   post_url: string | null;
   scheduled_for: string | null;

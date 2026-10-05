@@ -542,6 +542,7 @@ export type Database = {
           platforms: ContentPlatform[];
           title: string;
           description: string | null;
+          caption: string | null;
           status: ContentIdeaStatus;
           post_url: string | null;
           posted_at: string | null;
@@ -560,6 +561,7 @@ export type Database = {
           platforms?: ContentPlatform[];
           title: string;
           description?: string | null;
+          caption?: string | null;
           status?: ContentIdeaStatus;
           post_url?: string | null;
           posted_at?: string | null;

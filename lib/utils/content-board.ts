@@ -48,6 +48,10 @@ export function diffAssignees(current: string[], next: string[]) {
   };
 }
 
+// The most any platform here allows in a caption (LinkedIn). Instagram's own limit is lower and is
+// checked by the post preview.
+export const MAX_CAPTION_LENGTH = 3000;
+
 // Matches the database check on content_idea_review_points.body.
 export const MIN_REVIEW_POINT_LENGTH = 2;
 export const MAX_REVIEW_POINT_LENGTH = 3000;

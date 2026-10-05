@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
+import { CaptionField } from "@/components/content-board/caption-field";
 import { AssigneePicker } from "@/components/content-board/assignee-picker";
 import { PlatformPicker } from "@/components/content-board/platform-picker";
 import { ReferenceLinksField } from "@/components/content-board/reference-links-field";
@@ -90,6 +91,7 @@ export function IdeaDetail({
                 className="mt-1"
               />
             </div>
+            <CaptionField defaultValue={idea.caption ?? ""} />
             <div>
               <Label htmlFor="scheduledFor">Post on</Label>
               <Input
