@@ -2,6 +2,19 @@ export const NEWSLETTER_BUCKET = "newsletter-images";
 export const MAX_NEWSLETTER_IMAGE_INPUT_BYTES = 15 * 1024 * 1024;
 export const NEWSLETTER_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
+// A cover uploaded with a small copy for the website's cards is stored as two files that share
+// one id: <id>-full.<ext> (the picture) and <id>-card.webp (the ~800px copy). Only the full
+// address is saved on the post; the card's follows from it. Older covers have neither suffix.
+export const NEWSLETTER_FULL_SUFFIX = "-full";
+export const NEWSLETTER_CARD_SUFFIX = "-card.webp";
+
+// The address of a cover's small card copy, or null for a cover uploaded without one.
+export function coverCardUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const match = url.match(/^(.*\/[0-9a-f-]{36})-full\.(?:webp|jpe?g|png)$/i);
+  return match ? `${match[1]}${NEWSLETTER_CARD_SUFFIX}` : null;
+}
+
 // Manual tone: how strongly the picture is darkened under the card text, in percent. Below the
 // minimum the text is no longer readable on most pictures; above the maximum the picture vanishes.
 export const MIN_TONE = 20;
@@ -52,7 +65,14 @@ export function coverScrimGradient(overlayOpacity: number) {
   return `linear-gradient(to top, ${at(1)} 0%, ${at(0.92)} 40%, ${at(0.68)} 65%, ${at(0.34)} 85%, ${at(0.12)} 100%)`;
 }
 
-export type CoverImagePayload = CoverTreatment & { url: string; focusX: number; focusY: number; zoom: number };
+export type CoverImagePayload = CoverTreatment & {
+  url: string;
+  // A smaller (~800px) copy for list cards; missing for covers uploaded before it existed.
+  cardUrl?: string;
+  focusX: number;
+  focusY: number;
+  zoom: number;
+};
 
 export function coverImagePayload(
   url: string | null | undefined,
@@ -61,8 +81,10 @@ export function coverImagePayload(
 ): CoverImagePayload | null {
   if (!url) return null;
   const { focusX, focusY, zoom, tone } = { ...DEFAULT_COVER_ADJUST, ...adjust };
+  const cardUrl = coverCardUrl(url);
   return {
     url,
+    ...(cardUrl ? { cardUrl } : {}),
     ...coverTreatment(brightness, tone),
     focusX: clamp(Math.round(focusX), 0, 100),
     focusY: clamp(Math.round(focusY), 0, 100),
@@ -95,8 +117,12 @@ export function newsletterImagePath(publicUrl: string): string | null {
 }
 
 // Files in a post's folder that neither the story text nor the preview image use any more.
+// A cover's card copy (<id>-card.webp) counts as used while its full image (<id>-full.*) is.
 export function unusedNewsletterFiles(fileNames: string[], body: string, coverUrl: string | null | undefined) {
-  return fileNames.filter((name) => !body.includes(name) && !(coverUrl ?? "").includes(name));
+  const cover = coverUrl ?? "";
+  const cardInUse = (name: string) =>
+    name.endsWith(NEWSLETTER_CARD_SUFFIX) && cover.includes(`${name.slice(0, -NEWSLETTER_CARD_SUFFIX.length)}${NEWSLETTER_FULL_SUFFIX}.`);
+  return fileNames.filter((name) => !body.includes(name) && !cover.includes(name) && !cardInUse(name));
 }
 
 // The only addresses a post may use for its cover image: files this post uploaded itself.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  coverCardUrl,
   coverImagePayload,
   coverImageStyle,
   coverScrimGradient,
@@ -137,5 +138,34 @@ describe("unusedNewsletterFiles", () => {
 
   it("flags everything when nothing references the files", () => {
     expect(unusedNewsletterFiles(["a.webp", "b.webp"], "", null)).toEqual(["a.webp", "b.webp"]);
+  });
+
+  it("keeps a cover's card copy while its full image is the cover, and flags it once it is not", () => {
+    const id = "55555555-5555-4555-8555-555555555555";
+    const files = [`${id}-full.webp`, `${id}-card.webp`, "other-card.webp"];
+    expect(unusedNewsletterFiles(files, "", `https://x/b/${id}-full.webp`)).toEqual(["other-card.webp"]);
+    expect(unusedNewsletterFiles(files, "", "https://x/b/new.webp")).toEqual(files);
+  });
+});
+
+describe("coverCardUrl", () => {
+  const id = "55555555-5555-4555-8555-555555555555";
+  const base = `${SUPABASE}/storage/v1/object/public/newsletter-images/${WS}/${POST}`;
+
+  it("derives the card copy's address from a cover stored with the -full suffix", () => {
+    expect(coverCardUrl(`${base}/${id}-full.webp`)).toBe(`${base}/${id}-card.webp`);
+    expect(coverCardUrl(`${base}/${id}-full.png`)).toBe(`${base}/${id}-card.webp`);
+  });
+
+  it("gives nothing for covers uploaded without a card copy", () => {
+    expect(coverCardUrl(url)).toBeNull();
+    expect(coverCardUrl(null)).toBeNull();
+    expect(coverCardUrl(`${base}/${id}-card.webp`)).toBeNull();
+  });
+
+  it("is exposed on the payload only when it exists", () => {
+    expect(coverImagePayload(url, 40)).not.toHaveProperty("cardUrl");
+    expect(coverImagePayload(`${base}/${id}-full.webp`, 40)).toMatchObject({ cardUrl: `${base}/${id}-card.webp` });
+    expect(isOwnNewsletterImageUrl(`${base}/${id}-full.webp`, SUPABASE, POST)).toBe(true);
   });
 });

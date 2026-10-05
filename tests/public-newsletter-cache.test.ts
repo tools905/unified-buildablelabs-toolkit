@@ -58,9 +58,10 @@ describe("getPublicWorkspace", () => {
 });
 
 describe("public cache headers", () => {
-  it("lets a CDN reuse a good answer for a minute and serve a stale one while refreshing", () => {
+  it("lets a CDN reuse a good answer for five minutes and serve a stale one for a day while refreshing", () => {
     expect(PUBLIC_FEED_CACHE_CONTROL).toMatch(/public/);
-    expect(PUBLIC_FEED_CACHE_CONTROL).toMatch(/s-maxage=60/);
+    expect(PUBLIC_FEED_CACHE_CONTROL).toMatch(/s-maxage=300/);
+    expect(PUBLIC_FEED_CACHE_CONTROL).toMatch(/max-age=30,/);
     expect(PUBLIC_FEED_CACHE_CONTROL).toMatch(/stale-while-revalidate=\d+/);
   });
 

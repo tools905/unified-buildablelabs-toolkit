@@ -334,7 +334,7 @@ export function NewsletterEditor({
     setCoverError(null);
     setUploadingCover(true);
     try {
-      const { url, brightness } = await uploadNewsletterImage(file, post.workspace_id, post.id);
+      const { url, brightness } = await uploadNewsletterImage(file, post.workspace_id, post.id, { card: true });
       if (coverUrl) staleImages.current.push(coverUrl);
       setCoverUrl(url);
       setCoverBrightness(brightness);

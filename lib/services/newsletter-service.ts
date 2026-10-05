@@ -6,6 +6,7 @@ import {
   type UpdateNewsletterPostInput,
 } from "@/lib/validation/newsletter-schema";
 import {
+  coverCardUrl,
   isOwnNewsletterImageUrl,
   NEWSLETTER_BUCKET,
   newsletterImagePath,
@@ -371,7 +372,9 @@ export async function removeStaleImages(supabase: SupabaseClient<any>, postId: s
     const post = await getPost(supabase, postId);
     const inUse = `${post.body ?? ""}\n${post.cover_image_url ?? ""}\n${await versionReferences(supabase, postId)}`;
     const paths = urls
-      .map((url) => newsletterImagePath(url))
+      // A dropped cover takes its small card copy with it.
+      .flatMap((url) => [url, coverCardUrl(url)])
+      .map((url) => (url ? newsletterImagePath(url) : null))
       .filter((path): path is string => !!path && path.startsWith(`${post.workspace_id}/${postId}/`))
       .filter((path) => !inUse.includes(path.split("/").pop() ?? path));
     if (paths.length) await supabase.storage.from(NEWSLETTER_BUCKET).remove(paths);
@@ -383,20 +386,71 @@ export async function removeStaleImages(supabase: SupabaseClient<any>, postId: s
 // Public-facing reads/writes below run through the service-role client from
 // an unauthenticated API route — never exposed to the browser's own client.
 
+// Only what the website's cards show. The story text is left out on purpose: it is by far the
+// largest column, and the cards need just its word count (kept by Postgres in body_word_count).
+export const PUBLIC_POST_CARD_SELECT = [
+  "id",
+  "title",
+  "deck",
+  "tag",
+  "slug",
+  "published_at",
+  "author_ids",
+  "cover_image_url",
+  "cover_brightness",
+  "cover_focus_x",
+  "cover_focus_y",
+  "cover_zoom",
+  "cover_tone",
+  "body_word_count",
+].join(", ");
+
+// Used until migration 048 (body_word_count) has been applied: the same columns, with the
+// story text in place of the count so the reading time can still be worked out.
+export const PUBLIC_POST_CARD_SELECT_WITH_BODY = PUBLIC_POST_CARD_SELECT.replace("body_word_count", "body");
+
+// Postgres: the column named in the query does not exist.
+const UNDEFINED_COLUMN = "42703";
+
+export type PublicPostCard = {
+  id: string;
+  title: string;
+  deck: string | null;
+  tag: string | null;
+  slug: string | null;
+  published_at: string | null;
+  author_ids: string[];
+  cover_image_url: string | null;
+  cover_brightness: number | null;
+  cover_focus_x: number | null;
+  cover_focus_y: number | null;
+  cover_zoom: number | string | null;
+  cover_tone: number | null;
+  // One of the two is present: the count once migration 048 is applied, the text before that.
+  body_word_count?: number | null;
+  body?: string | null;
+};
+
 export async function listPublishedPosts(
   supabase: SupabaseClient<any>,
   workspaceId: string,
   limit = 8,
 ) {
-  const { data, error, count } = await supabase
-    .from("newsletter_posts")
-    .select(NEWSLETTER_POST_SELECT, { count: "exact" })
-    .eq("workspace_id", workspaceId)
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(limit);
+  const query = (select: string) =>
+    supabase
+      .from("newsletter_posts")
+      .select(select, { count: "exact" })
+      .eq("workspace_id", workspaceId)
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(limit);
+
+  let { data, error, count } = await query(PUBLIC_POST_CARD_SELECT);
+  if (error?.code === UNDEFINED_COLUMN) {
+    ({ data, error, count } = await query(PUBLIC_POST_CARD_SELECT_WITH_BODY));
+  }
   if (error) throw error;
-  return { posts: data ?? [], totalPublished: count ?? 0 };
+  return { posts: (data ?? []) as unknown as PublicPostCard[], totalPublished: count ?? 0 };
 }
 
 export async function getPublishedPostBySlug(

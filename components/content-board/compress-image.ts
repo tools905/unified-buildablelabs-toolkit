@@ -1,5 +1,8 @@
 const MAX_SIDE = 1600;
 const THUMB_SIDE = 360;
+// Newsletter cards on the website are at most ~400px wide, so an 800px copy is sharp on
+// high-density screens at a fraction of the full image's weight.
+export const NEWSLETTER_CARD_SIDE = 800;
 
 export type PreparedImage = {
   full: { blob: Blob; ext: string; contentType: string };
@@ -60,12 +63,19 @@ function measureBrightness(bitmap: ImageBitmap) {
   return Math.round((total / (size * size) / 255) * 100);
 }
 
-// Shrinks one image for the newsletter and reports how bright it is.
-export async function prepareNewsletterImage(file: File) {
+// Shrinks one image for the newsletter and reports how bright it is. With `card`, it also makes
+// a small WebP copy for the website's cards; `card` is null if the browser cannot write WebP,
+// because the card copy is found by name and must always be a .webp file.
+export async function prepareNewsletterImage(file: File, options: { card?: boolean } = {}) {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
     const image = await render(bitmap, MAX_SIDE, 0.82, file, true);
-    return { image, brightness: measureBrightness(bitmap) };
+    let card: PreparedImage["thumb"] | null = null;
+    if (options.card) {
+      const small = await render(bitmap, NEWSLETTER_CARD_SIDE, 0.8, file, false);
+      card = small.contentType === "image/webp" ? small : null;
+    }
+    return { image, card, brightness: measureBrightness(bitmap) };
   } finally {
     bitmap.close();
   }
