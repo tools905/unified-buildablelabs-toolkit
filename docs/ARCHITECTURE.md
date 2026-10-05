@@ -120,6 +120,25 @@ Linear integration (`022_linear_integration.sql`) — link-only:
 - `/api/meetings/[id]/convert-to-tickets` — user-triggered (not cron), admin
   only, session-authenticated. Supports `{"dry_run": true}` in the body to
   preview extracted tickets without creating them
+- `/api/newsletter`, `/api/newsletter/[slug]` — public feed the website's
+  Times page reads
+- `/api/newsletter/subscribe`, `/confirm`, `/unsubscribe` — public, double
+  opt-in newsletter signups (`newsletter-subscriber-service.ts`). The matching
+  reader-facing pages are `app/newsletter/confirm` and
+  `app/newsletter/unsubscribe` (no login). Newsletter emails go through
+  `newsletter-email-service.ts` with their own sender
+  (`NEWSLETTER_EMAIL_FROM`) and are recorded in `newsletter_deliveries`, not
+  `notification_logs`
+- `/api/newsletter/capture-config` — public; the wording and timing of the
+  website's capture points (values in `lib/utils/newsletter-capture-config.ts`)
+- `/api/webhooks/resend` — Resend's delivered/opened/clicked/bounced/complained
+  events for newsletter emails, verified with `RESEND_WEBHOOK_SECRET`
+  (`newsletter-send-service.ts` → `recordEmailEvent`)
+- Emailing an issue: admins use `/tools/newsletter/send/[postId]` (a published
+  post, once) and follow results on `/tools/newsletter/sends`. Sends live in
+  `newsletter_sends` (`045_newsletter_issue_sends.sql`); each subscriber's copy
+  is a `newsletter_deliveries` row, sent by `processIssueSends` (the "Send now"
+  action, then the cron for anything left)
 
 ## Cron jobs
 
@@ -135,6 +154,8 @@ Per `cron.schedule(...)` calls actually present in the migrations:
 | `toolkit-meeting-digest-weekly` | 17:00 UTC Friday | `/api/cron/meeting-digests?type=weekly` |
 | `toolkit-process-new-meetings` | 01:30 UTC daily | `/api/cron/process-new-meetings` |
 | `toolkit-content-cleanup` (`029_content_attachments_reviews.sql`) | 02:30 UTC daily | `/api/cron/content-cleanup` (deletes uploaded files of Content Board ideas posted more than 30 days ago) |
+| `toolkit-newsletter-queue` (`044_newsletter_email_capture.sql`) | every 5 min | `/api/cron/newsletter` (retries newsletter confirmation emails that failed to send; starts issue sends that are due and sends their emails in batches of 100) |
+| `toolkit-newsletter-cleanup` (`044_newsletter_email_capture.sql`) | 02:45 UTC daily | `/api/cron/newsletter?task=cleanup` (removes subscribers who never confirmed within 30 days, old rate-limit rows, webhook events older than 180 days) |
 
 `005_scheduler.sql`'s `daily-review-cron` and `011_supabase_cron.sql`'s
 `toolkit-daily` both call `/api/cron/daily` on different schedules and via

@@ -1,5 +1,8 @@
 export type NewsletterPostStatus = "draft" | "scheduled" | "published";
 
+// Where emailing a post to subscribers stands (a cancelled send counts as none).
+export type NewsletterSendStatus = "scheduled" | "sending" | "sent" | "failed";
+
 export type NewsletterAuthor = {
   id: string;
   full_name: string | null;

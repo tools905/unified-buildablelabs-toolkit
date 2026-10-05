@@ -8,6 +8,10 @@ export const PUBLIC_FEED_CACHE_CONTROL = "public, max-age=30, s-maxage=60, stale
 // A missing post is cached only briefly, so a post published a moment later appears quickly.
 export const PUBLIC_NOT_FOUND_CACHE_CONTROL = "public, max-age=0, s-maxage=15";
 
+// The newsletter capture points' wording and timing changes rarely; a change can take up to
+// five minutes to reach readers.
+export const CAPTURE_CONFIG_CACHE_CONTROL = "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
+
 export const PUBLIC_CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",

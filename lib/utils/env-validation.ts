@@ -37,6 +37,17 @@ const envSchema = z.object({
 
   // Linear (ticket linking) — optional until configured, read-only scope
   LINEAR_API_KEY: z.string().min(1).optional(),
+
+  // Newsletter email capture — optional until configured. Without NEWSLETTER_EMAIL_FROM,
+  // newsletter emails are printed to the dev server log (outside production) instead of sent.
+  NEWSLETTER_EMAIL_FROM: z.string().min(1).optional(),
+  NEWSLETTER_TOKEN_SECRET: z.string().min(32).optional(),
+  NEWSLETTER_ALLOWED_ORIGINS: z.string().min(1).optional(),
+  // Where issue emails link to: the website's origin and its post path ("{slug}" is replaced).
+  NEWSLETTER_SITE_URL: z.string().url().optional(),
+  NEWSLETTER_POST_PATH: z.string().min(1).optional(),
+  // Signing secret of the Resend webhook that reports delivery, opens, clicks and bounces.
+  RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -2,14 +2,26 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { FileText, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { FileText, Mail, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils/cn";
 import { formatISTShortDate } from "@/lib/utils/dates";
 import { createDraftAction } from "@/app/tools/newsletter/actions";
 import { DeletePostDialog } from "@/components/newsletter/delete-post-dialog";
-import type { NewsletterAuthor, NewsletterPost, NewsletterPostStatus } from "@/components/newsletter/types";
+import type {
+  NewsletterAuthor,
+  NewsletterPost,
+  NewsletterPostStatus,
+  NewsletterSendStatus,
+} from "@/components/newsletter/types";
+
+const SEND_LABELS: Record<NewsletterSendStatus, string> = {
+  scheduled: "Email scheduled",
+  sending: "Emailing",
+  sent: "Emailed",
+  failed: "Email failed",
+};
 
 const TABS: { status: NewsletterPostStatus; label: string }[] = [
   { status: "published", label: "Published" },
@@ -28,10 +40,15 @@ export function NewsletterPostsList({
   initialPosts,
   authorsById,
   currentUserId,
+  canEmail,
+  sendStatusByPostId,
 }: {
   initialPosts: NewsletterPost[];
   authorsById: Record<string, NewsletterAuthor>;
   currentUserId: string;
+  // Workspace admins can email a published post to subscribers.
+  canEmail: boolean;
+  sendStatusByPostId: Record<string, NewsletterSendStatus>;
 }) {
   const [activeTab, setActiveTab] = useState<NewsletterPostStatus>("published");
   const [search, setSearch] = useState("");
@@ -145,6 +162,26 @@ export function NewsletterPostsList({
                   </span>
                 </div>
               </Link>
+              {post.status === "published" && sendStatusByPostId[post.id] ? (
+                <Link
+                  href="/tools/newsletter/sends"
+                  className={cn(
+                    "mr-1 shrink-0 border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground",
+                    sendStatusByPostId[post.id] === "failed" && "border-destructive/40 text-destructive",
+                  )}
+                >
+                  {SEND_LABELS[sendStatusByPostId[post.id]]}
+                </Link>
+              ) : post.status === "published" && canEmail ? (
+                <Link
+                  href={`/tools/newsletter/send/${post.id}`}
+                  aria-label={`Email ${post.title || "this post"} to subscribers`}
+                  title="Email to subscribers"
+                  className="grid h-9 w-9 shrink-0 place-items-center text-quiet transition-colors hover:bg-muted hover:text-foreground focus-visible:text-foreground"
+                >
+                  <Mail className="h-4 w-4" />
+                </Link>
+              ) : null}
               {post.created_by === currentUserId ? (
                 <button
                   type="button"

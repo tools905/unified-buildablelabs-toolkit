@@ -5,7 +5,19 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/require-user";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
 import { requireEnabledTool } from "@/modules/core/tools/registry";
+import { createAdminClient } from "@/lib/supabase/admin";
 import * as newsletterService from "@/lib/services/newsletter-service";
+import { sendNewsletterTestEmail } from "@/lib/services/newsletter-email-service";
+import {
+  cancelIssueSend,
+  getIssuePost,
+  issueContentForPost,
+  NewsletterSendError,
+  processIssueSends,
+  scheduleIssueSend,
+} from "@/lib/services/newsletter-send-service";
+import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
+import { issueEmail } from "@/lib/utils/newsletter-email-templates";
 
 async function requireNewsletterContext() {
   await requireEnabledTool("newsletter");
@@ -75,4 +87,80 @@ export async function deletePostAction(formData: FormData) {
   await newsletterService.deletePost(supabase, postId);
   refreshNewsletter();
   redirect("/tools/newsletter");
+}
+
+// --- Emailing an issue to subscribers ------------------------------------------------------
+
+// Sending reaches every subscriber, so it is limited to workspace admins.
+async function requireNewsletterAdmin() {
+  const context = await requireNewsletterContext();
+  if (!(await isWorkspaceAdmin(context.workspace.id, context.user.id, context.supabase))) {
+    throw new Error("Only workspace admins can email subscribers.");
+  }
+  return context;
+}
+
+type IssueSendInput = { subject: string; previewText: string };
+
+export async function sendTestIssueAction(postId: string, input: IssueSendInput) {
+  const { user, workspace } = await requireNewsletterAdmin();
+  const admin = createAdminClient();
+  const post = await getIssuePost(admin, postId);
+  if (!post || post.workspace_id !== workspace.id || post.status !== "published") {
+    return { ok: false, message: "Publish this post before emailing it." };
+  }
+  if (!user.email) return { ok: false, message: "Your account has no email address to send the test to." };
+
+  const content = await issueContentForPost(admin, post, {
+    subject: `[Test] ${input.subject.trim() || post.title}`,
+    previewText: input.previewText.trim() || null,
+  });
+  const result = await sendNewsletterTestEmail(user.email, issueEmail(content, null));
+  if (!result.ok) return { ok: false, message: result.error ?? "The test email could not be sent." };
+  return {
+    ok: true,
+    message: result.printed
+      ? "Test printed to the server log (no newsletter sender is set up here)."
+      : `Test sent to ${user.email}.`,
+  };
+}
+
+// Schedules the issue, or with no time starts sending it straight away; batches that don't
+// fit in this request are sent by the cron within five minutes.
+export async function scheduleIssueSendAction(postId: string, input: IssueSendInput & { scheduledAt: string | null }) {
+  const { workspace, user } = await requireNewsletterAdmin();
+  const admin = createAdminClient();
+  const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+  if (scheduledAt && Number.isNaN(scheduledAt.getTime())) return { error: "Pick a valid date and time." };
+
+  try {
+    await scheduleIssueSend(admin, {
+      workspaceId: workspace.id,
+      postId,
+      subject: input.subject,
+      previewText: input.previewText,
+      scheduledAt,
+      actorId: user.id,
+    });
+    if (!scheduledAt) await processIssueSends(admin);
+  } catch (error) {
+    if (error instanceof NewsletterSendError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath("/tools/newsletter");
+  revalidatePath("/tools/newsletter/sends");
+  redirect("/tools/newsletter/sends");
+}
+
+export async function cancelIssueSendAction(formData: FormData) {
+  const { workspace, user } = await requireNewsletterAdmin();
+  const sendId = String(formData.get("sendId"));
+  try {
+    await cancelIssueSend(createAdminClient(), sendId, workspace.id, user.id);
+  } catch (error) {
+    if (!(error instanceof NewsletterSendError)) throw error;
+  }
+  revalidatePath("/tools/newsletter");
+  revalidatePath("/tools/newsletter/sends");
 }
