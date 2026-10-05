@@ -22,6 +22,8 @@ export type NewsletterPost = {
   cover_zoom: number;
   cover_tone: number | null;
   body: string;
+  tags: string[];
+  original_url: string | null;
   author_ids: string[];
   slug: string | null;
   status: NewsletterPostStatus;

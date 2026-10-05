@@ -196,6 +196,32 @@ summary::-webkit-details-marker {
 .newsletter-preview p:last-child {
   margin-bottom: 0;
 }
+.newsletter-preview h2,
+.newsletter-preview h3 {
+  margin: 1.4em 0 0.5em;
+  font-family: var(--font-serif, Georgia, serif);
+  font-weight: 600;
+  line-height: 1.25;
+  color: #1a1712;
+}
+.newsletter-preview h2 { font-size: 1.5em; }
+.newsletter-preview h3 { font-size: 1.2em; }
+.newsletter-preview pre {
+  margin: 0 0 1em;
+  padding: 12px 14px;
+  overflow-x: auto;
+  background: #e7e1cf;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+.newsletter-preview code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+.newsletter-preview :not(pre) > code {
+  padding: 1px 5px;
+  background: #e7e1cf;
+}
 .newsletter-preview strong {
   font-weight: 700;
 }
@@ -265,3 +291,41 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 1;
 }
+
+/* Look-alikes of Medium and Substack for the capsule preview. Approximate on purpose. */
+.medium-preview { color: #242424; font-family: Charter, "Bitstream Charter", Georgia, serif; }
+.medium-preview h1 { margin: 0 0 8px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 40px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; }
+.medium-preview h2 { margin: 0 0 32px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 22px; line-height: 1.3; font-weight: 400; color: #6B6B6B; }
+.medium-preview-body p, .medium-preview-body li, .medium-preview-body blockquote { font-size: 20px; line-height: 1.6; }
+.medium-preview-body p { margin: 0 0 1.2em; }
+.medium-preview-body a { color: inherit; text-decoration: underline; }
+.medium-preview-body blockquote { margin: 0 0 1.2em; padding-left: 20px; border-left: 3px solid #242424; font-style: italic; }
+.medium-preview-body ul, .medium-preview-body ol { margin: 0 0 1.2em; padding-left: 28px; }
+.medium-preview-body ul { list-style: disc; }
+.medium-preview-body ol { list-style: decimal; }
+.medium-preview-body li { display: list-item; margin-bottom: 0.4em; }
+.medium-preview-body img { display: block; max-width: 100%; height: auto; margin: 1.5em 0; }
+.medium-preview-body h2 { margin: 1.6em 0 0.5em; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 28px; font-weight: 700; color: #242424; }
+.medium-preview-body h3 { margin: 1.4em 0 0.5em; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 700; color: #242424; }
+.medium-preview-body h1 + h2 { margin: 0 0 32px; font-size: 22px; line-height: 1.3; font-weight: 400; color: #6B6B6B; }
+.medium-preview pre { margin: 0 0 1.2em; padding: 16px; overflow-x: auto; background: #F2F2F2; font-size: 15px; }
+.medium-preview code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.medium-preview :not(pre) > code { padding: 2px 5px; background: #F2F2F2; }
+
+.substack-preview { color: #363737; font-family: Georgia, "Times New Roman", serif; }
+.substack-preview-title { margin: 0 0 12px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 36px; line-height: 1.2; font-weight: 700; color: #1A1A1A; }
+.substack-preview-subtitle { margin: 0 0 32px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 20px; line-height: 1.4; color: #6B6B6B; }
+.substack-preview-body p, .substack-preview-body li, .substack-preview-body blockquote { font-size: 18px; line-height: 1.65; }
+.substack-preview-body p { margin: 0 0 1.1em; }
+.substack-preview-body a { color: #FF6719; text-decoration: underline; }
+.substack-preview-body blockquote { margin: 0 0 1.1em; padding-left: 18px; border-left: 3px solid #D5D5D5; font-style: italic; }
+.substack-preview-body ul, .substack-preview-body ol { margin: 0 0 1.1em; padding-left: 26px; }
+.substack-preview-body ul { list-style: disc; }
+.substack-preview-body ol { list-style: decimal; }
+.substack-preview-body li { display: list-item; margin-bottom: 0.4em; }
+.substack-preview-body img { display: block; max-width: 100%; height: auto; margin: 1.4em 0; }
+.substack-preview-body h2 { margin: 1.5em 0 0.5em; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 700; color: #1A1A1A; }
+.substack-preview-body h3 { margin: 1.3em 0 0.5em; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 21px; font-weight: 700; color: #1A1A1A; }
+.substack-preview pre { margin: 0 0 1.1em; padding: 16px; overflow-x: auto; background: #F4F4F4; font-size: 15px; }
+.substack-preview code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.substack-preview :not(pre) > code { padding: 2px 5px; background: #F4F4F4; }

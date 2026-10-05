@@ -1,9 +1,9 @@
 import { splitImageSettings, storyImageStyle } from "@/lib/utils/newsletter-story-image";
 
 // Minimal renderer for the subset of markdown the newsletter editor's
-// toolbar produces (bold/italic/strike/link/image/quote/lists). Shared so
+// toolbar produces (headings/bold/italic/strike/link/image/quote/lists/code). Shared so
 // the in-app preview and the future public newsletter page render identically.
-function escapeHtml(source: string) {
+export function escapeHtml(source: string) {
   return source
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -19,7 +19,7 @@ function renderImage(alt: string, src: string) {
   return `<img alt="${attribute(alt)}" src="${attribute(url)}" style="${storyImageStyle(size, align)}" />`;
 }
 
-function renderInline(text: string) {
+function renderFormatting(text: string) {
   return text
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt: string, src: string) => renderImage(alt, src))
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
@@ -28,10 +28,20 @@ function renderInline(text: string) {
     .replace(/_([^_]+)_/g, "<em>$1</em>");
 }
 
+// Inline code is cut out first, so nothing inside `backticks` is turned into bold, links and so on.
+function renderInline(text: string) {
+  return text
+    .split(/(`[^`]+`)/g)
+    .map((part, index) => (index % 2 === 1 ? `<code>${part.slice(1, -1)}</code>` : renderFormatting(part)))
+    .join("");
+}
+
 export function renderNewsletterMarkdown(source: string) {
   const lines = escapeHtml(source).split("\n");
   const html: string[] = [];
   let listType: "ul" | "ol" | null = null;
+  let codeLines: string[] | null = null;
+  let codeLanguage = "";
 
   function closeList() {
     if (listType) html.push(`</${listType}>`);
@@ -40,13 +50,40 @@ export function renderNewsletterMarkdown(source: string) {
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
+
+    // A fenced code block runs from one ``` line to the next; its lines are kept exactly as written.
+    if (codeLines !== null) {
+      if (line.startsWith("```")) {
+        const language = codeLanguage ? ` class="language-${codeLanguage}"` : "";
+        html.push(`<pre><code${language}>${codeLines.join("\n")}</code></pre>`);
+        codeLines = null;
+      } else {
+        codeLines.push(rawLine);
+      }
+      continue;
+    }
+    if (line.startsWith("```")) {
+      closeList();
+      codeLines = [];
+      codeLanguage = line.slice(3).trim().replace(/[^a-zA-Z0-9_+#-]/g, "");
+      continue;
+    }
+
+    const heading = /^(#{2,3})\s+(.+)$/.exec(line);
+    if (heading) {
+      closeList();
+      const level = heading[1].length;
+      html.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+      continue;
+    }
     if (!line) {
       closeList();
       continue;
     }
-    if (line.startsWith("> ")) {
+    // The text was escaped first, so a quote marker ">" is already "&gt;" by the time it is checked.
+    if (line.startsWith("&gt; ")) {
       closeList();
-      html.push(`<blockquote>${renderInline(line.slice(2))}</blockquote>`);
+      html.push(`<blockquote>${renderInline(line.slice(5))}</blockquote>`);
       continue;
     }
     if (line.startsWith("- ")) {
@@ -71,5 +108,7 @@ export function renderNewsletterMarkdown(source: string) {
     html.push(`<p>${renderInline(line)}</p>`);
   }
   closeList();
+  // A block left open at the end of the text still shows, instead of vanishing.
+  if (codeLines !== null) html.push(`<pre><code>${codeLines.join("\n")}</code></pre>`);
   return html.join("\n");
 }
