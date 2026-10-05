@@ -22,9 +22,11 @@ describe("placeholder adapters", () => {
     expect(html).toContain("<strong>world</strong>");
   });
 
-  it("keeps the Substack html to the story only", () => {
+  it("keeps the Substack html to the story and the original-link line, without the title", () => {
     const { html } = adapters.substack.transform(draft());
-    expect(html).toBe("<p>Hello <strong>world</strong></p>");
+    expect(html).toBe(
+      '<p>Hello <strong>world</strong></p>\n<p><em>Originally published at <a href="https://example.com/p">https://example.com/p</a>.</em></p>',
+    );
   });
 
   it("has no warnings for a complete post", () => {

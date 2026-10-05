@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils/cn";
 import { ActivityTimeline } from "@/components/content-board/activity-timeline";
 import { hasChangesSinceReview } from "@/components/content-board/activity";
 import { AttachmentAdder } from "@/components/content-board/attachment-adder";
+import { PostPreview } from "@/components/content-board/post-preview/post-preview";
 import { PreviewViewer } from "@/components/content-board/preview-viewer";
 import { ReviewPoints } from "@/components/content-board/review-points";
 import {
@@ -47,6 +49,8 @@ export function IdeaPanel({
   const dataRef = useRef<IdeaPanelData | null>(data);
   const [loadError, setLoadError] = useState(false);
   const [index, setIndex] = useState(0);
+  // "files" is the viewer of what was uploaded; "feed" shows it as an Instagram or LinkedIn post.
+  const [view, setView] = useState<"files" | "feed">("files");
   const [removeError, setRemoveError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -240,14 +244,48 @@ export function IdeaPanel({
         ) : (
           <>
             <section aria-label="Preview" className="space-y-3">
-              <h3 className="text-sm font-semibold">Preview</h3>
-              <PreviewViewer
-                attachments={attachments}
-                index={index}
-                onIndexChange={setIndex}
-                onRemove={removeAttachment}
-                busy={false}
-              />
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">Preview</h3>
+                <div className="flex border border-border" role="radiogroup" aria-label="Preview view">
+                  {(
+                    [
+                      { value: "files", label: "Files" },
+                      { value: "feed", label: "Feed preview" },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={view === option.value}
+                      onClick={() => setView(option.value)}
+                      className={cn(
+                        "px-3 py-1 text-xs font-medium transition-colors",
+                        view === option.value ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {view === "files" ? (
+                <PreviewViewer
+                  attachments={attachments}
+                  index={index}
+                  onIndexChange={setIndex}
+                  onRemove={removeAttachment}
+                  busy={false}
+                />
+              ) : (
+                <PostPreview
+                  attachments={attachments}
+                  caption={idea.caption ?? null}
+                  ideaPlatforms={platforms}
+                  title={idea.title}
+                  onEditCaption={onEdit}
+                />
+              )}
               {removeError ? (
                 <p role="alert" className="text-xs text-destructive">
                   {removeError}

@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   MAX_ASSIGNEES,
   MAX_ATTACHMENT_BYTES,
+  MAX_CAPTION_LENGTH,
   MAX_REFERENCE_LINKS,
   MAX_REVIEW_POINT_LENGTH,
   MIN_REVIEW_POINT_LENGTH,
@@ -44,9 +45,13 @@ export const assigneeIdsSchema = z
   .transform((ids) => [...new Set(ids.map((id) => id.trim()).filter(Boolean))])
   .pipe(z.array(z.string().uuid("That isn't a valid person.")).max(MAX_ASSIGNEES, `Assign up to ${MAX_ASSIGNEES} people.`));
 
+// The post text. Kept exactly as typed (line breaks matter in a caption); blank is cleaned up by the service.
+export const captionSchema = z.string().max(MAX_CAPTION_LENGTH, `Keep the caption under ${MAX_CAPTION_LENGTH} characters.`);
+
 export const createContentIdeaSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
   description: z.string().optional(),
+  caption: captionSchema.optional(),
   platforms: platformsSchema,
   scheduledFor: scheduledForSchema.optional(),
   referenceLinks: referenceLinksSchema.optional(),
@@ -58,6 +63,7 @@ export type CreateContentIdeaInput = z.infer<typeof createContentIdeaSchema>;
 export const updateContentIdeaSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters.").optional(),
   description: z.string().nullable().optional(),
+  caption: captionSchema.nullable().optional(),
   platforms: platformsSchema.optional(),
   status: contentIdeaStatusSchema.optional(),
   scheduledFor: scheduledForSchema.optional(),

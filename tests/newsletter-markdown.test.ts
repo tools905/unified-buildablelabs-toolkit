@@ -40,6 +40,51 @@ describe("renderNewsletterMarkdown", () => {
     expect(renderNewsletterMarkdown("Use `a_b_c` and **go**")).toBe("<p>Use <code>a_b_c</code> and <strong>go</strong></p>");
   });
 
+  it("renders a markdown table", () => {
+    const html = renderNewsletterMarkdown("| Step | Pain |\n|---|---|\n| The pain | Hours **lost** |\n| The recipe | Exact steps |");
+    expect(html).toBe(
+      "<table><thead><tr><th>Step</th><th>Pain</th></tr></thead>" +
+        "<tbody><tr><td>The pain</td><td>Hours <strong>lost</strong></td></tr>" +
+        "<tr><td>The recipe</td><td>Exact steps</td></tr></tbody></table>",
+    );
+  });
+
+  it("renders a table pasted with blank lines between the rows, and keeps the text around it", () => {
+    const html = renderNewsletterMarkdown(
+      "Intro line\n\n| Step | Invoice matching (finance) | Lead research (sales) |\n\n|---|--------------|-----------|\n\n| The pain | Hours a week | Reps spend mornings |\n\n| The recipe | Mostly exact steps | Mostly judgment |\n\nInvoice matching: mostly a for-loop",
+    );
+    expect(html.startsWith("<p>Intro line</p>\n<table>")).toBe(true);
+    expect(html).toContain("<th>Invoice matching (finance)</th>");
+    expect(html).toContain("<tr><td>The recipe</td><td>Mostly exact steps</td><td>Mostly judgment</td></tr>");
+    expect(html.endsWith("</table>\n<p>Invoice matching: mostly a for-loop</p>")).toBe(true);
+    expect(html).not.toContain("|");
+  });
+
+  it("supports alignment, missing outer pipes, short rows and escaped pipes", () => {
+    const html = renderNewsletterMarkdown("a | b | c\n:--|:-:|--:\n1 | 2\nx \\| y | `code` | 3");
+    expect(html).toContain('<th style="text-align:left">a</th><th style="text-align:center">b</th><th style="text-align:right">c</th>');
+    expect(html).toContain('<td style="text-align:left">1</td><td style="text-align:center">2</td><td style="text-align:right"></td>');
+    expect(html).toContain('<td style="text-align:left">x | y</td><td style="text-align:center"><code>code</code></td>');
+  });
+
+  it("does not turn a lone pipe line, a divider rule or a mismatched header into a table", () => {
+    expect(renderNewsletterMarkdown("a | b")).toBe("<p>a | b</p>");
+    expect(renderNewsletterMarkdown("a | b\n---")).toBe("<p>a | b</p>\n<p>---</p>");
+    expect(renderNewsletterMarkdown("| a | b |\n|---|")).toBe("<p>| a | b |</p>\n<p>|---|</p>");
+  });
+
+  it("ends the table at the first line without a pipe and stops a list before it", () => {
+    const html = renderNewsletterMarkdown("- item\n| a | b |\n|---|---|\n| 1 | 2 |\nsecond | row\n\nplain\n\n| late |");
+    expect(html).toBe(
+      "<ul>\n<li>item</li>\n</ul>\n<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr><tr><td>second</td><td>row</td></tr></tbody></table>\n<p>plain</p>\n<p>| late |</p>",
+    );
+  });
+
+  it("escapes HTML inside table cells and leaves tables inside code blocks alone", () => {
+    expect(renderNewsletterMarkdown("| a |\n|---|\n| <b>x</b> |")).toContain("<td>&lt;b&gt;x&lt;/b&gt;</td>");
+    expect(renderNewsletterMarkdown("```\n| a |\n|---|\n```")).toBe("<pre><code>| a |\n|---|</code></pre>");
+  });
+
   it("uses the language name safely", () => {
     const html = renderNewsletterMarkdown('```"><img onerror=x\nx\n```');
     expect(html).not.toContain("<img");

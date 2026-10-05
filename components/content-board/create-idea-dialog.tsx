@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createIdeaAction } from "@/app/tools/content-board/actions";
 import { FileDropZone } from "@/components/content-board/file-drop-zone";
+import { CaptionField } from "@/components/content-board/caption-field";
 import { AssigneePicker } from "@/components/content-board/assignee-picker";
 import { ReferenceLinksField } from "@/components/content-board/reference-links-field";
 import { PlatformPicker } from "@/components/content-board/platform-picker";
@@ -135,6 +136,7 @@ export function CreateIdeaDialog({
             <Label htmlFor="description">Details</Label>
             <Textarea id="description" name="description" className="mt-1" rows={3} />
           </div>
+          <CaptionField />
           <div>
             <Label htmlFor="scheduledFor">Post on (optional)</Label>
             <Input id="scheduledFor" name="scheduledFor" type="date" className="mt-1" />

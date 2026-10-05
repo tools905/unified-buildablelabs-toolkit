@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContentAttachmentKind } from "@/lib/db/types";
 import { CONTENT_BUCKET, MAX_ATTACHMENTS_PER_IDEA } from "@/lib/utils/content-board";
+import { downloadFileName, mimeTypeFromPath } from "@/lib/utils/download-name";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -38,6 +39,26 @@ export async function signPaths(supabase: SupabaseClient<any>, paths: string[]) 
     if (item.path && item.signedUrl) signed.set(item.path, item.signedUrl);
   }
   return signed;
+}
+
+// A link that saves one attached file when opened. The storage server answers it with a "save as"
+// header and the right file name, so any browser, phones and in-app browsers included, downloads it
+// by simply following the link: no script has to fetch the file first.
+export async function signDownload(supabase: SupabaseClient<any>, attachmentId: string) {
+  const { data: row, error } = await supabase
+    .from("content_idea_attachments")
+    .select("id, kind, storage_path, file_name")
+    .eq("id", attachmentId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row || row.kind === "link" || !row.storage_path) throw new Error("This file can't be downloaded.");
+
+  const name = downloadFileName(row.file_name, mimeTypeFromPath(row.storage_path));
+  const { data, error: signError } = await supabase.storage
+    .from(CONTENT_BUCKET)
+    .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, { download: name });
+  if (signError || !data?.signedUrl) throw signError ?? new Error("Could not prepare the download.");
+  return { url: data.signedUrl };
 }
 
 export async function addStoredAttachment(

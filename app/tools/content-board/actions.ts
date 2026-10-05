@@ -66,6 +66,7 @@ export async function createIdeaAction(formData: FormData) {
     const idea = await contentIdeaService.createContentIdea(supabase, workspace.id, user.id, {
       title: String(formData.get("title") ?? ""),
       description: (formData.get("description") as string) || undefined,
+      caption: (formData.get("caption") as string) || undefined,
       platforms: formData.getAll("platforms").map(String) as any,
       scheduledFor: (formData.get("scheduledFor") as string) ?? null,
       referenceLinks: formData.getAll("referenceLinks").map(String),
@@ -91,6 +92,8 @@ export async function updateIdeaAction(formData: FormData) {
     await contentIdeaService.updateContentIdea(supabase, workspace.id, ideaId, user.id, {
       title: (formData.get("title") as string) || undefined,
       description: (formData.get("description") as string) ?? null,
+      // Only sent by forms that have the caption box; other updates leave the saved caption alone.
+      caption: formData.has("caption") ? String(formData.get("caption")) : undefined,
       platforms: formData.has("platformsField") ? (formData.getAll("platforms").map(String) as any) : undefined,
       status: (formData.get("status") as ContentIdeaStatus) || undefined,
       scheduledFor: (formData.get("scheduledFor") as string) ?? null,
@@ -219,6 +222,11 @@ export async function addLinkAttachmentAction(input: { ideaId: string; url: stri
 export async function removeAttachmentAction(attachmentId: string) {
   const { supabase } = await requireContentBoardContext();
   return toResult(() => attachmentService.removeAttachment(supabase, attachmentId), { revalidate: false });
+}
+
+export async function getAttachmentDownloadAction(attachmentId: string) {
+  const { supabase } = await requireContentBoardContext();
+  return toResult(() => attachmentService.signDownload(supabase, attachmentId), { revalidate: false });
 }
 
 export async function setIdeaReviewedAction(ideaId: string, reviewed: boolean) {
