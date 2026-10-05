@@ -41,6 +41,71 @@ function renderInline(text: string) {
     .join("");
 }
 
+// The line under a table header: dashes per column, with optional colons for alignment.
+const TABLE_DIVIDER = /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$/;
+
+type Align = "left" | "center" | "right" | null;
+
+// "| a | b |" -> ["a", "b"]. A pipe written as \| stays inside its cell.
+function splitTableRow(line: string) {
+  let row = line.trim();
+  if (row.startsWith("|")) row = row.slice(1);
+  if (row.endsWith("|") && !row.endsWith("\\|")) row = row.slice(0, -1);
+  return row.split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, "|"));
+}
+
+function nextFilledLine(lines: string[], from: number) {
+  let at = from;
+  while (at < lines.length && !lines[at].trim()) at += 1;
+  return at;
+}
+
+// A table is a header row, a divider row, then body rows. Text pasted from a chat often has blank lines
+// between the rows, so those are skipped as long as the next filled line still starts with a pipe.
+// Returns the table's html and the index of the first line after it, or null when this isn't a table.
+function readTable(lines: string[], start: number): { html: string; next: number } | null {
+  const header = lines[start].trim();
+  if (!header.includes("|")) return null;
+
+  const dividerAt = nextFilledLine(lines, start + 1);
+  const divider = lines[dividerAt]?.trim();
+  if (!divider || !divider.includes("|") || !TABLE_DIVIDER.test(divider)) return null;
+
+  const headers = splitTableRow(header);
+  const dividers = splitTableRow(divider);
+  if (headers.length !== dividers.length) return null;
+
+  const aligns: Align[] = dividers.map((cell) => {
+    const left = cell.startsWith(":");
+    const right = cell.endsWith(":");
+    return left && right ? "center" : right ? "right" : left ? "left" : null;
+  });
+
+  const rows: string[][] = [];
+  let next = dividerAt + 1;
+  for (;;) {
+    const at = nextFilledLine(lines, next);
+    if (at >= lines.length) break;
+    const text = lines[at].trim();
+    const touching = at === next;
+    if (!(touching ? text.includes("|") : text.startsWith("|"))) break;
+    rows.push(splitTableRow(text));
+    next = at + 1;
+  }
+
+  const cell = (tag: "th" | "td", text: string, column: number) => {
+    const style = aligns[column] ? ` style="text-align:${aligns[column]}"` : "";
+    return `<${tag}${style}>${renderInline(text)}</${tag}>`;
+  };
+  const head = `<thead><tr>${headers.map((text, column) => cell("th", text, column)).join("")}</tr></thead>`;
+  const body = rows.length
+    ? `<tbody>${rows
+        .map((row) => `<tr>${headers.map((_, column) => cell("td", row[column] ?? "", column)).join("")}</tr>`)
+        .join("")}</tbody>`
+    : "";
+  return { html: `<table>${head}${body}</table>`, next };
+}
+
 export function renderNewsletterMarkdown(source: string) {
   const lines = escapeHtml(source).split("\n");
   const html: string[] = [];
@@ -53,7 +118,8 @@ export function renderNewsletterMarkdown(source: string) {
     listType = null;
   }
 
-  for (const rawLine of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
     const line = rawLine.trim();
 
     // A fenced code block runs from one ``` line to the next; its lines are kept exactly as written.
@@ -71,6 +137,14 @@ export function renderNewsletterMarkdown(source: string) {
       closeList();
       codeLines = [];
       codeLanguage = line.slice(3).trim().replace(/[^a-zA-Z0-9_+#-]/g, "");
+      continue;
+    }
+
+    const table = line ? readTable(lines, index) : null;
+    if (table) {
+      closeList();
+      html.push(table.html);
+      index = table.next - 1;
       continue;
     }
 
