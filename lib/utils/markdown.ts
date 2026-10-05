@@ -22,7 +22,12 @@ function renderImage(alt: string, src: string) {
 function renderFormatting(text: string) {
   return text
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt: string, src: string) => renderImage(alt, src))
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    // Only web and mail links become links; anything else (javascript: and the like) keeps just its words.
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) =>
+      /^(https?:|mailto:)/i.test(href.trim())
+        ? `<a href="${attribute(href.trim())}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        : label,
+    )
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/~~([^~]+)~~/g, "<del>$1</del>")
     .replace(/_([^_]+)_/g, "<em>$1</em>");

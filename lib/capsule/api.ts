@@ -11,9 +11,9 @@ import type {
   UpdateAtomOutput,
 } from "@/lib/capsule/types";
 
-// Everything the screens need from the server. The real version is a set of server actions (Ananya's
-// endpoints); until they exist the screens run on the in-browser fake in `fake-api.ts`. Both answer
-// with the same shapes from `types.ts`, so swapping one for the other changes nothing else.
+// Everything the screens need from the server. The real version is `createServerCapsuleApi()` in
+// `server-api.ts` (server actions); tests use the in-memory fake in tests/helpers. Both answer with
+// the same shapes from `types.ts`.
 export interface CapsuleApi {
   seal(input: SealCapsuleInput): Promise<CapsuleResult<SealCapsuleOutput>>;
   load(input: LoadCapsuleInput): Promise<CapsuleResult<LoadCapsuleOutput>>;

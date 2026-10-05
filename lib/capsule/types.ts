@@ -17,7 +17,10 @@ export type Draft = {
 
 // Something the writer should know before pasting, e.g. "Table converted to an image".
 export type CapsuleWarning = {
-  // Short stable code so screens and tests can match on it, e.g. "table-image", "heading-flattened".
+  // Short stable code so screens and tests can match on it. In use today:
+  //   any platform  title-missing, body-empty, no-canonical-url, no-tags, image-not-public, link-removed
+  //   converters    heading-flattened, list-flattened, code-no-highlight, table-as-list, math-plain,
+  //                 embed-manual, footnotes-converted
   code: string;
   message: string;
 };
