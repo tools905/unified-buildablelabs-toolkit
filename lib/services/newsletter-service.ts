@@ -188,6 +188,9 @@ export async function updatePost(
   return data;
 }
 
+// These are API routes next to /api/newsletter/[slug], which would hide a post with that slug.
+const RESERVED_SLUGS = new Set(["subscribe", "confirm", "unsubscribe", "capture-config"]);
+
 export async function publishPost(
   supabase: SupabaseClient<any>,
   postId: string,
@@ -208,7 +211,7 @@ export async function publishPost(
       .neq("id", postId)
       .maybeSingle();
     if (error) throw error;
-    if (!existing) break;
+    if (!existing && !RESERVED_SLUGS.has(slug)) break;
     slug = `${slugify(post.title)}-${suffix}`;
     suffix += 1;
   }
@@ -412,9 +415,4 @@ export async function getPublishedPostBySlug(
   return data;
 }
 
-export async function addSubscriber(supabase: SupabaseClient<any>, email: string) {
-  const { error } = await supabase
-    .from("newsletter_subscribers")
-    .upsert({ email: email.toLowerCase().trim() }, { onConflict: "email", ignoreDuplicates: true });
-  if (error) throw error;
-}
+// Subscriber signups, confirmation and unsubscribing live in newsletter-subscriber-service.ts.

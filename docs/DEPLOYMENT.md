@@ -19,6 +19,23 @@ Copy every var from `.env.example` into Vercel. Never commit real values.
 starts fine without them, and the Granola webhook just returns 401 until
 they're configured (see `lib/utils/env-validation.ts`).
 
+Newsletter email capture:
+`NEWSLETTER_TOKEN_SECRET` must be set before the subscribe, confirm and
+unsubscribe endpoints work. `NEWSLETTER_EMAIL_FROM` must be a sender on the
+newsletter subdomain verified in Resend. In production a missing sender makes
+newsletter emails fail (and the cron retries them); outside production it
+prints them to the server log instead. `NEWSLETTER_ALLOWED_ORIGINS` limits
+which sites may call the subscribe endpoint from the browser (unset = any).
+`NEWSLETTER_SITE_URL` / `NEWSLETTER_POST_PATH` set where issue emails link to
+(defaults: `NEXT_PUBLIC_APP_URL` and `/times/{slug}`).
+
+Open/click tracking for newsletter issues needs, in the Resend dashboard:
+1. Open and click tracking turned on for the newsletter sending domain.
+2. A webhook pointing at `https://<website-domain>/teams/api/webhooks/resend`
+   with the events `email.delivered`, `email.bounced`, `email.complained`,
+   `email.opened` and `email.clicked`; its signing secret goes in
+   `RESEND_WEBHOOK_SECRET`. Until that is set the endpoint answers 401.
+
 ## Supabase setup
 
 - Migrations live in `supabase/migrations/`, applied in numeric order
