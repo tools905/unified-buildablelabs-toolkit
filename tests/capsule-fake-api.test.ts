@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createFakeCapsuleApi } from "@/lib/capsule/fake-api";
+import { createFakeCapsuleApi } from "./helpers/fake-capsule-api";
 import { draftVersion } from "@/lib/capsule/version";
 import type { Draft } from "@/lib/capsule/types";
 

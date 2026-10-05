@@ -3,9 +3,8 @@ import { previewAtom } from "@/lib/capsule/preview";
 import { draftVersion } from "@/lib/capsule/version";
 import type { Atom, Capsule, CapsulePlatform, CapsuleResult, Draft } from "@/lib/capsule/types";
 
-// STAND-IN for the server while the real seal/status endpoints are being built. It keeps capsules in
-// the browser's own storage (so statuses survive a reload while testing) and builds the atoms with the
-// same adapters the real seal will use. Delete this once the real CapsuleApi is wired in.
+// In-memory CapsuleApi for tests of the screens' logic (prepareCapsule, statuses). It answers like the
+// real server actions (app/tools/newsletter/capsule-actions.ts) and builds atoms with the same adapters.
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 

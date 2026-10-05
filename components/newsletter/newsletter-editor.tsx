@@ -23,7 +23,8 @@ import { renderNewsletterMarkdown } from "@/lib/utils/markdown";
 import { CapsuleFields, checkOriginalUrl } from "@/components/newsletter/capsule-fields";
 import { PlatformPreview } from "@/components/capsule/platform-preview";
 import { PublishMenu } from "@/components/capsule/publish-menu";
-import { browserStorage, createFakeCapsuleApi } from "@/lib/capsule/fake-api";
+import { createServerCapsuleApi } from "@/lib/capsule/server-api";
+import { CapsuleHistory } from "@/components/capsule/capsule-history";
 import { PreviewSwitch, type PreviewTarget } from "@/components/capsule/preview-switch";
 import { previewAtom } from "@/lib/capsule/preview";
 import { CoverAdjustDialog } from "@/components/newsletter/cover-adjust-dialog";
@@ -170,6 +171,7 @@ export function NewsletterEditor({
   const [coverError, setCoverError] = useState<string | null>(null);
   const [draggingBody, setDraggingBody] = useState(false);
   const [showingHistory, setShowingHistory] = useState(false);
+  const [showingCrossPosts, setShowingCrossPosts] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Set once the post is being deleted, so closing the editor doesn't try to save it.
   const deleting = useRef(false);
@@ -238,17 +240,8 @@ export function NewsletterEditor({
     return { medium: previewAtom("medium", draft), substack: previewAtom("substack", draft) };
   }, [previewing, draft]);
 
-  // Stand-in for the server until the real seal and status endpoints are connected.
-  const draftRef = useRef(draft);
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
-  const capsuleApi = useMemo(
-    // The getter only runs later, from the menu's click handlers, never while rendering.
-    // eslint-disable-next-line react-hooks/refs
-    () => createFakeCapsuleApi({ getDraft: () => draftRef.current, storage: browserStorage }),
-    [],
-  );
+  // The seal and status endpoints. They read the saved post, so the menu saves it first (beforeSeal).
+  const capsuleApi = useMemo(() => createServerCapsuleApi(), []);
 
   // The byline line of the story card, as the website writes it: authors and read time.
   const cardByline = `${authorIds.map((id) => membersById[id]?.label).filter(Boolean).join(", ")}${authorIds.length ? " · " : ""}${Math.max(1, Math.round(body.trim().split(/\s+/).filter(Boolean).length / 200))} min read`;
@@ -490,6 +483,9 @@ export function NewsletterEditor({
             {previewing ? "Edit" : "Preview"}
           </Button>
           <PublishMenu api={capsuleApi} draft={draft} beforeSeal={flushSave} />
+          <Button type="button" variant="ghost" onClick={() => setShowingCrossPosts(true)}>
+            Cross-posts
+          </Button>
           <Button type="button" onClick={handlePublish} disabled={isPublishing}>
             {post.status === "published" ? "Republish" : "Publish"}
           </Button>
@@ -729,6 +725,10 @@ export function NewsletterEditor({
           beforeAction={flushSave}
           onClose={() => setShowingHistory(false)}
         />
+      ) : null}
+
+      {showingCrossPosts ? (
+        <CapsuleHistory api={capsuleApi} draftId={post.id} onClose={() => setShowingCrossPosts(false)} />
       ) : null}
 
       {adjustingCover && coverUrl ? (
