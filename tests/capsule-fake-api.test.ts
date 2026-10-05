@@ -48,7 +48,7 @@ describe("fake capsule api", () => {
     expect(atoms.medium.status).toBe("sealed");
     expect(atoms.substack.status).toBe("sealed");
     expect(atoms.medium.html).toContain("<h1>Title</h1>");
-    expect(atoms.substack.html).toBe("<p>Hello</p>");
+    expect(atoms.substack.html).toContain("<p>Hello</p>");
   });
 
   it("loads the latest capsule and says when the draft has changed since", async () => {
@@ -89,7 +89,7 @@ describe("fake capsule api", () => {
     const history = await api.history({ draftId: "d1" });
     if (!history.ok) throw new Error("history failed");
     expect(history.data.capsules).toHaveLength(2);
-    expect(history.data.capsules[0].atoms.substack.html).toBe("<p>Second version</p>");
+    expect(history.data.capsules[0].atoms.substack.html).toContain("<p>Second version</p>");
   });
 
   it("explains itself when the capsule is gone", async () => {

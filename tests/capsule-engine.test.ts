@@ -80,6 +80,22 @@ describe("parseBlocks", () => {
     expect(kinds("| just | pipes |")).toEqual(["paragraph"]);
   });
 
+  it("reads a table whose rows are separated by blank lines, as pasted from a chat", () => {
+    const pasted = "| Step | Pain |\n\n|---|---|\n\n| One | Hours |\n\n| Two | Slips |\n\nAfter the table.";
+    expect(parseBlocks(pasted)).toEqual([
+      { kind: "table", header: ["Step", "Pain"], rows: [["One", "Hours"], ["Two", "Slips"]] },
+      { kind: "paragraph", text: "After the table." },
+    ]);
+  });
+
+  it("does not turn a pipe line, a blank line and a lone rule into a table", () => {
+    expect(kinds("| just | pipes |\n\n---")).toEqual(["paragraph", "hr"]);
+  });
+
+  it("ends a table at the first filled line that does not start with a pipe", () => {
+    expect(kinds("| a |\n|---|\n| 1 |\n\nplain\n\n| late |")).toEqual(["table", "paragraph", "paragraph"]);
+  });
+
   it("reads a multi-line math block", () => {
     expect(parseBlocks("$$\na + b\n= c\n$$")[0]).toEqual({ kind: "math", tex: "a + b\n= c" });
   });

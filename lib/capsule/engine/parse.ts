@@ -31,6 +31,13 @@ export function cleanLanguage(value: string) {
   return value.trim().replace(/[^a-zA-Z0-9_+#-]/g, "");
 }
 
+// Index of the next line that has text, from `from` on (or the line count when there is none).
+function nextFilled(lines: string[], from: number) {
+  let at = from;
+  while (at < lines.length && !lines[at].trim()) at += 1;
+  return at;
+}
+
 function tableCells(line: string) {
   return line
     .trim()
@@ -97,13 +104,25 @@ export function parseBlocks(source: string): Block[] {
     }
 
     // A table needs a header row followed by a |---|---| row; anything else with pipes is a paragraph.
-    if (line.startsWith("|") && i + 1 < lines.length && TABLE_SEPARATOR.test(lines[i + 1].trim())) {
-      const header = tableCells(line);
-      const rows: string[][] = [];
-      i += 2;
-      while (i < lines.length && lines[i].trim().startsWith("|")) rows.push(tableCells(lines[i++]));
-      blocks.push({ kind: "table", header, rows });
-      continue;
+    // Text copied from a chat often has blank lines between the rows, so those are skipped as long as the
+    // next filled line still starts with a pipe (the divider must then have a pipe too, so a lone "---"
+    // after a blank line stays a rule). This matches what the website renderer accepts.
+    if (line.startsWith("|")) {
+      const dividerAt = nextFilled(lines, i + 1);
+      const divider = lines[dividerAt]?.trim();
+      if (divider !== undefined && TABLE_SEPARATOR.test(divider) && (dividerAt === i + 1 || divider.includes("|"))) {
+        const header = tableCells(line);
+        const rows: string[][] = [];
+        i = dividerAt + 1;
+        for (;;) {
+          const at = nextFilled(lines, i);
+          if (at >= lines.length || !lines[at].trim().startsWith("|")) break;
+          rows.push(tableCells(lines[at]));
+          i = at + 1;
+        }
+        blocks.push({ kind: "table", header, rows });
+        continue;
+      }
     }
 
     const footnote = FOOTNOTE.exec(line);
