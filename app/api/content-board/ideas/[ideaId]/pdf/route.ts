@@ -10,14 +10,22 @@ export const maxDuration = 60;
 // is a redirect to a signed file link that tells the browser to save the file. Following links is
 // something every browser does, phones and in-app browsers included, unlike saving a file a script
 // has fetched.
-export async function GET(_request: Request, { params }: { params: Promise<{ ideaId: string }> }) {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// `?files=<id>,<id>` picks the draft to download (the one on screen); without it, the latest draft.
+export async function GET(request: Request, { params }: { params: Promise<{ ideaId: string }> }) {
   await requireEnabledTool("content-board");
   const { ideaId } = await params;
   const { supabase, user } = await getUserSession();
   if (!user) return new NextResponse("Please sign in again, then try the download.", { status: 401 });
 
   try {
-    const url = await getIdeaPdfDownloadUrl(supabase, ideaId);
+    const fileIds = (new URL(request.url).searchParams.get("files") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => UUID.test(value))
+      .slice(0, 50);
+    const url = await getIdeaPdfDownloadUrl(supabase, ideaId, fileIds);
     return NextResponse.redirect(url, { status: 303, headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof NothingToDownloadError) return new NextResponse(error.message, { status: 404 });

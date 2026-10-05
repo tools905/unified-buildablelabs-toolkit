@@ -1,19 +1,22 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, Link2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Link2 } from "lucide-react";
 import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
-import { describeUploads, formatWhen, groupUploads } from "@/components/content-board/activity";
+import { describeUploads, draftOf, formatWhen, groupUploads, type UploadGroup } from "@/components/content-board/activity";
+import { ideaPdfUrl } from "@/components/content-board/idea-pdf";
 import { PdfViewer } from "@/components/content-board/pdf-viewer";
 import { cn } from "@/lib/utils/cn";
 import type { PanelAttachment } from "@/components/content-board/types";
 
 export function PreviewViewer({
+  ideaId,
   attachments,
   index,
   onIndexChange,
   onRemove,
   busy,
 }: {
+  ideaId: string;
   attachments: PanelAttachment[];
   index: number;
   onIndexChange: (index: number) => void;
@@ -21,6 +24,8 @@ export function PreviewViewer({
   busy: boolean;
 }) {
   const current = attachments[index];
+  const drafts = groupUploads(attachments);
+  const currentDraft = draftOf(drafts, index);
 
   if (!current) {
     return (
@@ -77,8 +82,16 @@ export function PreviewViewer({
 
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 text-xs text-muted-foreground">
-          Showing {index + 1} of {attachments.length} · uploaded by{" "}
-          <span className="font-medium text-foreground">{current.uploaderName}</span> · {formatWhen(current.createdAt)}
+          {currentDraft && drafts.length > 1 ? (
+            <span className="font-medium text-foreground">
+              Draft {currentDraft.number}
+              {currentDraft === drafts[drafts.length - 1] ? " (latest)" : ""} ·{" "}
+            </span>
+          ) : null}
+          {currentDraft && currentDraft.items.length > 1
+            ? `file ${currentDraft.items.findIndex((item) => item.index === index) + 1} of ${currentDraft.items.length} · `
+            : ""}
+          uploaded by <span className="font-medium text-foreground">{current.uploaderName}</span> · {formatWhen(current.createdAt)}
         </p>
         <div className="flex shrink-0 items-center gap-1">
           {current.kind === "link" && current.url ? (
@@ -102,82 +115,135 @@ export function PreviewViewer({
         </div>
       </div>
 
-      <UploadRounds attachments={attachments} index={index} onIndexChange={onIndexChange} />
+      <DraftList ideaId={ideaId} drafts={drafts} index={index} onIndexChange={onIndexChange} />
     </div>
   );
 }
 
-// Every upload, grouped by who added it and when, oldest round first and the latest one marked.
-// The tiles wrap onto new rows instead of scrolling sideways, so everything is visible at once.
-function UploadRounds({
-  attachments,
+// Every draft of the post, newest first so the latest is always at the top: who uploaded it, when,
+// what it holds, and a button to download just that draft as a PDF. Picking a draft shows it above;
+// the picked draft also lists its files, so any one of them can be looked at.
+function DraftList({
+  ideaId,
+  drafts,
   index,
   onIndexChange,
 }: {
-  attachments: PanelAttachment[];
+  ideaId: string;
+  drafts: UploadGroup[];
   index: number;
   onIndexChange: (index: number) => void;
 }) {
-  const groups = groupUploads(attachments);
-  const latest = groups[groups.length - 1];
+  const latest = drafts[drafts.length - 1];
+  const newestFirst = [...drafts].reverse();
 
   return (
-    <div className="space-y-2 border-t border-border pt-3">
-      {groups.length > 1 && latest ? (
-        <p className="text-xs">
-          <span className="font-semibold text-primary">Latest upload:</span> {describeUploads(latest.items)} by{" "}
-          <span className="font-medium">{latest.uploaderName}</span> · {formatWhen(latest.at)}
-        </p>
-      ) : null}
-      <ol className="space-y-3">
-        {groups.map((group, groupIndex) => {
-          const isLatest = group === latest && groups.length > 1;
+    <section aria-label="Drafts" className="space-y-2 border-t border-border pt-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <h4 className="text-xs font-semibold">
+          {drafts.length === 1 ? "Draft" : `Drafts (${drafts.length})`}
+        </h4>
+        {drafts.length > 1 ? <span className="text-[11px] text-muted-foreground">Newest first</span> : null}
+      </div>
+      <ol className="divide-y divide-border border border-border">
+        {newestFirst.map((draft) => {
+          const selected = draft.items.some((item) => item.index === index);
+          const fileIds = draft.items.filter((item) => item.attachment.kind !== "link").map((item) => item.attachment.id);
+          const isLatest = draft === latest;
           return (
             <li
-              key={group.key}
-              className={cn("border p-2", isLatest ? "border-primary/50 bg-primary/5" : "border-border")}
-              aria-label={`Upload ${groupIndex + 1} by ${group.uploaderName}`}
+              key={draft.key}
+              className={cn("transition-colors", selected ? "bg-primary/10 shadow-[inset_3px_0_0_var(--primary)]" : "hover:bg-muted/40")}
             >
-              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                <p className="text-xs">
-                  <span className="text-muted-foreground">{ordinal(groupIndex + 1)} upload · </span>
-                  <span className="font-semibold">{group.uploaderName}</span>
-                  <span className="text-muted-foreground"> · {describeUploads(group.items)}</span>
-                </p>
-                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  {isLatest ? (
-                    <span className="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
-                      Latest
+              <div className="flex items-center gap-2 py-2 pl-3 pr-1.5">
+                <button
+                  type="button"
+                  onClick={() => onIndexChange(draft.items[0].index)}
+                  aria-pressed={selected}
+                  aria-label={`Show draft ${draft.number}${isLatest ? " (latest)" : ""} by ${draft.uploaderName}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <DraftCover draft={draft} />
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
+                      Draft {draft.number}
+                      {isLatest ? (
+                        <span className="rounded-sm bg-primary px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                          Latest
+                        </span>
+                      ) : null}
+                      {selected ? <span className="text-[11px] font-medium text-primary">Viewing</span> : null}
                     </span>
-                  ) : null}
-                  {formatWhen(group.at)}
-                </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      <span className="text-foreground">{draft.uploaderName}</span> · {formatWhen(draft.at)}
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground">{describeUploads(draft.items)}</span>
+                  </span>
+                </button>
+                {fileIds.length > 0 ? (
+                  // A plain link, so the download works on phones and in in-app browsers too.
+                  <a
+                    href={ideaPdfUrl(ideaId, fileIds)}
+                    rel="noopener"
+                    aria-label={`Download draft ${draft.number} as PDF`}
+                    title={`Download draft ${draft.number} as PDF`}
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                ) : null}
               </div>
-              <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6">
-                {group.items.map(({ attachment, index: itemIndex }) => (
-                  <UploadTile
-                    key={attachment.id}
-                    attachment={attachment}
-                    position={itemIndex + 1}
-                    selected={itemIndex === index}
-                    onSelect={() => onIndexChange(itemIndex)}
-                  />
-                ))}
-              </div>
+              {selected && draft.items.length > 1 ? (
+                <div className="grid grid-cols-6 gap-1.5 px-3 pb-3 sm:grid-cols-8">
+                  {draft.items.map(({ attachment, index: itemIndex }, position) => (
+                    <FileTile
+                      key={attachment.id}
+                      attachment={attachment}
+                      position={position + 1}
+                      selected={itemIndex === index}
+                      onSelect={() => onIndexChange(itemIndex)}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </li>
           );
         })}
       </ol>
-    </div>
+    </section>
   );
 }
 
-function ordinal(value: number) {
-  const suffix = value % 100 >= 11 && value % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][value % 10] ?? "th";
-  return `${value}${suffix}`;
+function pictureOf(attachment: PanelAttachment) {
+  return attachment.kind === "image" ? (attachment.thumbUrl ?? attachment.url) : attachment.thumbUrl;
 }
 
-function UploadTile({
+// A small look at a draft: its first file, with a count when it holds several.
+function DraftCover({ draft }: { draft: UploadGroup }) {
+  const first = draft.items[0].attachment;
+  const picture = pictureOf(first);
+  return (
+    <span className="relative grid h-[60px] w-12 shrink-0 place-items-center overflow-hidden rounded-sm border border-border bg-card text-muted-foreground">
+      {picture ? (
+        // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URLs
+        <img src={picture} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
+      ) : first.kind === "pdf" ? (
+        <FileText className="h-5 w-5" />
+      ) : (
+        <Link2 className="h-5 w-5" />
+      )}
+      {draft.items.length > 1 ? (
+        <span className="absolute bottom-0.5 right-0.5 rounded-sm bg-black/75 px-1 text-[9px] font-semibold text-white">
+          {draft.items.length}
+        </span>
+      ) : first.kind === "pdf" ? (
+        <span className="absolute bottom-0.5 right-0.5 rounded-sm bg-black/75 px-1 text-[9px] font-semibold text-white">PDF</span>
+      ) : null}
+    </span>
+  );
+}
+
+function FileTile({
   attachment,
   position,
   selected,
@@ -188,17 +254,16 @@ function UploadTile({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const picture = attachment.kind === "image" ? (attachment.thumbUrl ?? attachment.url) : attachment.thumbUrl;
-  const kindLabel = attachment.kind === "pdf" ? "PDF" : attachment.kind === "link" ? "Link" : null;
+  const picture = pictureOf(attachment);
   return (
     <button
       type="button"
       onClick={onSelect}
-      aria-label={`Show item ${position}${attachment.fileName ? `: ${attachment.fileName}` : ""}`}
+      aria-label={`Show file ${position}${attachment.fileName ? `: ${attachment.fileName}` : ""}`}
       aria-current={selected}
       title={attachment.fileName ?? undefined}
       className={cn(
-        "relative flex aspect-[4/5] items-center justify-center overflow-hidden border bg-card text-muted-foreground transition-colors",
+        "relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-sm border bg-card text-muted-foreground transition-colors",
         selected ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/50",
       )}
     >
@@ -206,13 +271,10 @@ function UploadTile({
         // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URLs
         <img src={picture} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
       ) : attachment.kind === "pdf" ? (
-        <FileText className="h-5 w-5" />
+        <FileText className="h-4 w-4" />
       ) : (
-        <Link2 className="h-5 w-5" />
+        <Link2 className="h-4 w-4" />
       )}
-      {kindLabel ? (
-        <span className="absolute bottom-0.5 right-0.5 rounded-sm bg-black/75 px-1 text-[9px] font-semibold text-white">{kindLabel}</span>
-      ) : null}
       <span className="absolute left-0.5 top-0.5 rounded-sm bg-black/60 px-1 text-[9px] text-white">{position}</span>
     </button>
   );

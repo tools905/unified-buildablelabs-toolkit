@@ -6,7 +6,7 @@ import { Download, ExternalLink, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { ActivityTimeline } from "@/components/content-board/activity-timeline";
-import { hasChangesSinceReview } from "@/components/content-board/activity";
+import { draftOf, groupUploads, hasChangesSinceReview } from "@/components/content-board/activity";
 import { AttachmentAdder } from "@/components/content-board/attachment-adder";
 import { PostPreview } from "@/components/content-board/post-preview/post-preview";
 import { PreviewViewer } from "@/components/content-board/preview-viewer";
@@ -53,7 +53,8 @@ export function IdeaPanel({
   const [data, setData] = useState<IdeaPanelData | null>(() => peekPanel(idea.id));
   const dataRef = useRef<IdeaPanelData | null>(data);
   const [loadError, setLoadError] = useState(false);
-  const [index, setIndex] = useState(0);
+  // The file picked in the viewer. Until someone picks one, the panel shows the latest draft.
+  const [chosenIndex, setChosenIndex] = useState<number | null>(null);
   // "files" is the viewer of what was uploaded; "feed" shows it as an Instagram or LinkedIn post.
   const [view, setView] = useState<"files" | "feed">("files");
   const [removeError, setRemoveError] = useState<string | null>(null);
@@ -102,7 +103,7 @@ export function IdeaPanel({
           });
           commit({ ...next, attachments });
           setLoadError(false);
-          setIndex((value) => Math.min(value, Math.max(0, next.attachments.length - 1)));
+          setChosenIndex((value) => (value === null ? null : Math.min(value, Math.max(0, next.attachments.length - 1))));
         })
         .catch(() => {
           // With data already on screen, a failed quiet reload must not blank it out.
@@ -132,6 +133,14 @@ export function IdeaPanel({
   }, [ideaId, refresh]);
 
   const attachments = data?.attachments ?? [];
+  const drafts = groupUploads(attachments);
+  const latestDraft = drafts[drafts.length - 1] ?? null;
+  const index = Math.min(chosenIndex ?? latestDraft?.items[0]?.index ?? 0, Math.max(0, attachments.length - 1));
+  // The draft on screen: what Download and the feed preview use.
+  const currentDraft = draftOf(drafts, index) ?? latestDraft;
+  const currentDraftFileIds = (currentDraft?.items ?? [])
+    .filter((item) => item.attachment.kind !== "link")
+    .map((item) => item.attachment.id);
   const currentKind = attachments[index]?.kind;
 
   // A file dropped just outside the upload box would make the browser open it and leave the app.
@@ -162,18 +171,18 @@ export function IdeaPanel({
       }
       if (typing) return;
       if (currentKind === "pdf") return;
-      if (event.key === "ArrowLeft") setIndex((value) => Math.max(0, value - 1));
-      if (event.key === "ArrowRight") setIndex((value) => Math.min(attachments.length - 1, value + 1));
+      if (event.key === "ArrowLeft") setChosenIndex(Math.max(0, index - 1));
+      if (event.key === "ArrowRight") setChosenIndex(Math.min(attachments.length - 1, index + 1));
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [keyboardActive, onClose, currentKind, attachments.length]);
+  }, [keyboardActive, onClose, currentKind, attachments.length, index]);
 
   function removeAttachment(attachment: PanelAttachment) {
     setRemoveError(null);
     const before = dataRef.current?.attachments ?? [];
     applyLocal((current) => ({ ...current, attachments: current.attachments.filter((item) => item.id !== attachment.id) }));
-    setIndex((value) => Math.min(value, Math.max(0, before.length - 2)));
+    setChosenIndex((value) => (value === null ? null : Math.min(value, Math.max(0, before.length - 2))));
     void (async () => {
       const putBack = () => applyLocal((current) => ({ ...current, attachments: before }));
       let succeeded = true;
@@ -232,9 +241,17 @@ export function IdeaPanel({
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium">
               {hasFiles ? (
                 // A plain link, so the download works on phones and in in-app browsers too.
-                <a href={ideaPdfUrl(idea.id)} rel="noopener" className="inline-flex min-h-8 items-center gap-1 text-primary hover:underline">
+                <a
+                  href={ideaPdfUrl(idea.id, currentDraftFileIds)}
+                  rel="noopener"
+                  className="inline-flex min-h-8 items-center gap-1 text-primary hover:underline"
+                >
                   <Download className="h-3.5 w-3.5" />
-                  Download PDF
+                  {drafts.length > 1 && currentDraftFileIds.length > 0 && currentDraft
+                    ? `Download draft ${currentDraft.number}${currentDraft === latestDraft ? " (latest)" : ""} as PDF`
+                    : drafts.length > 1
+                      ? "Download latest draft as PDF"
+                      : "Download PDF"}
                 </a>
               ) : null}
               {livePostUrl ? (
@@ -310,15 +327,22 @@ export function IdeaPanel({
               </div>
               {view === "files" ? (
                 <PreviewViewer
+                  ideaId={idea.id}
                   attachments={attachments}
                   index={index}
-                  onIndexChange={setIndex}
+                  onIndexChange={setChosenIndex}
                   onRemove={removeAttachment}
                   busy={false}
                 />
               ) : (
                 <PostPreview
-                  attachments={attachments}
+                  // Only the draft on screen: earlier drafts are not part of the post.
+                  attachments={currentDraft ? currentDraft.items.map((item) => item.attachment) : attachments}
+                  draftLabel={
+                    drafts.length > 1 && currentDraft
+                      ? `Draft ${currentDraft.number}${currentDraft === latestDraft ? " (latest)" : ""} by ${currentDraft.uploaderName}`
+                      : null
+                  }
                   caption={idea.caption ?? null}
                   ideaPlatforms={platforms}
                   title={idea.title}

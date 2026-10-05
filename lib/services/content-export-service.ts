@@ -4,11 +4,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
 import { exportFolder, listAttachments } from "@/lib/services/content-attachment-service";
-import { CONTENT_BUCKET } from "@/lib/utils/content-board";
+import { CONTENT_BUCKET, groupIntoDrafts } from "@/lib/utils/content-board";
 import { exportKey, ideaPdfFileName, pageSizeFor } from "@/lib/utils/content-export";
 import { mimeTypeFromPath } from "@/lib/utils/download-name";
 
 const DOWNLOAD_LINK_TTL_SECONDS = 10 * 60;
+// PDFs made for downloading are kept so a second download is instant; beyond this many per idea the
+// oldest are removed.
+const KEEP_EXPORTS = 10;
 
 export class NothingToDownloadError extends Error {
   constructor() {
@@ -54,9 +57,10 @@ export async function buildIdeaPdf(supabase: SupabaseClient<any>, files: { kind:
   return doc.save();
 }
 
-// A short-lived link that downloads the idea's post as a single PDF. Uses the caller's own Supabase
-// client, so row-level security decides who may download what.
-export async function getIdeaPdfDownloadUrl(supabase: SupabaseClient<any>, ideaId: string) {
+// A short-lived link that downloads one draft of the idea's post as a single PDF: the draft made of
+// `fileIds` (the one on screen), or the latest draft when none are given. Uses the caller's own
+// Supabase client, so row-level security decides who may download what.
+export async function getIdeaPdfDownloadUrl(supabase: SupabaseClient<any>, ideaId: string, fileIds: string[] = []) {
   const { data: idea, error } = await supabase
     .from("content_ideas")
     .select("id, title, workspace_id")
@@ -65,12 +69,19 @@ export async function getIdeaPdfDownloadUrl(supabase: SupabaseClient<any>, ideaI
   if (error) throw error;
   if (!idea) throw new NothingToDownloadError();
 
-  const files = (await listAttachments(supabase, ideaId)).filter(
+  const all = await listAttachments(supabase, ideaId);
+  const drafts = groupIntoDrafts(all, (item) => item.created_by, (item) => item.created_at);
+  const draftIndex = fileIds.length
+    ? drafts.findIndex((draft) => draft.some((item) => fileIds.includes(item.id)))
+    : drafts.length - 1;
+  const draft = draftIndex >= 0 ? drafts[draftIndex] : [];
+  const chosen = fileIds.length ? draft.filter((item) => fileIds.includes(item.id)) : draft;
+  const files = chosen.filter(
     (item): item is typeof item & { storage_path: string } => item.kind !== "link" && Boolean(item.storage_path),
   );
   if (files.length === 0) throw new NothingToDownloadError();
 
-  const fileName = ideaPdfFileName(idea.title);
+  const fileName = ideaPdfFileName(drafts.length > 1 ? `${idea.title} - draft ${draftIndex + 1}` : idea.title);
   const storage = supabase.storage.from(CONTENT_BUCKET);
 
   // A single uploaded PDF already is the download.
@@ -86,9 +97,13 @@ export async function getIdeaPdfDownloadUrl(supabase: SupabaseClient<any>, ideaI
       const { error: uploadError } = await storage.upload(path, pdf, { contentType: "application/pdf", upsert: false });
       // Someone else may have made the same PDF a moment ago; theirs is just as good.
       if (uploadError && !/exists|duplicate/i.test(uploadError.message)) throw uploadError;
-      // PDFs made for an older set of files are no longer needed.
-      const stale = (existing ?? []).filter((item) => item.name !== name).map((item) => `${folder}/${item.name}`);
-      if (stale.length) await storage.remove(stale);
+      // Keep the PDFs of other drafts for quick downloads, but only the most recent few.
+      const older = (existing ?? [])
+        .filter((item) => item.name !== name)
+        .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+        .slice(KEEP_EXPORTS - 1)
+        .map((item) => `${folder}/${item.name}`);
+      if (older.length) await storage.remove(older);
     }
   }
 

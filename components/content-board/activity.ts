@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import type { IdeaPanelData, PanelAttachment } from "@/components/content-board/types";
 import type { ContentIdeaStatus } from "@/lib/db/types";
+import { groupIntoDrafts } from "@/lib/utils/content-board";
 
 // "30 Sep 2026, 5:12 pm" in the viewer's own time zone.
 export function formatWhen(value: string | Date) {
@@ -68,34 +69,37 @@ export function hasChangesSinceReview(data: IdeaPanelData) {
   return data.attachments.some((item) => new Date(item.createdAt).getTime() > reviewedAt);
 }
 
-// Uploads more than this far apart count as separate rounds, even from the same person.
-const SAME_UPLOAD_MS = 30 * 60 * 1000;
-
 export type UploadGroup = {
   key: string;
+  // 1 for the first draft uploaded, counting up.
+  number: number;
   uploaderName: string;
   at: string;
   // Each file with its position in the full list (what the viewer shows when it is picked).
   items: { attachment: PanelAttachment; index: number }[];
 };
 
-// The idea's files split into rounds of uploading, in the order they happened: one round is one
-// person adding files around the same time. Shows at a glance who uploaded first, who added what
-// after them, and which round is the latest.
+// The idea's files split into drafts, oldest first: one draft is one person adding files around the
+// same time (see groupIntoDrafts). Shows who uploaded first, who added what after them, and which
+// draft is the latest.
 export function groupUploads(attachments: PanelAttachment[]): UploadGroup[] {
-  const groups: UploadGroup[] = [];
-  attachments.forEach((attachment, index) => {
-    const last = groups[groups.length - 1];
-    const previous = last?.items[last.items.length - 1]?.attachment;
-    const sameRound =
-      last &&
-      previous &&
-      last.uploaderName === attachment.uploaderName &&
-      Math.abs(new Date(attachment.createdAt).getTime() - new Date(previous.createdAt).getTime()) <= SAME_UPLOAD_MS;
-    if (sameRound) last.items.push({ attachment, index });
-    else groups.push({ key: attachment.id, uploaderName: attachment.uploaderName, at: attachment.createdAt, items: [{ attachment, index }] });
-  });
-  return groups;
+  const drafts = groupIntoDrafts(
+    attachments.map((attachment, index) => ({ attachment, index })),
+    (item) => item.attachment.uploaderName,
+    (item) => item.attachment.createdAt,
+  );
+  return drafts.map((items, position) => ({
+    key: items[0].attachment.id,
+    number: position + 1,
+    uploaderName: items[0].attachment.uploaderName,
+    at: items[0].attachment.createdAt,
+    items,
+  }));
+}
+
+// The draft a file belongs to.
+export function draftOf(groups: UploadGroup[], index: number): UploadGroup | null {
+  return groups.find((group) => group.items.some((item) => item.index === index)) ?? null;
 }
 
 // "8 images", "1 PDF", "2 images · 1 design link".

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { canMoveIdea, diffAssignees } from "@/lib/utils/content-board";
+import { canMoveIdea, diffAssignees, groupIntoDrafts } from "@/lib/utils/content-board";
 import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
@@ -16,7 +16,7 @@ import {
 } from "@/lib/validation/content-idea-schema";
 
 export const CONTENT_IDEA_SELECT =
-  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order), review_points:content_idea_review_points(id, is_resolved, created_at), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
+  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at), review_points:content_idea_review_points(id, is_resolved, created_at), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
 
 export async function createContentIdea(
   supabase: SupabaseClient<any>,
@@ -196,20 +196,32 @@ export async function listContentIdeas(
 }
 
 type IdeaWithEmbeds = {
-  attachments?: { id: string; kind: "image" | "pdf" | "link"; thumb_path: string | null; sort_order: number }[] | null;
+  attachments?:
+    | {
+        id: string;
+        kind: "image" | "pdf" | "link";
+        thumb_path: string | null;
+        sort_order: number;
+        created_by?: string;
+        created_at?: string;
+      }[]
+    | null;
   review_points?: { id: string; is_resolved: boolean; created_at?: string }[] | null;
 };
 
 export type CardThumbnail = { kind: "image" | "pdf" | "link"; url: string | null };
 
 // Adds the small things a board card shows: attachment count, review counts, when the first
-// feedback came in, and a thumbnail. The thumbnail is the first upload that has a small preview
-// image (a picture, or the first page of a PDF carousel); otherwise just the kind of file.
+// feedback came in, and a thumbnail. The thumbnail comes from the latest draft: its first upload that
+// has a small preview image (a picture, or the first page of a PDF carousel). Without one, the
+// earliest such upload; otherwise just the kind of file.
 export async function attachCardPreviews<T extends IdeaWithEmbeds>(supabase: SupabaseClient<any>, ideas: T[]) {
   const firstThumb = new Map<number, { path: string; kind: "image" | "pdf" }>();
   ideas.forEach((idea, index) => {
     const sorted = [...(idea.attachments ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-    const withThumb = sorted.find((item) => item.kind !== "link" && item.thumb_path);
+    const drafts = groupIntoDrafts(sorted, (item) => item.created_by ?? "", (item) => item.created_at ?? "");
+    const hasThumb = (item: (typeof sorted)[number]) => item.kind !== "link" && Boolean(item.thumb_path);
+    const withThumb = drafts[drafts.length - 1]?.find(hasThumb) ?? sorted.find(hasThumb);
     if (withThumb?.thumb_path) firstThumb.set(index, { path: withThumb.thumb_path, kind: withThumb.kind as "image" | "pdf" });
   });
   const signed = await signPaths(supabase, [...firstThumb.values()].map((thumb) => thumb.path));

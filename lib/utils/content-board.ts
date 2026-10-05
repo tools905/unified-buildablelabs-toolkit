@@ -173,3 +173,24 @@ export function sortColumnIdeas<T extends SortableIdea>(status: ContentIdeaStatu
   }
   return ideas;
 }
+
+// Uploads more than this far apart count as separate drafts, even from the same person.
+export const SAME_DRAFT_MS = 30 * 60 * 1000;
+
+// Splits an idea's uploads (in upload order) into drafts: one draft is one person adding files around
+// the same time. Used by the panel to show the drafts and by the server to know which files make up
+// the draft being downloaded, so both always agree.
+export function groupIntoDrafts<T>(items: T[], who: (item: T) => string, at: (item: T) => string): T[][] {
+  const drafts: T[][] = [];
+  for (const item of items) {
+    const current = drafts[drafts.length - 1];
+    const previous = current?.[current.length - 1];
+    const sameDraft =
+      previous !== undefined &&
+      who(previous) === who(item) &&
+      Math.abs(new Date(at(item)).getTime() - new Date(at(previous)).getTime()) <= SAME_DRAFT_MS;
+    if (sameDraft) current.push(item);
+    else drafts.push([item]);
+  }
+  return drafts;
+}

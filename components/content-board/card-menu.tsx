@@ -71,7 +71,7 @@ export function CardMenu({
           <DropdownMenuItem asChild>
             <a href={ideaPdfUrl(idea.id)} rel="noopener">
               <Download />
-              Download as PDF
+              Download latest draft (PDF)
             </a>
           </DropdownMenuItem>
         ) : null}

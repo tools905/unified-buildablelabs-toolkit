@@ -24,8 +24,11 @@ export function PostPreview({
   ideaPlatforms,
   title,
   onEditCaption,
+  draftLabel = null,
 }: {
   attachments: PanelAttachment[];
+  // Which draft is being previewed, when the idea has more than one.
+  draftLabel?: string | null;
   caption: string | null;
   ideaPlatforms: string[];
   // The idea's title, shown as the document title under a LinkedIn carousel made of images.
@@ -83,6 +86,12 @@ export function PostPreview({
           {dark ? "Dark feed" : "Light feed"}
         </button>
       </div>
+
+      {draftLabel ? (
+        <p className="text-xs text-muted-foreground">
+          Previewing <span className="font-medium text-foreground">{draftLabel}</span>. Pick another draft under Files to preview it.
+        </p>
+      ) : null}
 
       <button
         type="button"
