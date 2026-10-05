@@ -5,15 +5,19 @@ import Link from "next/link";
 import {
   ChevronLeft,
   Code,
+  Eye,
   Heading2,
   Heading3,
   History,
   Image as ImageIcon,
   Link as LinkIcon,
   List,
+  ListChecks,
   ListOrdered,
+  Pencil,
   Quote,
   SquareCode,
+  Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -441,16 +445,20 @@ export function NewsletterEditor({
 
   return (
     <div className="-m-4 flex min-h-[calc(100vh-1px)] flex-col sm:-m-6 lg:-m-10">
-      <div className="flex items-center justify-between gap-3 border-b border-muted px-6 py-4 sm:px-8">
-        <div className="flex items-center gap-3.5">
+      {/* The header reacts to its own width (the sidebar takes part of the screen, so the window's width says
+          little). Below 900px the quiet buttons keep only their icon. Below 660px the buttons drop to a second
+          line, with the save status and Publish staying on the first, and Preview is an icon too. Every label
+          stays on one line. `relative` lets the Cross-post popup span the header. */}
+      <div className="@container relative flex flex-wrap items-center gap-x-2.5 gap-y-3 border-b border-muted px-4 py-3 sm:px-8 sm:py-4">
+        <div className="order-1 mr-auto flex items-center gap-3.5">
           <Link
             href="/tools/newsletter"
             aria-label="Back to posts"
-            className="grid h-[34px] w-[34px] place-items-center border border-border text-chrome transition-colors hover:border-quiet hover:text-foreground"
+            className="grid h-[34px] w-[34px] shrink-0 place-items-center border border-border text-chrome transition-colors hover:border-quiet hover:text-foreground"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </Link>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
             <span
               className={cn(
                 "inline-block h-1.5 w-1.5 rounded-full",
@@ -464,32 +472,58 @@ export function NewsletterEditor({
             </span>
           </div>
         </div>
-        <div className="flex gap-2.5">
+        <div className="order-3 flex basis-full flex-wrap items-center justify-end gap-2 @min-[661px]:order-2 @min-[661px]:basis-auto sm:gap-2.5">
           {canDelete ? (
             <Button
               type="button"
               variant="ghost"
-              className="text-destructive hover:bg-destructive/10"
+              aria-label="Delete"
+              title="Delete"
+              className="whitespace-nowrap text-destructive hover:bg-destructive/10 @max-[900px]:w-10 @max-[900px]:px-0"
               onClick={() => setConfirmingDelete(true)}
             >
-              Delete
+              <Trash2 className="h-4 w-4 @min-[901px]:hidden" />
+              <span className="@max-[900px]:hidden">Delete</span>
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" onClick={() => setShowingHistory(true)}>
-            <History className="mr-1.5 h-3.5 w-3.5" />
-            History
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Version history"
+            title="Version history"
+            className="whitespace-nowrap @max-[900px]:w-10 @max-[900px]:px-0"
+            onClick={() => setShowingHistory(true)}
+          >
+            <History className="h-3.5 w-3.5 @min-[901px]:mr-1.5" />
+            <span className="@max-[900px]:hidden">History</span>
           </Button>
-          <Button type="button" variant="outline" onClick={() => setPreviewing((value) => !value)}>
-            {previewing ? "Edit" : "Preview"}
+          <Button
+            type="button"
+            variant="outline"
+            aria-label={previewing ? "Edit" : "Preview"}
+            title={previewing ? "Edit" : "Preview"}
+            className="whitespace-nowrap @max-[660px]:w-10 @max-[660px]:px-0"
+            onClick={() => setPreviewing((value) => !value)}
+          >
+            {previewing ? <Pencil className="h-4 w-4 @min-[661px]:hidden" /> : <Eye className="h-4 w-4 @min-[661px]:hidden" />}
+            <span className="@max-[660px]:hidden">{previewing ? "Edit" : "Preview"}</span>
           </Button>
           <PublishMenu api={capsuleApi} draft={draft} beforeSeal={flushSave} />
-          <Button type="button" variant="ghost" onClick={() => setShowingCrossPosts(true)}>
-            Cross-posts
-          </Button>
-          <Button type="button" onClick={handlePublish} disabled={isPublishing}>
-            {post.status === "published" ? "Republish" : "Publish"}
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Cross-post history"
+            title="Cross-post history"
+            className="whitespace-nowrap @max-[900px]:w-10 @max-[900px]:px-0"
+            onClick={() => setShowingCrossPosts(true)}
+          >
+            <ListChecks className="h-3.5 w-3.5 @min-[901px]:mr-1.5" />
+            <span className="@max-[900px]:hidden">Cross-posts</span>
           </Button>
         </div>
+        <Button type="button" className="order-2 whitespace-nowrap @min-[661px]:order-3" onClick={handlePublish} disabled={isPublishing}>
+          {post.status === "published" ? "Republish" : "Publish"}
+        </Button>
       </div>
 
       {previewing ? (

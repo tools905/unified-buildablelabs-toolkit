@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronDown, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,8 +113,10 @@ export function PublishMenu({
   const panelAtom = panel && capsule ? capsule.atoms[panel.platform] : null;
 
   return (
-    <div ref={root} className="relative">
-      <Button type="button" variant="outline" onClick={toggle} aria-expanded={open} aria-haspopup="dialog">
+    // Below `sm` the wrapper is not the anchor, so the popup spans the editor header (which is
+    // `relative`) instead of hanging off a button that may have wrapped to the left side.
+    <div ref={root} className="sm:relative">
+      <Button type="button" variant="outline" className="whitespace-nowrap" onClick={toggle} aria-expanded={open} aria-haspopup="dialog">
         Cross-post
         <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
       </Button>
@@ -122,7 +125,7 @@ export function PublishMenu({
         <div
           role="dialog"
           aria-label="Publish on Medium or Substack"
-          className="popover-shadow absolute right-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-4 text-sm"
+          className="popover-shadow absolute inset-x-4 top-full z-50 mt-2 rounded-lg border border-border bg-card p-4 text-sm sm:inset-x-auto sm:right-0 sm:w-[26rem]"
         >
           {preparing ? (
             <p className="flex items-center gap-2 text-muted-foreground" role="status">
@@ -225,27 +228,32 @@ export function PublishMenu({
         </div>
       ) : null}
 
-      {panel && capsule && panelAtom ? (
-        <SidePanel
-          key={`${capsule.id}-${panel.platform}`}
-          platform={panel.platform}
-          atom={panelAtom}
-          canonicalUrl={capsule.canonicalUrl}
-          outcome={panel.outcome}
-          onClose={() => setPanel(null)}
-          onCopyAgain={() => copyAgain(panel.platform)}
-          onOpenEditor={() => {
-            const opened = openEditor(editorUrl(panel.platform, publication));
-            if (!opened) {
-              setPanel({
-                platform: panel.platform,
-                outcome: { kind: "blocked", message: "Your browser blocked the new tab. Allow pop-ups for this site, then press Open again." },
-              });
-            }
-          }}
-          onMarkPosted={(liveUrl) => markPosted(panel.platform, liveUrl ?? undefined)}
-        />
-      ) : null}
+      {/* In a portal so no ancestor (the editor header is a layout container) can turn `fixed` into
+          "fixed inside the header". The panel only exists after a click, so `document` is always there. */}
+      {panel && capsule && panelAtom
+        ? createPortal(
+            <SidePanel
+              key={`${capsule.id}-${panel.platform}`}
+              platform={panel.platform}
+              atom={panelAtom}
+              canonicalUrl={capsule.canonicalUrl}
+              outcome={panel.outcome}
+              onClose={() => setPanel(null)}
+              onCopyAgain={() => copyAgain(panel.platform)}
+              onOpenEditor={() => {
+                const opened = openEditor(editorUrl(panel.platform, publication));
+                if (!opened) {
+                  setPanel({
+                    platform: panel.platform,
+                    outcome: { kind: "blocked", message: "Your browser blocked the new tab. Allow pop-ups for this site, then press Open again." },
+                  });
+                }
+              }}
+              onMarkPosted={(liveUrl) => markPosted(panel.platform, liveUrl ?? undefined)}
+            />,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
