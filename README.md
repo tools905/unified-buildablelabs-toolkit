@@ -1,4 +1,4 @@
-# Unified BuildableLabs Toolkit
+# BuildableLabs Team Connect
 
 An internal toolkit web app for BuildableLabs. The app uses one shared auth system,
 one Supabase Postgres database, one default internal workspace, and modular tool
@@ -13,6 +13,9 @@ areas for current and future team workflows.
 - Tickets: kanban-style ticket tracking with claimed-vs-verified progress
   review and in-platform notifications.
 - Resources: shared catalog of guides, tools, and learning roadmaps.
+- Content Board: social content from idea to posted (Ideas → Feedback →
+  Shortlisted → In Progress → Posted), with post previews, review points,
+  one-PDF downloads, assignment emails and a posting calendar.
 - Meetings: recap of past meetings ingested from Granola once a summary is
   generated (see `docs/GRANOLA_INTEGRATION.md`).
 
@@ -52,7 +55,7 @@ DATABASE_URL=
 DIRECT_URL=
 
 RESEND_API_KEY=
-EMAIL_FROM="BuildableLabs Toolkit <notifications@your-verified-domain.com>"
+EMAIL_FROM="BuildableLabs Team Connect <notifications@your-verified-domain.com>"
 
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=deepseek/deepseek-v4-flash
@@ -93,8 +96,7 @@ but the product treats this as one internal workspace.
 
 ## Main Routes
 
-- `/dashboard`
-- `/tools`
+- `/dashboard` (every tool, plus the workspace overview for admins)
 - `/tools/peer-review`
 - `/tools/peer-review/admin`
 - `/tools/peer-review/member`
@@ -110,13 +112,14 @@ but the product treats this as one internal workspace.
 - `/tools/resources`
 - `/tools/resources/admin`
 - `/tools/meetings`
-- `/admin`
-- `/admin/tools`
-- `/admin/settings`
+- `/tools/content-board`
+- `/tools/content-board/calendar`
 - `/admin/audit-logs`
+- `/team`, `/team/logs` (admins only)
 
 Legacy Peer Review routes under `/projects` and `/my-reviews` redirect to the
-new toolkit routes.
+new toolkit routes. `/tools`, `/admin`, `/admin/settings` and `/admin/tools`
+were folded into the Dashboard and redirect there.
 
 ## Verification
 

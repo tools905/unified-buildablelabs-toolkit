@@ -2,7 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { diffAssignees } from "@/lib/utils/content-board";
+import { canMoveIdea, diffAssignees } from "@/lib/utils/content-board";
+import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
+import { getAppLink } from "@/lib/utils/app-url";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
 import { removeStoredFilesForIdea, signPaths } from "@/lib/services/content-attachment-service";
 import {
@@ -14,7 +16,7 @@ import {
 } from "@/lib/validation/content-idea-schema";
 
 export const CONTENT_IDEA_SELECT =
-  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order), review_points:content_idea_review_points(id, is_resolved), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
+  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order), review_points:content_idea_review_points(id, is_resolved, created_at), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
 
 export async function createContentIdea(
   supabase: SupabaseClient<any>,
@@ -125,7 +127,7 @@ export async function setIdeaAssignees(
     metadata: { added: add, removed: remove },
   });
 
-  // Telling people is best effort: a failed notification must not undo the assignment.
+  // Telling people is best effort: a failed notification or email must not undo the assignment.
   const toNotify = add.filter((userId) => userId !== actorId);
   if (toNotify.length) {
     let title = options.ideaTitle;
@@ -133,15 +135,35 @@ export async function setIdeaAssignees(
       const { data } = await supabase.from("content_ideas").select("title").eq("id", ideaId).maybeSingle();
       title = data?.title ?? "an idea";
     }
+    const { data: people } = await supabase.from("profiles").select("id, full_name, email").in("id", [actorId, ...toNotify]);
+    const nameOf = (id: string) => {
+      const person = people?.find((candidate: { id: string }) => candidate.id === id);
+      return person?.full_name || person?.email || "Someone";
+    };
+    const assignerName = nameOf(actorId);
+    const ideaUrl = getAppLink(`/tools/content-board?idea=${ideaId}`);
     await Promise.allSettled(
-      toNotify.map((userId) =>
-        createNotification({
-          userId,
-          type: "content_idea_assigned",
-          title: "You were assigned a content idea",
-          message: `You were assigned “${title}” on the Content Board. Open Content Board in Tools to see it.`,
-        }),
-      ),
+      toNotify.flatMap((userId) => {
+        const email = people?.find((candidate: { id: string; email: string | null }) => candidate.id === userId)?.email;
+        return [
+          createNotification({
+            userId,
+            type: "content_idea_assigned",
+            title: "You were assigned a content idea",
+            message: `${assignerName} assigned you “${title}” on the Content Board.`,
+          }),
+          email
+            ? sendContentIdeaAssignedEmail(supabase, {
+                to: email,
+                assigneeName: nameOf(userId),
+                assignerName,
+                ideaTitle: title ?? "an idea",
+                url: ideaUrl,
+                workspaceId,
+              })
+            : Promise.resolve(),
+        ];
+      }),
     );
   }
 
@@ -175,40 +197,80 @@ export async function listContentIdeas(
 
 type IdeaWithEmbeds = {
   attachments?: { id: string; kind: "image" | "pdf" | "link"; thumb_path: string | null; sort_order: number }[] | null;
-  review_points?: { id: string; is_resolved: boolean }[] | null;
+  review_points?: { id: string; is_resolved: boolean; created_at?: string }[] | null;
 };
 
 export type CardThumbnail = { kind: "image" | "pdf" | "link"; url: string | null };
 
-// Adds the small things a board card shows: attachment count, review counts and a
-// thumbnail (a signed URL to the first image's small thumbnail, or just an icon kind).
+// Adds the small things a board card shows: attachment count, review counts, when the first
+// feedback came in, and a thumbnail. The thumbnail is the first upload that has a small preview
+// image (a picture, or the first page of a PDF carousel); otherwise just the kind of file.
 export async function attachCardPreviews<T extends IdeaWithEmbeds>(supabase: SupabaseClient<any>, ideas: T[]) {
-  const firstImageThumb = new Map<number, string>();
+  const firstThumb = new Map<number, { path: string; kind: "image" | "pdf" }>();
   ideas.forEach((idea, index) => {
     const sorted = [...(idea.attachments ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-    const image = sorted.find((item) => item.kind === "image" && item.thumb_path);
-    if (image?.thumb_path) firstImageThumb.set(index, image.thumb_path);
+    const withThumb = sorted.find((item) => item.kind !== "link" && item.thumb_path);
+    if (withThumb?.thumb_path) firstThumb.set(index, { path: withThumb.thumb_path, kind: withThumb.kind as "image" | "pdf" });
   });
-  const signed = await signPaths(supabase, [...firstImageThumb.values()]);
+  const signed = await signPaths(supabase, [...firstThumb.values()].map((thumb) => thumb.path));
 
   return ideas.map((idea, index) => {
     const attachments = idea.attachments ?? [];
     const points = idea.review_points ?? [];
-    const thumbPath = firstImageThumb.get(index);
-    const thumbnail: CardThumbnail | null = thumbPath
-      ? { kind: "image", url: signed.get(thumbPath) ?? null }
+    const thumb = firstThumb.get(index);
+    const thumbnail: CardThumbnail | null = thumb
+      ? { kind: thumb.kind, url: signed.get(thumb.path) ?? null }
       : attachments.some((item) => item.kind === "pdf")
         ? { kind: "pdf", url: null }
-        : attachments.length > 0
-          ? { kind: "link", url: null }
-          : null;
+        : attachments.some((item) => item.kind === "image")
+          ? { kind: "image", url: null }
+          : attachments.length > 0
+            ? { kind: "link", url: null }
+            : null;
+    const feedbackTimes = points.map((point) => point.created_at).filter((value): value is string => Boolean(value)).sort();
     return {
       ...idea,
       attachment_count: attachments.length,
+      file_count: attachments.filter((item) => item.kind !== "link").length,
       review_count: points.length,
       open_review_count: points.filter((point) => !point.is_resolved).length,
+      first_feedback_at: feedbackTimes[0] ?? null,
       thumbnail,
     };
+  });
+}
+
+// Moves an idea to another column, if this person is allowed to make that move (see canMoveIdea).
+// A date can come along when shortlisting, so the idea lands on the calendar at the same time.
+export async function moveContentIdea(
+  supabase: SupabaseClient<any>,
+  workspaceId: string,
+  ideaId: string,
+  actorId: string,
+  to: ContentIdeaStatus,
+  options: { scheduledFor?: string | null } = {},
+) {
+  const [{ data: idea, error }, isAdmin] = await Promise.all([
+    supabase
+      .from("content_ideas")
+      .select("id, status, assignees:content_idea_assignees(user_id)")
+      .eq("id", ideaId)
+      .maybeSingle(),
+    isWorkspaceAdmin(workspaceId, actorId, supabase),
+  ]);
+  if (error) throw error;
+  if (!idea) throw new Error("This idea no longer exists.");
+  const isAssignee = (idea.assignees ?? []).some((row: { user_id: string }) => row.user_id === actorId);
+  if (!canMoveIdea({ from: idea.status, to, isAdmin, isAssignee })) {
+    throw new Error(
+      isAdmin || isAssignee
+        ? "That move isn't allowed from here."
+        : "Only admins and the people assigned to this idea can move it.",
+    );
+  }
+  return updateContentIdea(supabase, workspaceId, ideaId, actorId, {
+    status: to,
+    ...(options.scheduledFor ? { scheduledFor: options.scheduledFor } : {}),
   });
 }
 

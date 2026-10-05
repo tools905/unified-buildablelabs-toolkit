@@ -9,6 +9,9 @@ import { TICKET_COLUMNS, type MemberOption, type TicketWithRelations } from "@/c
 import { updateTicketStatusAction } from "@/app/tools/tickets/actions";
 import type { TicketStatus } from "@/lib/db/types";
 import { cn } from "@/lib/utils/cn";
+import { useUrlState } from "@/components/dashboard/use-url-state";
+
+const URL_KEYS = ["ticket"] as const;
 
 export function KanbanBoard({
   initialTickets,
@@ -24,7 +27,9 @@ export function KanbanBoard({
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<TicketStatus | null>(null);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  // The open ticket lives in the address, so the phone's Back button closes it instead of leaving.
+  const { values, push, pop } = useUrlState(URL_KEYS);
+  const selectedTicketId = values.ticket;
   const [, startTransition] = useTransition();
 
   // Merge in-flight drag moves so the board updates instantly, without
@@ -131,7 +136,7 @@ export function KanbanBoard({
                     key={ticket.id}
                     ticket={ticket}
                     isDragging={draggingId === ticket.id}
-                    onOpen={() => setSelectedTicketId(ticket.id)}
+                    onOpen={() => push({ ticket: ticket.id })}
                     onDragStart={(event) => {
                       setDraggingId(ticket.id);
                       event.dataTransfer.effectAllowed = "move";
@@ -158,7 +163,7 @@ export function KanbanBoard({
           ticket={selectedTicket}
           members={members}
           currentUserId={currentUserId}
-          onClose={() => setSelectedTicketId(null)}
+          onClose={() => pop({ ticket: null })}
         />
       ) : null}
     </div>

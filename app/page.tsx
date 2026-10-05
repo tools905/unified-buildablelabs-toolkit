@@ -21,7 +21,7 @@ export default async function Home() {
           Internal BuildableLabs platform
         </p>
         <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
-          Unified BuildableLabs Toolkit
+          BuildableLabs Team Connect
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-slate-400">
           One authenticated workspace for peer reviews, LinkedIn assessments, HR guidance,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   addMonths,
   eachDayOfInterval,
@@ -19,7 +19,12 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IdeaDetail } from "@/components/content-board/idea-detail";
 import { IdeaPanel } from "@/components/content-board/idea-panel";
+import { AssignDialog } from "@/components/content-board/assign-dialog";
+import { useIdeaMoves } from "@/components/content-board/use-idea-moves";
+import { useUrlState } from "@/components/dashboard/use-url-state";
+import { scheduleIdeaAction } from "@/app/tools/content-board/actions";
 import {
+  CONTENT_COLUMNS,
   PLATFORM_META,
   ideaPlatforms,
   platformMeta,
@@ -32,6 +37,40 @@ import { cn } from "@/lib/utils/cn";
 const WEEK_STARTS_ON = 1; // Monday
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const VISIBLE_PER_DAY = 3;
+const URL_KEYS = ["idea", "view"] as const;
+
+// Shortlisted and in-progress ideas are the ones planned to go out, so they belong on the calendar.
+const PLANNED: ContentIdeaWithRelations["status"][] = ["approved", "in_progress"];
+
+// Puts one idea on the calendar straight from the list, without opening the Edit window.
+function ScheduleField({ ideaId }: { ideaId: string }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <span className="flex shrink-0 flex-col items-end">
+      <input
+        type="date"
+        aria-label="Choose the posting day"
+        disabled={pending}
+        onChange={(event) => {
+          const value = event.target.value;
+          if (!value) return;
+          setError(null);
+          startTransition(async () => {
+            const result = await scheduleIdeaAction(ideaId, value);
+            if (!result.ok) setError(result.error);
+          });
+        }}
+        className="h-9 rounded-sm border border-border bg-background px-2 text-xs"
+      />
+      {error ? (
+        <span role="alert" className="mt-0.5 text-[11px] text-destructive">
+          {error}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 export function ContentCalendar({
   ideas,
@@ -47,12 +86,13 @@ export function ContentCalendar({
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [platformFilter, setPlatformFilter] = useState("");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
-  const [panelIdeaId, setPanelIdeaId] = useState<string | null>(null);
-  const [editIdeaId, setEditIdeaId] = useState<string | null>(null);
+  const { ideas: liveIdeas, moveIdea, setOptimisticStatus, moveError, clearMoveError } = useIdeaMoves(ideas);
+  // The open idea lives in the address, so the phone's Back button closes it (see useUrlState).
+  const { values, push, pop } = useUrlState(URL_KEYS);
 
   const visibleIdeas = useMemo(
-    () => ideas.filter((idea) => !platformFilter || ideaPlatforms(idea).includes(platformFilter)),
-    [ideas, platformFilter],
+    () => liveIdeas.filter((idea) => !platformFilter || ideaPlatforms(idea).includes(platformFilter)),
+    [liveIdeas, platformFilter],
   );
 
   const byDay = useMemo(() => {
@@ -65,7 +105,7 @@ export function ContentCalendar({
   }, [visibleIdeas]);
 
   const unscheduled = useMemo(
-    () => visibleIdeas.filter((idea) => !idea.scheduled_for && idea.status !== "posted"),
+    () => visibleIdeas.filter((idea) => !idea.scheduled_for && PLANNED.includes(idea.status)),
     [visibleIdeas],
   );
 
@@ -81,8 +121,8 @@ export function ContentCalendar({
   const agendaDays = days.filter((day) => isSameMonth(day, month) && byDay.has(format(day, "yyyy-MM-dd")));
 
   const today = startOfToday();
-  const panelIdea = ideas.find((idea) => idea.id === panelIdeaId) ?? null;
-  const editIdea = ideas.find((idea) => idea.id === editIdeaId) ?? null;
+  const panelIdea = liveIdeas.find((idea) => idea.id === values.idea) ?? null;
+  const view = panelIdea ? values.view : null;
   const scheduledThisMonth = days.filter((day) => isSameMonth(day, month)).reduce(
     (total, day) => total + (byDay.get(format(day, "yyyy-MM-dd"))?.length ?? 0),
     0,
@@ -96,11 +136,12 @@ export function ContentCalendar({
       <button
         key={idea.id}
         type="button"
-        onClick={() => setPanelIdeaId(idea.id)}
-        title={`${platformList.map((meta) => meta.label).join(", ")} · ${idea.title}${overdue ? " (overdue)" : ""}`}
+        onClick={() => push({ idea: idea.id, view: null })}
+        title={`${platformList.map((meta) => meta.label).join(", ")} · ${idea.title} · ${CONTENT_COLUMNS.find((column) => column.status === idea.status)?.label ?? idea.status}${overdue ? " (overdue)" : ""}`}
         className={cn(
           "flex w-full min-w-0 items-center gap-1.5 rounded-sm border border-border bg-card px-1.5 py-1 text-left text-xs transition-colors hover:border-primary/50",
           posted && "text-muted-foreground",
+          PLANNED.includes(idea.status) && "border-primary/50",
           overdue && "border-amber-500/60",
         )}
       >
@@ -243,39 +284,60 @@ export function ContentCalendar({
         </div>
       </div>
 
-      <section aria-label="Not scheduled" className="mt-6">
+      <section aria-label="Shortlisted, not on the calendar yet" className="mt-6">
         <div className="mb-2 flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Not scheduled yet</h3>
+          <h3 className="text-sm font-semibold">Shortlisted, not on the calendar yet</h3>
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{unscheduled.length}</span>
         </div>
         {unscheduled.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Every open idea has a date.</p>
+          <p className="text-sm text-muted-foreground">Every shortlisted and in-progress post has a posting day.</p>
         ) : (
           <>
-            <p className="mb-2 text-xs text-muted-foreground">Open an idea and choose Edit to give it a posting day.</p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{unscheduled.map(renderChip)}</div>
+            <p className="mb-2 text-xs text-muted-foreground">Pick a day to put a post on the calendar.</p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {unscheduled.map((idea) => (
+                <div key={idea.id} className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">{renderChip(idea)}</div>
+                  <ScheduleField ideaId={idea.id} />
+                </div>
+              ))}
+            </div>
           </>
         )}
       </section>
+
+      {moveError ? (
+        <div role="alert" className="mt-4 flex items-start justify-between gap-3 border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+          <span>{moveError}</span>
+          <button type="button" onClick={clearMoveError} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {panelIdea ? (
         <IdeaPanel
           key={panelIdea.id}
           idea={panelIdea}
-          keyboardActive={!editIdea}
-          onClose={() => setPanelIdeaId(null)}
-          onEdit={() => setEditIdeaId(panelIdea.id)}
+          keyboardActive={!view}
+          onClose={() => pop({ idea: null, view: null })}
+          onEdit={() => push({ view: "edit" })}
+          onMove={moveIdea}
+          onOptimisticStatus={setOptimisticStatus}
         />
       ) : null}
-      {editIdea ? (
+      {panelIdea && view === "edit" ? (
         <IdeaDetail
-          idea={editIdea}
+          idea={panelIdea}
           members={members}
           isAdmin={isAdmin}
           currentUserId={currentUserId}
-          onClose={() => setEditIdeaId(null)}
+          onClose={() => pop({ view: null })}
         />
+      ) : null}
+      {panelIdea && view === "assign" && isAdmin ? (
+        <AssignDialog idea={panelIdea} members={members} currentUserId={currentUserId} onClose={() => pop({ view: null })} />
       ) : null}
     </div>
   );

@@ -47,7 +47,7 @@ async function requestJsonFromProvider<T>(input: {
       ...(input.provider === "openrouter"
         ? {
             "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-            "X-Title": "Unified BuildableLabs Toolkit",
+            "X-Title": "BuildableLabs Team Connect",
           }
         : {}),
     },

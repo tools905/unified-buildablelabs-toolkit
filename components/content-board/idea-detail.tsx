@@ -38,10 +38,10 @@ export function IdeaDetail({
   const statusLabel = CONTENT_COLUMNS.find((c) => c.status === idea.status)?.label ?? idea.status;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="popover-shadow flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-card">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="popover-shadow flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-lg border border-border bg-card sm:max-w-lg sm:rounded-lg">
         <div
-          className="flex items-start justify-between gap-3 border-b border-border px-6 py-4"
+          className="flex items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6"
           style={{ backgroundColor: `${platformMeta(ideaPlatforms(idea)[0]).color}14` }}
         >
           <div>
@@ -53,7 +53,7 @@ export function IdeaDetail({
           </Button>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+        <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6">
           <form
             onSubmit={(event) => {
               // Not a form `action`: React would reset every field after a failed save.

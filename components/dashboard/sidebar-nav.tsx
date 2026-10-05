@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
-  BarChart3,
   Bot,
   BookOpen,
   CalendarClock,
@@ -19,9 +18,7 @@ import {
   Newspaper,
   Settings,
   Share2,
-  SlidersHorizontal,
   Users,
-  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -32,18 +29,15 @@ type NavItem = {
   exact?: boolean;
 };
 
-const baseLinks: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/tools", label: "Tools", icon: Wrench },
-];
+// The Dashboard is the one place for every tool (it replaced the separate Tools catalog) and,
+// for admins, the workspace overview that used to be Admin Reports.
+const baseLinks: NavItem[] = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }];
 
+// Only admins see these, and each page also turns non-admins away on the server.
 const adminLinks: NavItem[] = [
   { href: "/team", label: "Team", icon: Users, exact: true },
   { href: "/team/logs", label: "Workspace Logs", icon: Activity },
-  { href: "/admin", label: "Admin Reports", icon: BarChart3, exact: true },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: History },
-  { href: "/admin/settings", label: "App Settings", icon: SlidersHorizontal },
-  { href: "/admin/tools", label: "Tool Settings", icon: Settings },
 ];
 
 const toolNav: Array<{

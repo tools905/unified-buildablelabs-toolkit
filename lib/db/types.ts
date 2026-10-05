@@ -19,7 +19,8 @@ export type NotificationType =
   | "overdue_reminder"
   | "admin_overdue_summary"
   | "report_ready"
-  | "linkedin_post_summary";
+  | "linkedin_post_summary"
+  | "content_idea_assigned";
 export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";

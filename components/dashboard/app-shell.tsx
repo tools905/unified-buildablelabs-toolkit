@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Menu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
+import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 import { getUserSession } from "@/lib/auth/require-user";
@@ -34,28 +34,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <div className="lg:hidden">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-card/95 px-4 py-3 shadow-sm backdrop-blur">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-card/95 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] shadow-sm backdrop-blur">
           <Link href="/dashboard" className="block min-w-0">
             <div className="truncate text-base font-bold tracking-tight text-foreground">
               BuildableLabs
             </div>
-            <div className="text-xs text-muted-foreground">Unified Toolkit</div>
+            <div className="text-xs text-muted-foreground">Team Connect</div>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <Badge>{admin ? "Admin" : "Member"}</Badge>
             <NotificationBell unreadCount={unreadCount} />
             <LogoutButton />
-            <details className="relative">
-              <summary
-                aria-label="Open navigation"
-                className="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-md border border-border bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Menu className="h-5 w-5" />
-              </summary>
-              <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-border bg-card p-4 popover-shadow">
-                <SidebarNav admin={admin} />
-              </div>
-            </details>
+            <MobileNav admin={admin} />
           </div>
         </header>
       </div>
@@ -66,7 +56,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               <div className="text-base font-bold tracking-tight text-foreground">
                 BuildableLabs
               </div>
-              <div className="text-xs text-muted-foreground">Unified Toolkit</div>
+              <div className="text-xs text-muted-foreground">Team Connect</div>
             </Link>
             <div className="mt-3 flex items-center gap-2">
               <Badge>{admin ? "Admin" : "Member"}</Badge>

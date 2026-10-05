@@ -1,5 +1,14 @@
-import { getIdeaPanelAction } from "@/app/tools/content-board/actions";
 import type { IdeaPanelData } from "@/components/content-board/types";
+import { BASE_PATH } from "@/lib/utils/app-url";
+
+async function fetchPanel(ideaId: string): Promise<IdeaPanelData> {
+  const response = await fetch(`${BASE_PATH}/api/content-board/ideas/${encodeURIComponent(ideaId)}/panel`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(`Panel request failed (${response.status})`);
+  return (await response.json()) as IdeaPanelData;
+}
 
 // Keeps the last panel data per idea in the browser. Hovering a card loads it ahead of the
 // click, and opening an idea again shows what was there at once while fresh data loads behind.
@@ -38,7 +47,7 @@ export function forgetPanel(ideaId: string) {
 export function loadPanel(ideaId: string, options: { fresh?: boolean } = {}): Promise<IdeaPanelData> {
   const pending = inflight.get(ideaId);
   if (pending && !options.fresh) return pending;
-  const request = getIdeaPanelAction(ideaId)
+  const request = fetchPanel(ideaId)
     .then((data) => {
       storePanel(ideaId, data);
       return data;

@@ -1,21 +1,20 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { Upload, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createIdeaAction } from "@/app/tools/content-board/actions";
-import { FileDropZone } from "@/components/content-board/file-drop-zone";
+import { UploadDropZone } from "@/components/content-board/upload-drop-zone";
 import { CaptionField } from "@/components/content-board/caption-field";
 import { AssigneePicker } from "@/components/content-board/assignee-picker";
 import { ReferenceLinksField } from "@/components/content-board/reference-links-field";
 import { PlatformPicker } from "@/components/content-board/platform-picker";
 import { type ContentMemberOption } from "@/components/content-board/types";
 import { uploadAttachmentFile } from "@/components/content-board/upload-attachment";
-import { ATTACHMENT_ACCEPT, checkAttachmentFile, MAX_ATTACHMENTS_PER_IDEA } from "@/lib/utils/content-board";
-import { cn } from "@/lib/utils/cn";
+import { checkAttachmentFile, MAX_ATTACHMENTS_PER_IDEA } from "@/lib/utils/content-board";
 
 function formatSize(bytes: number) {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -38,7 +37,6 @@ export function CreateIdeaDialog({
   const [progress, setProgress] = useState<string | null>(null);
   // The idea exists but some files failed: the form is done, only Close is left.
   const [created, setCreated] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   if (!open) {
     return <Button onClick={() => setOpen(true)}>New idea</Button>;
@@ -72,14 +70,13 @@ export function CreateIdeaDialog({
     }
     setFiles(next);
     if (problems.length) setFileError(problems.join(" "));
-    if (fileInput.current) fileInput.current.value = "";
   }
 
   const filesFull = files.length >= MAX_ATTACHMENTS_PER_IDEA;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-card p-5 popover-shadow">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-lg border border-border bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] popover-shadow sm:max-w-md sm:rounded-lg">
         <h2 className="text-lg font-semibold">New idea</h2>
         <form
           onSubmit={(event) => {
@@ -146,58 +143,33 @@ export function CreateIdeaDialog({
 
           <div>
             <Label htmlFor="create-files">Images or PDF (optional)</Label>
-            <FileDropZone
-              className="mt-1 space-y-2"
+            <UploadDropZone
+              className="mt-1"
+              inputId="create-files"
               disabled={pending || created || filesFull}
               onFiles={addFiles}
-            >
-              {(dragging) => (
-                <>
-                  <input
-                    ref={fileInput}
-                    id="create-files"
-                    type="file"
-                    multiple
-                    accept={ATTACHMENT_ACCEPT}
-                    className="sr-only"
-                    onChange={(event) => addFiles(Array.from(event.target.files ?? []))}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={pending || created || filesFull}
-                    onClick={() => fileInput.current?.click()}
-                  >
-                    <Upload className="h-4 w-4" />
-                    Add images or PDF
-                  </Button>
-                  <p className={cn("text-xs", dragging ? "font-medium text-primary" : "text-muted-foreground")}>
-                    {dragging ? "Drop to add" : "Drag and drop files here. They upload when you create the idea."}
-                  </p>
-                  {files.length > 0 ? (
-                    <ul className="divide-y divide-border border border-border">
-                      {files.map((file, index) => (
-                        <li key={`${file.name}-${file.size}`} className="flex items-center gap-2 px-2 py-1.5 text-sm">
-                          <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                          <span className="shrink-0 text-xs text-muted-foreground">{formatSize(file.size)}</span>
-                          {!pending && !created ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${file.name}`}
-                              onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
-                              className="shrink-0 p-0.5 text-muted-foreground transition-colors hover:text-destructive"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </>
-              )}
-            </FileDropZone>
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Files upload when you create the idea.</p>
+            {files.length > 0 ? (
+              <ul className="mt-2 divide-y divide-border border border-border">
+                {files.map((file, index) => (
+                  <li key={`${file.name}-${file.size}`} className="flex items-center gap-2 px-2 py-1.5 text-sm">
+                    <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{formatSize(file.size)}</span>
+                    {!pending && !created ? (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
+                        className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {fileError ? (
               <p role="alert" className="mt-1 text-xs text-destructive">
                 {fileError}

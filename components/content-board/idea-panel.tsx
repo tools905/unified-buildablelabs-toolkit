@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Pencil, X } from "lucide-react";
+import { Download, ExternalLink, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { ActivityTimeline } from "@/components/content-board/activity-timeline";
@@ -11,6 +11,8 @@ import { AttachmentAdder } from "@/components/content-board/attachment-adder";
 import { PostPreview } from "@/components/content-board/post-preview/post-preview";
 import { PreviewViewer } from "@/components/content-board/preview-viewer";
 import { ReviewPoints } from "@/components/content-board/review-points";
+import { StageActions, type MoveIdea } from "@/components/content-board/stage-actions";
+import { ideaPdfUrl } from "@/components/content-board/idea-pdf";
 import {
   CONTENT_COLUMNS,
   assigneeLabel,
@@ -36,11 +38,14 @@ export function IdeaPanel({
   onEdit,
   keyboardActive,
   onOptimisticStatus,
+  onMove,
 }: {
   idea: ContentIdeaWithRelations;
   onClose: () => void;
   onEdit: () => void;
   keyboardActive: boolean;
+  // Moves the idea to another column (the board shows it at once and reports any refusal).
+  onMove: MoveIdea;
   // Lets the board move this idea's card before the server has answered (null undoes it).
   onOptimisticStatus?: (ideaId: string, status: ContentIdeaStatus | null) => void;
 }) {
@@ -187,6 +192,8 @@ export function IdeaPanel({
   }
 
   const platforms = ideaPlatforms(idea);
+  const hasFiles = attachments.some((item) => item.kind !== "link") || (!data && idea.file_count > 0);
+  const livePostUrl = idea.post_url && /^https?:\/\//i.test(idea.post_url) ? idea.post_url : null;
   const statusLabel = CONTENT_COLUMNS.find((column) => column.status === idea.status)?.label ?? idea.status;
 
   return (
@@ -194,7 +201,7 @@ export function IdeaPanel({
       aria-label="Idea preview and review"
       className="panel-slide-in popover-shadow fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-border bg-background sm:w-[460px] lg:w-[540px]"
     >
-      <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-4">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             {platforms.map((platform) => {
@@ -219,11 +226,32 @@ export function IdeaPanel({
               Assigned to {(idea.assignees ?? []).map(assigneeLabel).join(", ")}
             </p>
           ) : null}
+          {hasFiles || livePostUrl ? (
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium">
+              {hasFiles ? (
+                // A plain link, so the download works on phones and in in-app browsers too.
+                <a href={ideaPdfUrl(idea.id)} rel="noopener" className="inline-flex min-h-8 items-center gap-1 text-primary hover:underline">
+                  <Download className="h-3.5 w-3.5" />
+                  Download PDF
+                </a>
+              ) : null}
+              {livePostUrl ? (
+                <a
+                  href={livePostUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-8 items-center gap-1 text-primary hover:underline"
+                >
+                  View live post <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button type="button" variant="ghost" size="sm" onClick={onEdit} aria-label="Edit idea details">
             <Pencil className="h-4 w-4" />
-            Edit
+            <span className="hidden sm:inline">Edit</span>
           </Button>
           <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close panel">
             <X className="h-4 w-4" />
@@ -231,7 +259,7 @@ export function IdeaPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-5">
         {loadError ? (
           <p role="alert" className="text-sm text-destructive">
             Couldn&apos;t load this idea&apos;s preview.{" "}
@@ -243,6 +271,15 @@ export function IdeaPanel({
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
           <>
+            <StageActions
+              key={idea.status}
+              idea={idea}
+              isAdmin={data.isAdmin}
+              currentUserId={data.currentUserId}
+              openReviewCount={data.points.filter((point) => !point.isResolved).length}
+              onMove={onMove}
+            />
+
             <section aria-label="Preview" className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">Preview</h3>

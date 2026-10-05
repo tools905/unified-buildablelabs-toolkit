@@ -25,7 +25,7 @@ export async function requestOpenRouterJson<T>(input: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": getAppUrl(),
-      "X-Title": "Unified BuildableLabs Toolkit",
+      "X-Title": "BuildableLabs Team Connect",
     },
     body: JSON.stringify({
       model: OPENROUTER_MODEL,

@@ -26,7 +26,7 @@ export default async function ContentCalendarPage() {
       <PageHeader
         eyebrow="Content Board"
         title="Calendar"
-        description="See which idea goes out on which day. Set the date from an idea's Edit window."
+        description="Every post with a posting day, plus shortlisted posts still waiting for one."
       />
       <ContentCalendar ideas={ideas} members={toMemberOptions(members)} isAdmin={admin} currentUserId={user.id} />
     </>

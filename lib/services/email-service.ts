@@ -16,12 +16,17 @@ type EmailInput = {
   assignmentId?: string | null;
 };
 
-function normalizeEmailFrom() {
-  let from = process.env.EMAIL_FROM ?? "";
+export const PRODUCT_NAME = "BuildableLabs Team Connect";
+
+// The sender address comes from EMAIL_FROM; the name people see is always the product's, so the
+// rename shows in every inbox without anyone having to edit the deployed environment.
+export function normalizeEmailFrom(raw = process.env.EMAIL_FROM ?? "") {
+  let from = raw.trim();
   if (from.startsWith('"') && from.endsWith('"')) {
-    from = from.slice(1, -1);
+    from = from.slice(1, -1).trim();
   }
-  return from.trim();
+  const address = from.match(/<([^<>\s]+@[^<>\s]+)>/)?.[1] ?? (/^[^<>\s]+@[^<>\s]+$/.test(from) ? from : null);
+  return address ? `${PRODUCT_NAME} <${address}>` : from;
 }
 
 function escapeHtml(value: string) {
@@ -109,7 +114,7 @@ export function inviteEmailHtml(input: {
   acceptUrl: string;
   expiresAt: string;
 }) {
-  return `<h1>Join ${input.workspaceName}</h1><p>${input.inviterName} invited you to the BuildableLabs Toolkit.</p>${button(input.acceptUrl, "Accept invite")}<p>This invite expires ${input.expiresAt}.</p>`;
+  return `<h1>Join ${input.workspaceName}</h1><p>${input.inviterName} invited you to ${PRODUCT_NAME}.</p>${button(input.acceptUrl, "Accept invite")}<p>This invite expires ${input.expiresAt}.</p>`;
 }
 
 export async function sendInviteEmail(
@@ -125,7 +130,7 @@ export async function sendInviteEmail(
 ) {
   return sendEmail(supabase, {
     to: input.to,
-    subject: `You're invited to join ${input.workspaceName} on the BuildableLabs Toolkit`,
+    subject: `You're invited to join ${input.workspaceName} on ${PRODUCT_NAME}`,
     html: inviteEmailHtml(input),
     type: "invite",
     workspaceId: input.workspaceId,
@@ -277,9 +282,38 @@ export async function sendLinkedInPostSummaryEmail(
       <h2>Next revision ideas</h2>
       <ul>${list(input.suggestions)}</ul>
       ${postLink}
-      <p style="color:#666;font-size:12px">This is private coaching for the post you manually submitted in the BuildableLabs Toolkit.</p>
+      <p style="color:#666;font-size:12px">This is private coaching for the post you manually submitted in ${PRODUCT_NAME}.</p>
     `,
     type: "linkedin_post_summary",
+    workspaceId: input.workspaceId,
+  });
+}
+
+export function contentIdeaAssignedEmailHtml(input: {
+  assigneeName: string;
+  assignerName: string;
+  ideaTitle: string;
+  url: string;
+}) {
+  return `<p>Hi ${escapeHtml(input.assigneeName)},</p><p>An idea to work on has been assigned to you by ${escapeHtml(input.assignerName)}:</p><p><strong>${escapeHtml(input.ideaTitle)}</strong></p>${button(input.url, "Open the idea")}<p style="color:#666;font-size:12px">Sent by ${PRODUCT_NAME} because you were assigned this idea on the Content Board.</p>`;
+}
+
+export async function sendContentIdeaAssignedEmail(
+  supabase: SupabaseClient<any>,
+  input: {
+    to: string;
+    assigneeName: string;
+    assignerName: string;
+    ideaTitle: string;
+    url: string;
+    workspaceId: string;
+  },
+) {
+  return sendEmail(supabase, {
+    to: input.to,
+    subject: `${input.assignerName} assigned you an idea: ${input.ideaTitle}`,
+    html: contentIdeaAssignedEmailHtml(input),
+    type: "content_idea_assigned",
     workspaceId: input.workspaceId,
   });
 }

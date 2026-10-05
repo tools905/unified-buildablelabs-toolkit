@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContentAttachmentKind } from "@/lib/db/types";
 import { CONTENT_BUCKET, MAX_ATTACHMENTS_PER_IDEA } from "@/lib/utils/content-board";
-import { downloadFileName, mimeTypeFromPath } from "@/lib/utils/download-name";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -30,35 +29,49 @@ export async function listAttachments(supabase: SupabaseClient<any>, ideaId: str
   return data ?? [];
 }
 
+// Signed links handed out recently, kept while the server stays warm. Giving the same file the same
+// link on every page load lets the browser reuse the image it already has instead of downloading
+// every thumbnail again after each refresh, and skips a storage request. Only paths read from rows
+// the caller can see (row-level security) are ever passed in here.
+const REUSE_SIGNED_URL_MS = 40 * 60 * 1000;
+const signedCache = new Map<string, { url: string; at: number }>();
+
 export async function signPaths(supabase: SupabaseClient<any>, paths: string[]) {
   const signed = new Map<string, string>();
   if (paths.length === 0) return signed;
-  const { data, error } = await supabase.storage.from(CONTENT_BUCKET).createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+  const now = Date.now();
+  const missing: string[] = [];
+  for (const path of new Set(paths)) {
+    const hit = signedCache.get(path);
+    if (hit && now - hit.at < REUSE_SIGNED_URL_MS) signed.set(path, hit.url);
+    else missing.push(path);
+  }
+  if (missing.length === 0) return signed;
+  const { data, error } = await supabase.storage.from(CONTENT_BUCKET).createSignedUrls(missing, SIGNED_URL_TTL_SECONDS);
   if (error) throw error;
   for (const item of data ?? []) {
-    if (item.path && item.signedUrl) signed.set(item.path, item.signedUrl);
+    if (item.path && item.signedUrl) {
+      signed.set(item.path, item.signedUrl);
+      signedCache.set(item.path, { url: item.signedUrl, at: now });
+    }
+  }
+  if (signedCache.size > 5000) {
+    for (const [path, entry] of signedCache) if (now - entry.at >= REUSE_SIGNED_URL_MS) signedCache.delete(path);
   }
   return signed;
 }
 
-// A link that saves one attached file when opened. The storage server answers it with a "save as"
-// header and the right file name, so any browser, phones and in-app browsers included, downloads it
-// by simply following the link: no script has to fetch the file first.
-export async function signDownload(supabase: SupabaseClient<any>, attachmentId: string) {
-  const { data: row, error } = await supabase
-    .from("content_idea_attachments")
-    .select("id, kind, storage_path, file_name")
-    .eq("id", attachmentId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!row || row.kind === "link" || !row.storage_path) throw new Error("This file can't be downloaded.");
+// Where the PDF made for downloading an idea is kept (see content-export-service).
+export function exportFolder(workspaceId: string, ideaId: string) {
+  return `${workspaceId}/${ideaId}/exports`;
+}
 
-  const name = downloadFileName(row.file_name, mimeTypeFromPath(row.storage_path));
-  const { data, error: signError } = await supabase.storage
-    .from(CONTENT_BUCKET)
-    .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, { download: name });
-  if (signError || !data?.signedUrl) throw signError ?? new Error("Could not prepare the download.");
-  return { url: data.signedUrl };
+// Removes every PDF made for downloading this idea. Best effort: a leftover export is harmless.
+export async function removeIdeaExports(supabase: SupabaseClient<any>, workspaceId: string, ideaId: string) {
+  const folder = exportFolder(workspaceId, ideaId);
+  const { data } = await supabase.storage.from(CONTENT_BUCKET).list(folder, { limit: 100 });
+  const paths = (data ?? []).map((item) => `${folder}/${item.name}`);
+  if (paths.length) await supabase.storage.from(CONTENT_BUCKET).remove(paths);
 }
 
 export async function addStoredAttachment(
@@ -146,6 +159,8 @@ export async function removeAttachment(supabase: SupabaseClient<any>, attachment
 }
 
 export async function removeStoredFilesForIdea(supabase: SupabaseClient<any>, ideaId: string) {
+  const { data: idea } = await supabase.from("content_ideas").select("workspace_id").eq("id", ideaId).maybeSingle();
+  if (idea?.workspace_id) await removeIdeaExports(supabase, idea.workspace_id, ideaId);
   const rows = await listAttachments(supabase, ideaId);
   const paths = rows.flatMap((row) => [row.storage_path, row.thumb_path]).filter((path): path is string => Boolean(path));
   if (paths.length === 0) return;
@@ -158,7 +173,7 @@ export async function cleanupPostedContentFiles(supabase: SupabaseClient<any>, o
   const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("content_idea_attachments")
-    .select("id, storage_path, thumb_path, content_ideas!inner(status, posted_at)")
+    .select("id, idea_id, workspace_id, storage_path, thumb_path, content_ideas!inner(status, posted_at)")
     .neq("kind", "link")
     .eq("content_ideas.status", "posted")
     .lt("content_ideas.posted_at", cutoff);
@@ -170,6 +185,8 @@ export async function cleanupPostedContentFiles(supabase: SupabaseClient<any>, o
     const { error: storageError } = await supabase.storage.from(CONTENT_BUCKET).remove(paths.slice(i, i + 100));
     if (storageError) throw storageError;
   }
+  const ideas = new Map(rows.map((row) => [row.idea_id as string, row.workspace_id as string]));
+  for (const [ideaId, workspaceId] of ideas) await removeIdeaExports(supabase, workspaceId, ideaId);
   const ids = rows.map((row) => row.id);
   for (let i = 0; i < ids.length; i += 100) {
     const { error: deleteError } = await supabase.from("content_idea_attachments").delete().in("id", ids.slice(i, i + 100));

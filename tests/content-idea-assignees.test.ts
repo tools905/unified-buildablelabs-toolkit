@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/services/workspace-service", () => ({ isWorkspaceAdmin: vi.fn() }));
 vi.mock("@/lib/services/audit-service", () => ({ writeAuditLog: vi.fn(async () => undefined) }));
 vi.mock("@/lib/services/notification-service", () => ({ createNotification: vi.fn(async () => undefined) }));
+vi.mock("@/lib/services/email-service", () => ({ sendContentIdeaAssignedEmail: vi.fn(async () => undefined) }));
 
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { setIdeaAssignees } from "@/lib/services/content-idea-service";
 import { createNotification } from "@/lib/services/notification-service";
+import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { assigneeIdsSchema } from "@/lib/validation/content-idea-schema";
 import { diffAssignees, MAX_ASSIGNEES, orderAssignees, toMemberOptions } from "@/lib/utils/content-board";
@@ -18,6 +20,8 @@ const ANA = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const BEN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const CAL = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const STRANGER = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+
+const PEOPLE: Record<string, string> = { [ADMIN]: "Akhil", [ANA]: "Ana", [BEN]: "Ben", [CAL]: "Cal" };
 
 // A stand-in for Supabase that answers the few queries setIdeaAssignees makes and records its writes.
 function fakeSupabase(options: { members: string[]; assigned: string[] }) {
@@ -49,7 +53,9 @@ function fakeSupabase(options: { members: string[]; assigned: string[] }) {
         const data =
           table === "workspace_members"
             ? options.members.filter((id) => (filterIn ?? []).includes(id)).map((user_id) => ({ user_id }))
-            : options.assigned.map((user_id) => ({ user_id }));
+            : table === "profiles"
+              ? (filterIn ?? []).map((id) => ({ id, full_name: PEOPLE[id] ?? null, email: `${(PEOPLE[id] ?? id).toLowerCase()}@buildablelabs.com` }))
+              : options.assigned.map((user_id) => ({ user_id }));
         return Promise.resolve({ data, error: null }).then(resolve, reject);
       },
     };
@@ -103,6 +109,29 @@ describe("setIdeaAssignees", () => {
     expect(written.deleted).toEqual([ANA]);
     expect(result).toEqual({ added: [CAL], removed: [ANA] });
     expect(vi.mocked(createNotification).mock.calls.map(([input]) => input.userId)).toEqual([CAL]);
+  });
+
+  it("emails each newly assigned person, saying who assigned them and linking to the idea", async () => {
+    const { client } = fakeSupabase({ members: [ANA, BEN], assigned: [] });
+    await setIdeaAssignees(client, WORKSPACE, IDEA, ADMIN, [ANA, BEN], { ideaTitle: "Carousel on onboarding" });
+    expect(sendContentIdeaAssignedEmail).toHaveBeenCalledTimes(2);
+    expect(sendContentIdeaAssignedEmail).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        to: "ana@buildablelabs.com",
+        assigneeName: "Ana",
+        assignerName: "Akhil",
+        ideaTitle: "Carousel on onboarding",
+        url: expect.stringContaining(`/tools/content-board?idea=${IDEA}`),
+        workspaceId: WORKSPACE,
+      }),
+    );
+  });
+
+  it("does not email the admin about assigning themselves", async () => {
+    const { client } = fakeSupabase({ members: [ADMIN, ANA], assigned: [] });
+    await setIdeaAssignees(client, WORKSPACE, IDEA, ADMIN, [ADMIN, ANA]);
+    expect(vi.mocked(sendContentIdeaAssignedEmail).mock.calls.map(([, input]) => input.to)).toEqual(["ana@buildablelabs.com"]);
   });
 
   it("does not notify the admin about assigning themselves", async () => {

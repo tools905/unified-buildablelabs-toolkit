@@ -13,7 +13,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Unified BuildableLabs Toolkit</CardTitle>
+          <CardTitle>BuildableLabs Team Connect</CardTitle>
           <CardDescription>Log in or create your account.</CardDescription>
         </CardHeader>
         <CardContent>

@@ -63,8 +63,8 @@ export function AssigneePicker({
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         {selected.length === 0
-          ? "Nobody assigned. Tick one or more people; they get a notification."
-          : `${selected.length} assigned${full ? " (the most allowed)" : ""}. Newly assigned people get a notification.`}
+          ? "Nobody assigned. Tick one or more people; they get a notification and an email."
+          : `${selected.length} assigned${full ? " (the most allowed)" : ""}. Newly assigned people get a notification and an email.`}
       </p>
     </fieldset>
   );

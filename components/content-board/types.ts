@@ -44,8 +44,12 @@ export type ContentIdeaWithRelations = {
   creator: ContentIdeaProfile | null;
   assignees: IdeaAssignee[];
   attachment_count: number;
+  // Uploaded images and PDFs (not design links): what the PDF download is made from.
+  file_count: number;
   review_count: number;
   open_review_count: number;
+  // When the first review point was added; orders the Feedback column.
+  first_feedback_at: string | null;
   thumbnail: { kind: ContentAttachmentKind; url: string | null } | null;
 };
 

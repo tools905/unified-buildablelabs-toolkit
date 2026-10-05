@@ -126,17 +126,19 @@ summary::-webkit-details-marker {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
-.card-hover-effect:hover {
-  transform: translateY(-3px);
+.card-hover-effect[data-active="true"] {
   border-color: rgba(11, 63, 222, 0.35);
   box-shadow: var(--shadow-card-hover);
 }
 
-/* Corner accent bars, matching the brand site's case-card treatment: a
-   glowing trace along the top-left and top-right corners that's faintly
-   visible at rest and extends further on hover. */
+/* Corner accent bars, matching the brand site's case-card treatment: a glowing trace along the
+   top-left and top-right corners. Hidden at rest; they only grow in while a card is hovered, or
+   while it is the card being viewed. */
 .card-hover-effect::before,
 .card-hover-effect::after {
   content: "";
@@ -145,27 +147,77 @@ summary::-webkit-details-marker {
   pointer-events: none;
   background: var(--primary-hover);
   box-shadow: 0 0 16px rgba(39, 91, 255, 0.68);
-  transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+  opacity: 0;
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.2s ease;
 }
 .card-hover-effect::before {
   left: -1px;
   top: -1px;
-  right: 60%;
+  right: 40%;
   height: 2px;
+  transform: scaleX(0);
   transform-origin: left;
 }
 .card-hover-effect::after {
   right: -1px;
   top: -1px;
-  bottom: 70%;
+  bottom: 50%;
   width: 2px;
+  transform: scaleY(0);
   transform-origin: top;
 }
-.card-hover-effect:hover::before {
-  transform: scaleX(1.65);
+.card-hover-effect[data-active="true"]::before,
+.card-hover-effect[data-active="true"]::after {
+  opacity: 1;
+  transform: none;
 }
-.card-hover-effect:hover::after {
-  transform: scaleY(1.7);
+
+/* Pointer devices only: on touch screens a tap would leave a card stuck in its hover look. */
+@media (hover: hover) and (pointer: fine) {
+  .card-hover-effect:hover {
+    transform: translateY(-3px);
+    border-color: rgba(11, 63, 222, 0.35);
+    box-shadow: var(--shadow-card-hover);
+  }
+  .card-hover-effect:hover::before,
+  .card-hover-effect:hover::after {
+    opacity: 1;
+    transform: none;
+  }
+  /* Board cards grow a little instead of lifting, so the post preview is easier to read. */
+  .card-zoom:hover,
+  .card-zoom[data-active="true"] {
+    transform: scale(1.03);
+    z-index: 2;
+  }
+}
+.card-zoom:active {
+  transform: scale(0.99);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-hover-effect,
+  .card-hover-effect::before,
+  .card-hover-effect::after {
+    transition: none;
+  }
+  .card-hover-effect:hover,
+  .card-zoom:hover,
+  .card-zoom[data-active="true"],
+  .card-zoom:active {
+    transform: none;
+  }
+}
+
+/* Phones: iOS zooms the whole page into any text field smaller than 16px when it is tapped.
+   Keep fields at 16px on small screens so typing never jolts the layout. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* Content Board side panel entrance. */

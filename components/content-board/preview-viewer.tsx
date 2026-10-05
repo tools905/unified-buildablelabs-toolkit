@@ -1,9 +1,8 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Link2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, FileText, Link2 } from "lucide-react";
 import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
 import { formatWhen } from "@/components/content-board/activity";
-import { useDownloadUrl } from "@/components/content-board/use-download-url";
 import { PdfViewer } from "@/components/content-board/pdf-viewer";
 import { cn } from "@/lib/utils/cn";
 import type { PanelAttachment } from "@/components/content-board/types";
@@ -22,7 +21,6 @@ export function PreviewViewer({
   busy: boolean;
 }) {
   const current = attachments[index];
-  const download = useDownloadUrl(current && current.kind !== "link" ? current.id : null);
 
   if (!current) {
     return (
@@ -33,11 +31,10 @@ export function PreviewViewer({
   }
 
   const canStep = attachments.length > 1 && current.kind !== "pdf";
-  const downloadUrl = current.kind !== "link" ? current.url : null;
 
   return (
     <div className="space-y-2">
-      <div className="relative h-[64vh] min-h-[320px] overflow-hidden border border-border bg-muted/30">
+      <div className="relative h-[56dvh] min-h-[300px] overflow-hidden border border-border bg-muted/30 sm:h-[64vh]">
         {current.kind === "image" && current.url ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URLs, not a fixed host
           <img src={current.url} alt={current.fileName ?? "Slide"} className="h-full w-full object-contain" />
@@ -113,36 +110,6 @@ export function PreviewViewer({
             >
               Open <ExternalLink className="h-3 w-3" />
             </a>
-          ) : null}
-          {downloadUrl ? (
-            download.url ? (
-              // A plain link: the storage server answers it with a "save as" header, so the browser
-              // downloads the file itself. That works on phones and in in-app browsers, where a script
-              // saving a fetched copy often does nothing.
-              <a
-                href={download.url}
-                rel="noopener"
-                className="inline-flex h-10 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground sm:h-8 sm:px-2 sm:text-xs"
-              >
-                <Download className="h-4 w-4 sm:h-3 sm:w-3" />
-                Download
-              </a>
-            ) : download.error ? (
-              <button
-                type="button"
-                onClick={download.retry}
-                title={download.error}
-                className="inline-flex h-10 items-center gap-1.5 px-3 text-sm text-destructive sm:h-8 sm:px-2 sm:text-xs"
-              >
-                <Download className="h-4 w-4 sm:h-3 sm:w-3" />
-                Couldn&apos;t prepare it. Retry
-              </button>
-            ) : (
-              <span aria-busy="true" className="inline-flex h-10 items-center gap-1.5 px-3 text-sm text-muted-foreground opacity-60 sm:h-8 sm:px-2 sm:text-xs">
-                <Download className="h-4 w-4 sm:h-3 sm:w-3" />
-                Preparing…
-              </span>
-            )
           ) : null}
           <InlineConfirmButton
             label="Remove"

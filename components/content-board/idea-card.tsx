@@ -2,9 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import { CalendarDays, Check, Clock, ExternalLink, Link as LinkIcon, FileText, ImageIcon, Link2, MessageSquare, Paperclip, UserCheck } from "lucide-react";
+import { CardMenu } from "@/components/content-board/card-menu";
 import { format, isBefore, parseISO, startOfToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { setPostUrlAction } from "@/app/tools/content-board/actions";
+import type { ContentIdeaStatus } from "@/lib/db/types";
 import { cn } from "@/lib/utils/cn";
 import { formatWhen } from "@/components/content-board/activity";
 import { prefetchPanel } from "@/components/content-board/panel-cache";
@@ -26,19 +28,39 @@ function initials(name: string | null | undefined, email: string | undefined) {
     .toUpperCase();
 }
 
-function Thumbnail({ thumbnail }: { thumbnail: NonNullable<ContentIdeaWithRelations["thumbnail"]> }) {
-  if (thumbnail.kind === "image" && thumbnail.url) {
+// A look at the post itself: the first picture, or the first page of a PDF carousel.
+function Thumbnail({
+  thumbnail,
+  fileCount,
+}: {
+  thumbnail: NonNullable<ContentIdeaWithRelations["thumbnail"]>;
+  fileCount: number;
+}) {
+  if (thumbnail.kind !== "link" && thumbnail.url) {
     return (
-      <div className="mt-2 h-24 overflow-hidden border border-border bg-muted">
+      <div className="relative mt-2 h-48 overflow-hidden rounded-sm border border-border bg-muted">
         {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URLs, not a fixed host */}
-        <img src={thumbnail.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        <img
+          src={thumbnail.url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          className="h-full w-full object-cover object-top"
+        />
+        {thumbnail.kind === "pdf" || fileCount > 1 ? (
+          <span className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            {thumbnail.kind === "pdf" ? <FileText className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+            {[thumbnail.kind === "pdf" ? "PDF" : null, fileCount > 1 ? `${fileCount} files` : null].filter(Boolean).join(" · ")}
+          </span>
+        ) : null}
       </div>
     );
   }
   const Icon = thumbnail.kind === "link" ? Link2 : thumbnail.kind === "pdf" ? FileText : ImageIcon;
   const label = thumbnail.kind === "link" ? "Design link" : thumbnail.kind === "pdf" ? "PDF carousel" : "Image";
   return (
-    <div className="mt-2 flex h-12 items-center gap-2 border border-border bg-muted px-3 text-xs text-muted-foreground">
+    <div className="mt-2 flex h-12 items-center gap-2 rounded-sm border border-border bg-muted px-3 text-xs text-muted-foreground">
       <Icon className="h-4 w-4" />
       {label}
     </div>
@@ -105,14 +127,28 @@ function PostUrlInline({ ideaId }: { ideaId: string }) {
 export function IdeaCard({
   idea,
   onOpen,
+  onEdit,
+  onAssign,
+  onMove,
   onDragStart,
   onDragEnd,
   isDragging,
+  canDrag,
+  active,
+  isAdmin,
   currentUserId,
 }: {
   idea: ContentIdeaWithRelations;
   currentUserId: string;
+  isAdmin: boolean;
+  // Its side panel is open: shown with the same highlight as a card under the pointer.
+  active: boolean;
+  // Only admins drag cards between columns; everyone else uses the next-step buttons.
+  canDrag: boolean;
   onOpen: () => void;
+  onEdit: () => void;
+  onAssign: () => void;
+  onMove: (status: ContentIdeaStatus) => void;
   onDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?: () => void;
   isDragging: boolean;
@@ -124,19 +160,13 @@ export function IdeaCard({
   const shownAssignees = assignees.slice(0, 3);
   const scheduled = idea.scheduled_for ? parseISO(idea.scheduled_for) : null;
   const overdue = scheduled !== null && idea.status !== "posted" && isBefore(scheduled, startOfToday());
-  // A posted idea with a link opens the live post in a new tab; everything else opens the panel.
-  const postUrl = idea.status === "posted" && isWebUrl(idea.post_url) ? idea.post_url : null;
-
-  function activate() {
-    if (postUrl) window.open(postUrl, "_blank", "noopener,noreferrer");
-    else onOpen();
-  }
+  const postUrl = isWebUrl(idea.post_url) ? idea.post_url : null;
 
   // Resting the pointer on a card loads its panel ahead of the click, so the click opens it at once.
   // The short delay stops a quick sweep across the board from loading every card it passes.
   const warmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function warmUp() {
-    if (postUrl || warmTimer.current) return;
+    if (warmTimer.current) return;
     warmTimer.current = setTimeout(() => {
       warmTimer.current = null;
       prefetchPanel(idea.id);
@@ -151,21 +181,25 @@ export function IdeaCard({
     <div
       role="button"
       tabIndex={0}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onClick={activate}
+      draggable={canDrag}
+      onDragStart={canDrag ? onDragStart : undefined}
+      onDragEnd={canDrag ? onDragEnd : undefined}
+      onClick={onOpen}
+      data-active={active ? "true" : undefined}
+      aria-current={active ? "true" : undefined}
       onMouseEnter={warmUp}
       onMouseLeave={cancelWarmUp}
       onFocus={warmUp}
       onBlur={cancelWarmUp}
       onTouchStart={warmUp}
       onKeyDown={(event) => {
-        if (event.key === "Enter") activate();
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
       }}
-      title={postUrl ? "Opens the post in a new tab" : undefined}
       className={cn(
-        "card-shadow card-hover-effect flex min-h-[9rem] cursor-pointer flex-col rounded-lg border border-border bg-card p-3",
+        "card-shadow card-hover-effect card-zoom flex min-h-[9rem] cursor-pointer flex-col rounded-lg border border-border bg-card p-3",
         isDragging && "opacity-50",
       )}
     >
@@ -195,7 +229,7 @@ export function IdeaCard({
           </span>
         ) : null}
       </div>
-      {idea.thumbnail ? <Thumbnail thumbnail={idea.thumbnail} /> : null}
+      {idea.thumbnail ? <Thumbnail thumbnail={idea.thumbnail} fileCount={idea.file_count} /> : null}
       <p className="mt-2 flex-1 text-sm font-medium leading-snug">{idea.title}</p>
       {assignees.length > 0 ? (
         <p
@@ -268,47 +302,43 @@ export function IdeaCard({
           ) : null}
         </div>
       ) : null}
+      {idea.status === "posted" && !postUrl ? <PostUrlInline ideaId={idea.id} /> : null}
       {postUrl ? (
-        <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-          <span className="flex items-center gap-1 font-medium text-primary">
-            View post <ExternalLink className="h-3 w-3" />
-          </span>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpen();
-            }}
-            onKeyDown={(event) => event.stopPropagation()}
-            className="text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Details
-          </button>
-        </div>
-      ) : idea.status === "posted" ? (
-        <PostUrlInline ideaId={idea.id} />
-      ) : isWebUrl(idea.post_url) ? (
+        // Only this link opens the live post; the card itself opens the preview and its feedback.
         <a
-          href={idea.post_url}
+          href={postUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(event) => event.stopPropagation()}
-          className="mt-2 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          onKeyDown={(event) => event.stopPropagation()}
+          draggable={false}
+          className="mt-2 inline-flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline"
         >
-          View post <ExternalLink className="h-3 w-3" />
+          Live post <ExternalLink className="h-3 w-3" />
         </a>
       ) : null}
-      <time
-        dateTime={idea.created_at}
-        title={`Created ${formatWhen(idea.created_at)}`}
-        className="mt-2 inline-flex items-center gap-1 self-start text-[11px] text-muted-foreground"
-      >
-        <Clock className="h-3 w-3" />
-        {createdFormat
-          .format(new Date(idea.created_at))
-          .replace("Sept", "Sep")
-          .replace(/ (am|pm|AM|PM)$/, (m) => m.toLowerCase())}
-      </time>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <time
+          dateTime={idea.created_at}
+          title={`Created ${formatWhen(idea.created_at)}`}
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+        >
+          <Clock className="h-3 w-3" />
+          {createdFormat
+            .format(new Date(idea.created_at))
+            .replace("Sept", "Sep")
+            .replace(/ (am|pm|AM|PM)$/, (m) => m.toLowerCase())}
+        </time>
+        <CardMenu
+          idea={idea}
+          isAdmin={isAdmin}
+          isAssignee={assignedToMe}
+          onOpen={onOpen}
+          onEdit={onEdit}
+          onAssign={onAssign}
+          onMove={onMove}
+        />
+      </div>
     </div>
   );
 }

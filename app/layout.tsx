@@ -22,8 +22,8 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Unified BuildableLabs Toolkit",
-  description: "Internal tools for BuildableLabs workflows, reviews, reports, and team operations.",
+  title: "BuildableLabs Team Connect",
+  description: "BuildableLabs Team Connect: the team's tools for content, reviews, reports and operations in one place.",
 };
 
 export default function RootLayout({
