@@ -40,7 +40,7 @@ describe("buildActivity", () => {
           reviewerName: "Aditi",
         },
         attachments: [
-          { id: "a1", kind: "pdf", fileName: "carousel.pdf", url: null, embedUrl: null, createdAt: "2026-09-02T09:00:00Z", uploaderName: "Mridul" },
+          { id: "a1", kind: "pdf", fileName: "carousel.pdf", url: null, embedUrl: null, thumbUrl: null, createdAt: "2026-09-02T09:00:00Z", uploaderName: "Mridul" },
         ],
         points: [
           {
@@ -67,7 +67,7 @@ describe("buildActivity", () => {
 });
 
 describe("hasChangesSinceReview", () => {
-  const file = (createdAt: string) => ({ id: "a", kind: "image" as const, fileName: null, url: null, embedUrl: null, createdAt, uploaderName: "M" });
+  const file = (createdAt: string) => ({ id: "a", kind: "image" as const, fileName: null, url: null, embedUrl: null, thumbUrl: null, createdAt, uploaderName: "M" });
 
   it("is false when nothing was reviewed", () => {
     expect(hasChangesSinceReview(data({ attachments: [file("2026-09-02T09:00:00Z")] }))).toBe(false);

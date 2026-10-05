@@ -59,7 +59,7 @@ export function IdeaPanel({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const router = useRouter();
 
-  const urlCache = useRef(new Map<string, { url: string; at: number }>());
+  const urlCache = useRef(new Map<string, { url: string; thumbUrl: string | null; at: number }>());
   // Two quick actions start two reloads; only the newest one may update the screen, otherwise a
   // slower, older answer could put back a list that is missing the point that was just added.
   const refreshSeq = useRef(0);
@@ -94,8 +94,10 @@ export function IdeaPanel({
           const attachments = next.attachments.map((item) => {
             if (item.kind === "link" || !item.url) return item;
             const cached = urlCache.current.get(item.id);
-            if (cached && now - cached.at < URL_REUSE_MS) return { ...item, url: cached.url };
-            urlCache.current.set(item.id, { url: item.url, at: now });
+            if (cached && now - cached.at < URL_REUSE_MS) {
+              return { ...item, url: cached.url, thumbUrl: cached.thumbUrl ?? item.thumbUrl };
+            }
+            urlCache.current.set(item.id, { url: item.url, thumbUrl: item.thumbUrl, at: now });
             return item;
           });
           commit({ ...next, attachments });
@@ -353,7 +355,7 @@ export function IdeaPanel({
               onChanged={afterChange}
             />
 
-            <ActivityTimeline data={data} />
+            <ActivityTimeline data={data} status={idea.status} />
           </>
         )}
       </div>

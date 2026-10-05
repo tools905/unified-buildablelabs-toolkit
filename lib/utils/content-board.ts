@@ -72,7 +72,8 @@ export function checkAttachmentFile(file: { type: string; size: number }): strin
 
 // Who may move an idea from one column to another.
 //  - Ideas → Feedback happens by itself when the first review point is added.
-//  - Ideas or Feedback → Shortlisted is an admin's call ("satisfied with the changes").
+//  - Ideas or Feedback → Shortlisted is an admin's call ("satisfied with the changes"). Open review
+//    points are pointed out but don't stop an admin who is satisfied anyway.
 //  - Shortlisted → In Progress → Posted is done by the people assigned to post it.
 //  - Admins can move any card anywhere (dragging is their override).
 // Assignees may also take one step back, to undo a click made by mistake.
@@ -95,7 +96,8 @@ export function canMoveIdea(input: {
 
 // The one step forward a person can take on an idea from where it is now, if any.
 export type NextStep =
-  | { kind: "move"; to: ContentIdeaStatus; label: string }
+  // `note` is a reminder shown next to the button; it never stops the move.
+  | { kind: "move"; to: ContentIdeaStatus; label: string; note?: string }
   | { kind: "blocked"; label: string; reason: string }
   | { kind: "wait"; reason: string }
   | null;
@@ -115,14 +117,14 @@ export function nextStep(input: {
         : { kind: "wait", reason: "Add a review point to send it to Feedback." };
     case "feedback":
       if (!isAdmin) return { kind: "wait", reason: "An admin shortlists it once the review points are fixed." };
-      if (openReviewCount > 0) {
-        return {
-          kind: "blocked",
-          label: "Shortlist",
-          reason: `${openReviewCount} review ${openReviewCount === 1 ? "point is" : "points are"} still open.`,
-        };
-      }
-      return { kind: "move", to: "approved", label: "Shortlist" };
+      return openReviewCount > 0
+        ? {
+            kind: "move",
+            to: "approved",
+            label: "Shortlist",
+            note: `${openReviewCount} review ${openReviewCount === 1 ? "point is" : "points are"} still open. You can shortlist anyway.`,
+          }
+        : { kind: "move", to: "approved", label: "Shortlist" };
     case "approved":
       if (isAssignee || isAdmin) {
         if (!hasAssignees && isAdmin) {

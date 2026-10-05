@@ -79,6 +79,7 @@ export function StageActions({
 
       {step?.kind === "move" ? (
         <div className="flex flex-wrap items-end gap-2">
+          {step.note ? <p className="w-full text-xs text-amber-500">{step.note}</p> : null}
           {shortlisting ? (
             <label className="min-w-[10rem] flex-1 text-xs text-muted-foreground">
               Posting day (optional, puts it on the calendar)

@@ -61,6 +61,8 @@ export type PanelAttachment = {
   url: string | null;
   // Only set for links that can be shown inside the panel.
   embedUrl: string | null;
+  // A small picture of it: the image itself scaled down, or the first page of a PDF.
+  thumbUrl: string | null;
   createdAt: string;
   uploaderName: string;
 };

@@ -1,5 +1,6 @@
 import { format } from "date-fns";
-import type { IdeaPanelData } from "@/components/content-board/types";
+import type { IdeaPanelData, PanelAttachment } from "@/components/content-board/types";
+import type { ContentIdeaStatus } from "@/lib/db/types";
 
 // "30 Sep 2026, 5:12 pm" in the viewer's own time zone.
 export function formatWhen(value: string | Date) {
@@ -65,4 +66,55 @@ export function hasChangesSinceReview(data: IdeaPanelData) {
   const reviewedAt = data.history.reviewedAt ? new Date(data.history.reviewedAt).getTime() : null;
   if (reviewedAt === null) return false;
   return data.attachments.some((item) => new Date(item.createdAt).getTime() > reviewedAt);
+}
+
+// Uploads more than this far apart count as separate rounds, even from the same person.
+const SAME_UPLOAD_MS = 30 * 60 * 1000;
+
+export type UploadGroup = {
+  key: string;
+  uploaderName: string;
+  at: string;
+  // Each file with its position in the full list (what the viewer shows when it is picked).
+  items: { attachment: PanelAttachment; index: number }[];
+};
+
+// The idea's files split into rounds of uploading, in the order they happened: one round is one
+// person adding files around the same time. Shows at a glance who uploaded first, who added what
+// after them, and which round is the latest.
+export function groupUploads(attachments: PanelAttachment[]): UploadGroup[] {
+  const groups: UploadGroup[] = [];
+  attachments.forEach((attachment, index) => {
+    const last = groups[groups.length - 1];
+    const previous = last?.items[last.items.length - 1]?.attachment;
+    const sameRound =
+      last &&
+      previous &&
+      last.uploaderName === attachment.uploaderName &&
+      Math.abs(new Date(attachment.createdAt).getTime() - new Date(previous.createdAt).getTime()) <= SAME_UPLOAD_MS;
+    if (sameRound) last.items.push({ attachment, index });
+    else groups.push({ key: attachment.id, uploaderName: attachment.uploaderName, at: attachment.createdAt, items: [{ attachment, index }] });
+  });
+  return groups;
+}
+
+// "8 images", "1 PDF", "2 images · 1 design link".
+export function describeUploads(items: { attachment: PanelAttachment }[]) {
+  const count = (kind: PanelAttachment["kind"]) => items.filter((item) => item.attachment.kind === kind).length;
+  const parts: string[] = [];
+  const images = count("image");
+  const pdfs = count("pdf");
+  const links = count("link");
+  if (images) parts.push(`${images} ${images === 1 ? "image" : "images"}`);
+  if (pdfs) parts.push(`${pdfs} ${pdfs === 1 ? "PDF" : "PDFs"}`);
+  if (links) parts.push(`${links} design ${links === 1 ? "link" : "links"}`);
+  return parts.join(" · ");
+}
+
+// How the latest activity is highlighted: red while reviewed work is still waiting in Feedback,
+// green once the idea has been shortlisted (or gone further). Nothing before any review.
+export function activityTone(status: ContentIdeaStatus, reviewPointCount: number): "waiting" | "shortlisted" | null {
+  if (status === "feedback" && reviewPointCount > 0) return "waiting";
+  if (status === "approved" || status === "in_progress" || status === "posted") return "shortlisted";
+  return null;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canMoveIdea, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
+import { activityTone, describeUploads, groupUploads } from "@/components/content-board/activity";
 
 describe("who can move an idea between columns", () => {
   it("lets admins move a card anywhere", () => {
@@ -33,8 +34,12 @@ describe("who can move an idea between columns", () => {
 describe("the next step shown on an idea", () => {
   const base = { isAdmin: false, isAssignee: false, hasAssignees: true, openReviewCount: 0 };
 
-  it("only lets an admin shortlist once every review point is fixed", () => {
-    expect(nextStep({ ...base, status: "feedback", isAdmin: true, openReviewCount: 2 })).toMatchObject({ kind: "blocked" });
+  it("lets an admin shortlist from Feedback, pointing out review points still open", () => {
+    expect(nextStep({ ...base, status: "feedback", isAdmin: true, openReviewCount: 2 })).toMatchObject({
+      kind: "move",
+      to: "approved",
+      note: expect.stringContaining("2 review points are still open"),
+    });
     expect(nextStep({ ...base, status: "feedback", isAdmin: true })).toEqual({ kind: "move", to: "approved", label: "Shortlist" });
     expect(nextStep({ ...base, status: "feedback" })).toMatchObject({ kind: "wait" });
   });
@@ -78,5 +83,42 @@ describe("the order of cards inside a column", () => {
       { id: "y", status: "posted" as const, created_at: "2026-09-02T00:00:00Z" },
     ];
     expect(sortColumnIdeas("posted", ideas).map((idea) => idea.id)).toEqual(["x", "y"]);
+  });
+});
+
+describe("the idea panel's uploads and activity", () => {
+  const file = (id: string, uploaderName: string, createdAt: string, kind: "image" | "pdf" | "link" = "image") => ({
+    id,
+    kind,
+    fileName: `${id}.png`,
+    url: `https://x/${id}`,
+    embedUrl: null,
+    thumbUrl: null,
+    createdAt,
+    uploaderName,
+  });
+
+  it("groups uploads by who added them and when, in the order they happened", () => {
+    const groups = groupUploads([
+      file("a", "Ankitha", "2026-10-01T04:53:00Z"),
+      file("b", "Ankitha", "2026-10-01T04:54:00Z"),
+      file("c", "Aditi", "2026-10-05T20:24:00Z", "pdf"),
+      file("d", "Aditi", "2026-10-06T09:00:00Z"),
+    ]);
+    expect(groups.map((group) => [group.uploaderName, group.items.map((item) => item.index)])).toEqual([
+      ["Ankitha", [0, 1]],
+      ["Aditi", [2]],
+      ["Aditi", [3]],
+    ]);
+    expect(describeUploads(groups[0].items)).toBe("2 images");
+    expect(describeUploads(groups[1].items)).toBe("1 PDF");
+  });
+
+  it("highlights activity red while reviewed work waits in Feedback and green once shortlisted", () => {
+    expect(activityTone("feedback", 2)).toBe("waiting");
+    expect(activityTone("feedback", 0)).toBeNull();
+    expect(activityTone("idea", 0)).toBeNull();
+    expect(activityTone("approved", 1)).toBe("shortlisted");
+    expect(activityTone("posted", 0)).toBe("shortlisted");
   });
 });

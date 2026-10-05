@@ -35,7 +35,9 @@ export async function getIdeaPanelData(
     supabase.from("profiles").select("id, full_name, email").in("id", personIds),
     attachmentService.signPaths(
       supabase,
-      attachments.map((item) => item.storage_path).filter((path): path is string => Boolean(path)),
+      attachments
+        .flatMap((item) => [item.storage_path, item.thumb_path])
+        .filter((path): path is string => Boolean(path)),
     ),
   ]);
   const nameOf = (id: string | null | undefined) => {
@@ -61,6 +63,7 @@ export async function getIdeaPanelData(
       fileName: item.file_name,
       url: item.kind === "link" ? item.url : item.storage_path ? (signed.get(item.storage_path) ?? null) : null,
       embedUrl: item.kind === "link" && item.url ? toEmbedUrl(item.url) : null,
+      thumbUrl: item.thumb_path ? (signed.get(item.thumb_path) ?? null) : null,
       createdAt: item.created_at,
       uploaderName: nameOf(item.created_by),
     })),
