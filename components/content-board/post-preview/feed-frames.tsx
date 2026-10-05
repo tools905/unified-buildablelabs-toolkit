@@ -11,22 +11,24 @@ import { cn } from "@/lib/utils/cn";
 import { frameRatio, PREVIEW_BRAND } from "@/lib/utils/social-preview";
 
 // Colours of each app, light and dark. The preview's own dark mode is independent of the toolkit's.
-const INSTAGRAM = {
+export const INSTAGRAM = {
   light: { bg: "#ffffff", text: "#262626", muted: "#737373", border: "#dbdbdb", link: "#00376b" },
   dark: { bg: "#000000", text: "#f5f5f5", muted: "#a8a8a8", border: "#262626", link: "#e0f1ff" },
 };
-const LINKEDIN = {
+export const LINKEDIN = {
   light: { bg: "#ffffff", text: "rgba(0,0,0,0.9)", muted: "rgba(0,0,0,0.6)", border: "#e0dfdc", link: "#0a66c2" },
   dark: { bg: "#1b1f23", text: "rgba(255,255,255,0.9)", muted: "rgba(255,255,255,0.6)", border: "#38434f", link: "#71b7fb" },
 };
 
 // Each app uses the phone's own system font, so the previews do too rather than the toolkit's.
-const INSTAGRAM_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-const LINKEDIN_FONT = '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Fira Sans", Ubuntu, sans-serif';
+export const INSTAGRAM_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+export const LINKEDIN_FONT = '-apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Fira Sans", Ubuntu, sans-serif';
 
-type FrameProps = { slides: LoadedSlide[]; caption: string; dark: boolean; title?: string };
+// "card": a post on its own, as in the side panel. "screen": the post inside the full-screen app view,
+// edge to edge across the screen the way the app draws it on a phone.
+type FrameProps = { slides: LoadedSlide[]; caption: string; dark: boolean; title?: string; variant?: "card" | "screen" };
 
-function Avatar({ size, rounded }: { size: number; rounded: "full" | "sm" }) {
+export function Avatar({ size, rounded }: { size: number; rounded: "full" | "sm" }) {
   return (
     <span
       className={cn("grid shrink-0 place-items-center ring-1 ring-black/10", rounded === "full" ? "rounded-full" : "rounded-sm")}
@@ -38,7 +40,7 @@ function Avatar({ size, rounded }: { size: number; rounded: "full" | "sm" }) {
   );
 }
 
-export function InstagramFrame({ slides, caption, dark }: FrameProps) {
+export function InstagramFrame({ slides, caption, dark, variant = "card" }: FrameProps) {
   const theme = dark ? INSTAGRAM.dark : INSTAGRAM.light;
   const [index, setIndex] = useState(0);
   const current = Math.min(index, Math.max(0, slides.length - 1));
@@ -46,7 +48,7 @@ export function InstagramFrame({ slides, caption, dark }: FrameProps) {
   return (
     <article
       aria-label="Instagram post preview"
-      className="mx-auto w-full max-w-[375px] overflow-hidden border"
+      className={cn("w-full overflow-hidden", variant === "card" && "mx-auto max-w-[375px] border")}
       style={{ backgroundColor: theme.bg, color: theme.text, borderColor: theme.border, fontFamily: INSTAGRAM_FONT }}
     >
       <header className="flex items-center gap-2.5 px-3 py-2">
@@ -109,7 +111,7 @@ export function InstagramFrame({ slides, caption, dark }: FrameProps) {
   );
 }
 
-export function LinkedInFrame({ slides, caption, dark, title }: FrameProps) {
+export function LinkedInFrame({ slides, caption, dark, title, variant = "card" }: FrameProps) {
   const theme = dark ? LINKEDIN.dark : LINKEDIN.light;
   const [index, setIndex] = useState(0);
   const current = Math.min(index, Math.max(0, slides.length - 1));
@@ -121,7 +123,10 @@ export function LinkedInFrame({ slides, caption, dark, title }: FrameProps) {
   return (
     <article
       aria-label="LinkedIn post preview"
-      className="@container mx-auto w-full max-w-[420px] overflow-hidden rounded-lg border"
+      className={cn(
+        "@container w-full overflow-hidden",
+        variant === "card" ? "mx-auto max-w-[420px] rounded-lg border" : "border-y",
+      )}
       style={{ backgroundColor: theme.bg, color: theme.text, borderColor: theme.border, fontFamily: LINKEDIN_FONT }}
     >
       <header className="flex items-start gap-2 px-3 pb-2 pt-3">

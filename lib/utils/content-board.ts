@@ -142,23 +142,34 @@ export function nextStep(input: {
   }
 }
 
-type SortableIdea = { status: ContentIdeaStatus; created_at: string; first_feedback_at?: string | null };
+type SortableIdea = {
+  status: ContentIdeaStatus;
+  created_at: string;
+  first_feedback_at?: string | null;
+  reviewed_at?: string | null;
+};
 
 const time = (value: string | null | undefined) => (value ? new Date(value).getTime() : Number.POSITIVE_INFINITY);
 
 // The order cards are shown in inside one column. Ideas: the first one added comes first.
-// Feedback: the idea that got its first feedback earliest comes first. Other columns keep the
-// order they arrive in (newest first).
+// Feedback: ideas marked as reviewed come first, in the order they were reviewed (the first one
+// reviewed on top); the ones not reviewed yet follow, the one that got feedback earliest first.
+// Other columns keep the order they arrive in (newest first).
 export function sortColumnIdeas<T extends SortableIdea>(status: ContentIdeaStatus, ideas: T[]): T[] {
   if (status === "idea") {
     return [...ideas].sort((a, b) => time(a.created_at) - time(b.created_at));
   }
   if (status === "feedback") {
-    return [...ideas].sort(
-      (a, b) =>
+    return [...ideas].sort((a, b) => {
+      const aReviewed = Boolean(a.reviewed_at);
+      const bReviewed = Boolean(b.reviewed_at);
+      if (aReviewed !== bReviewed) return aReviewed ? -1 : 1;
+      if (aReviewed && bReviewed) return time(a.reviewed_at) - time(b.reviewed_at) || time(a.created_at) - time(b.created_at);
+      return (
         time(a.first_feedback_at ?? a.created_at) - time(b.first_feedback_at ?? b.created_at) ||
-        time(a.created_at) - time(b.created_at),
-    );
+        time(a.created_at) - time(b.created_at)
+      );
+    });
   }
   return ideas;
 }

@@ -77,6 +77,15 @@ describe("the order of cards inside a column", () => {
     expect(sortColumnIdeas("feedback", ideas).map((idea) => idea.id)).toEqual(["c", "b", "a"]);
   });
 
+  it("puts reviewed ideas at the top of Feedback, in the order they were reviewed", () => {
+    const ideas = [
+      { id: "waiting", status: "feedback" as const, created_at: "2026-09-01T00:00:00Z", first_feedback_at: "2026-09-02T00:00:00Z", reviewed_at: null },
+      { id: "reviewed-second", status: "feedback" as const, created_at: "2026-09-05T00:00:00Z", first_feedback_at: "2026-09-06T00:00:00Z", reviewed_at: "2026-10-04T00:00:00Z" },
+      { id: "reviewed-first", status: "feedback" as const, created_at: "2026-09-20T00:00:00Z", first_feedback_at: "2026-09-21T00:00:00Z", reviewed_at: "2026-10-02T00:00:00Z" },
+    ];
+    expect(sortColumnIdeas("feedback", ideas).map((idea) => idea.id)).toEqual(["reviewed-first", "reviewed-second", "waiting"]);
+  });
+
   it("leaves other columns in the order they came in", () => {
     const ideas = [
       { id: "x", status: "posted" as const, created_at: "2026-10-02T00:00:00Z" },

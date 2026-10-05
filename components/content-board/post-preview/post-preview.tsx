@@ -1,16 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, Info, Loader2, Moon, Pencil, Sun } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Info, Loader2, Moon, Pencil, Smartphone, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InstagramFrame, LinkedInFrame } from "@/components/content-board/post-preview/feed-frames";
+import { FeedAppView } from "@/components/content-board/post-preview/feed-app-view";
+import { useUrlState } from "@/components/dashboard/use-url-state";
 import { ProfileGridPreview } from "@/components/content-board/post-preview/profile-grid";
 import { MAX_PREVIEW_PAGES, usePostSlides } from "@/components/content-board/post-preview/use-post-slides";
 import type { PanelAttachment } from "@/components/content-board/types";
 import { cn } from "@/lib/utils/cn";
 import { checkPost, coverGetsCropped, PREVIEW_PLATFORMS, type PreviewPlatform } from "@/lib/utils/social-preview";
 
+const URL_KEYS = ["preview"] as const;
+const PHONE_QUERY = "(max-width: 639px)";
+
 // How the idea would look in the Instagram or LinkedIn feed, built from its uploaded files and caption.
+// "Open in app view" shows it inside the app's own screen; on a phone that opens straight away and
+// fills the screen, so the post is seen at exactly the size the app would draw it.
 export function PostPreview({
   attachments,
   caption,
@@ -31,6 +38,14 @@ export function PostPreview({
   );
   const [dark, setDark] = useState(false);
   const { slides, loading, skippedLinks, failed, cutPages } = usePostSlides(attachments);
+  // The app view lives in the address (?preview=app), so the phone's Back button closes it.
+  const { values, push, pop } = useUrlState(URL_KEYS);
+  const appViewOpen = values.preview === "app";
+
+  // On a phone, choosing Feed preview opens the full-screen app view right away.
+  useEffect(() => {
+    if (window.matchMedia(PHONE_QUERY).matches) push({ preview: "app" });
+  }, [push]);
 
   const warnings = useMemo(
     () => checkPost({ platform, slides, caption, skippedLinks }),
@@ -68,6 +83,28 @@ export function PostPreview({
           {dark ? "Dark feed" : "Light feed"}
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => push({ preview: "app" })}
+        className="flex w-full items-center justify-center gap-2 border border-primary/50 bg-primary/10 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-primary/20"
+      >
+        <Smartphone className="h-4 w-4 text-primary" />
+        Open in {platform === "instagram" ? "Instagram" : "LinkedIn"} app view
+      </button>
+
+      {appViewOpen ? (
+        <FeedAppView
+          platform={platform}
+          onPlatformChange={setPlatform}
+          dark={dark}
+          onDarkChange={setDark}
+          slides={loading ? [] : slides}
+          caption={text}
+          title={title}
+          onClose={() => pop({ preview: null })}
+        />
+      ) : null}
 
       <div className="rounded-md border border-border bg-muted/30 p-3 sm:p-4">
         {loading ? (
