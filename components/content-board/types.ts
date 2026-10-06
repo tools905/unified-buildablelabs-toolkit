@@ -1,6 +1,7 @@
 import { FaFacebook, FaInstagram, FaLinkedin, FaXTwitter, FaYoutube } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 import type { ContentAttachmentKind, ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
+import type { LatestActivity } from "@/lib/utils/content-board";
 
 export type ContentIdeaProfile = {
   id: string;
@@ -48,8 +49,10 @@ export type ContentIdeaWithRelations = {
   file_count: number;
   review_count: number;
   open_review_count: number;
-  // When the first review point was added; orders the Feedback column.
+  // When the first review point was added.
   first_feedback_at: string | null;
+  // The latest review activity (reviewed, comment, comment done, upload); orders the Feedback column.
+  latest_activity: LatestActivity | null;
   thumbnail: { kind: ContentAttachmentKind; url: string | null } | null;
 };
 
@@ -92,6 +95,9 @@ export type IdeaPanelData = {
   currentUserId: string;
   currentUserName: string;
   isAdmin: boolean;
+  // The idea's column right now, straight from the database. When it differs from what the board
+  // shows, the board was out of date (someone else moved the card) and is refreshed.
+  status: ContentIdeaStatus;
   history: IdeaPanelHistory;
   attachments: PanelAttachment[];
   points: PanelReviewPoint[];

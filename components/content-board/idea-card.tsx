@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CalendarDays, Check, Clock, ExternalLink, Link as LinkIcon, FileText, ImageIcon, Link2, MessageSquare, Paperclip, UserCheck } from "lucide-react";
+import { CalendarDays, Check, Clock, History, ExternalLink, Link as LinkIcon, FileText, ImageIcon, Link2, MessageSquare, Paperclip, UserCheck } from "lucide-react";
 import { CardMenu } from "@/components/content-board/card-menu";
-import { format, isBefore, parseISO, startOfToday } from "date-fns";
+import { format, formatDistanceToNowStrict, isBefore, parseISO, startOfToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { setPostUrlAction } from "@/app/tools/content-board/actions";
+import { describeActivity } from "@/lib/utils/content-board";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 import { cn } from "@/lib/utils/cn";
 import { formatWhen } from "@/components/content-board/activity";
@@ -231,6 +232,19 @@ export function IdeaCard({
       </div>
       {idea.thumbnail ? <Thumbnail thumbnail={idea.thumbnail} fileCount={idea.file_count} /> : null}
       <p className="mt-2 flex-1 text-sm font-medium leading-snug">{idea.title}</p>
+      {idea.status === "feedback" && idea.latest_activity ? (
+        // Why this card sits where it does in Feedback: its latest review activity.
+        <p
+          className="mt-1.5 flex items-center gap-1 text-xs font-medium text-primary"
+          title={`Latest activity: ${formatWhen(idea.latest_activity.at)}`}
+        >
+          <History className="h-3 w-3 shrink-0" />
+          <span className="min-w-0 truncate">
+            {describeActivity(idea.latest_activity)} ·{" "}
+            <span suppressHydrationWarning>{formatDistanceToNowStrict(new Date(idea.latest_activity.at), { addSuffix: true })}</span>
+          </span>
+        </p>
+      ) : null}
       {assignees.length > 0 ? (
         <p
           className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"

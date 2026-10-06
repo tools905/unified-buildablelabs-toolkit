@@ -132,6 +132,18 @@ export function IdeaPanel({
     if (!peekFreshPanel(ideaId)) refresh();
   }, [ideaId, refresh]);
 
+  // The board shows this idea in one column but the database says another: someone moved it from
+  // another screen or device. Refresh the board once so the card, and the next-step buttons, catch up.
+  const serverStatus = data?.status;
+  const refreshedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!serverStatus || serverStatus === idea.status) return;
+    const key = `${idea.status}->${serverStatus}`;
+    if (refreshedFor.current === key) return;
+    refreshedFor.current = key;
+    router.refresh();
+  }, [serverStatus, idea.status, router]);
+
   const attachments = data?.attachments ?? [];
   const drafts = groupUploads(attachments);
   const latestDraft = drafts[drafts.length - 1] ?? null;

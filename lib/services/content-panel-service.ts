@@ -20,7 +20,7 @@ export async function getIdeaPanelData(
     isWorkspaceAdmin(workspace.id, user.id, supabase),
     supabase
       .from("content_ideas")
-      .select("created_at, created_by, posted_at, reviewed_at, reviewed_by")
+      .select("status, created_at, created_by, posted_at, reviewed_at, reviewed_by")
       .eq("id", ideaId)
       .single(),
   ]);
@@ -50,6 +50,7 @@ export async function getIdeaPanelData(
     currentUserId: user.id,
     currentUserName: nameOf(user.id),
     isAdmin: admin,
+    status: idea.status,
     history: {
       createdAt: idea.created_at,
       creatorName: nameOf(idea.created_by),

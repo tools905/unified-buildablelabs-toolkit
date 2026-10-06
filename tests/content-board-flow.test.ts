@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canMoveIdea, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
+import { canMoveIdea, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
 import { activityTone, describeUploads, groupUploads } from "@/components/content-board/activity";
 
 describe("who can move an idea between columns", () => {
@@ -67,23 +67,27 @@ describe("the order of cards inside a column", () => {
     expect(sortColumnIdeas("idea", ideas).map((idea) => idea.id)).toEqual(["old", "new"]);
   });
 
-  it("shows the idea that got feedback first at the top of Feedback", () => {
+  it("puts the idea with the latest review activity at the top of Feedback, reviewed or not", () => {
     const ideas = [
-      { id: "a", status: "feedback" as const, created_at: "2026-09-01T00:00:00Z", first_feedback_at: "2026-10-03T00:00:00Z" },
-      { id: "b", status: "feedback" as const, created_at: "2026-09-20T00:00:00Z", first_feedback_at: "2026-10-01T00:00:00Z" },
-      { id: "c", status: "feedback" as const, created_at: "2026-09-10T00:00:00Z", first_feedback_at: null },
+      { id: "reviewed-yesterday", status: "feedback" as const, created_at: "2026-09-01T00:00:00Z", latest_activity: { kind: "reviewed" as const, at: "2026-10-05T10:00:00Z", by: "Aditi" } },
+      { id: "commented-now", status: "feedback" as const, created_at: "2026-09-02T00:00:00Z", latest_activity: { kind: "comment" as const, at: "2026-10-06T09:00:00Z", by: "Akhil" } },
+      { id: "quiet", status: "feedback" as const, created_at: "2026-09-03T00:00:00Z", first_feedback_at: "2026-09-04T00:00:00Z", latest_activity: null },
     ];
-    // "c" has no feedback date, so its creation date stands in for it.
-    expect(sortColumnIdeas("feedback", ideas).map((idea) => idea.id)).toEqual(["c", "b", "a"]);
+    expect(sortColumnIdeas("feedback", ideas).map((idea) => idea.id)).toEqual(["commented-now", "reviewed-yesterday", "quiet"]);
   });
 
-  it("puts reviewed ideas at the top of Feedback, in the order they were reviewed", () => {
-    const ideas = [
-      { id: "waiting", status: "feedback" as const, created_at: "2026-09-01T00:00:00Z", first_feedback_at: "2026-09-02T00:00:00Z", reviewed_at: null },
-      { id: "reviewed-second", status: "feedback" as const, created_at: "2026-09-05T00:00:00Z", first_feedback_at: "2026-09-06T00:00:00Z", reviewed_at: "2026-10-04T00:00:00Z" },
-      { id: "reviewed-first", status: "feedback" as const, created_at: "2026-09-20T00:00:00Z", first_feedback_at: "2026-09-21T00:00:00Z", reviewed_at: "2026-10-02T00:00:00Z" },
-    ];
-    expect(sortColumnIdeas("feedback", ideas).map((idea) => idea.id)).toEqual(["reviewed-first", "reviewed-second", "waiting"]);
+  it("finds an idea's latest review activity and says what it was", () => {
+    const activity = latestActivity({
+      reviewedAt: "2026-10-05T10:00:00Z",
+      reviewerName: "Aditi",
+      points: [{ createdAt: "2026-10-04T10:00:00Z", resolvedAt: "2026-10-06T08:00:00Z", authorName: "Akhil" }],
+      uploads: [{ createdAt: "2026-10-03T10:00:00Z", uploaderName: "Mridul" }],
+    });
+    expect(activity).toEqual({ kind: "resolved", at: "2026-10-06T08:00:00Z", by: null });
+    expect(describeActivity(activity!)).toBe("Comment marked done");
+    expect(describeActivity({ kind: "upload", at: "x", by: "Mridul" })).toBe("New upload by Mridul");
+    expect(describeActivity({ kind: "reviewed", at: "x", by: "Aditi" })).toBe("Reviewed by Aditi");
+    expect(latestActivity({})).toBeNull();
   });
 
   it("leaves other columns in the order they came in", () => {

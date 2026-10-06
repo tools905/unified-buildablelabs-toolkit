@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { canMoveIdea, diffAssignees, groupIntoDrafts } from "@/lib/utils/content-board";
+import { canMoveIdea, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
 import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
@@ -16,7 +16,7 @@ import {
 } from "@/lib/validation/content-idea-schema";
 
 export const CONTENT_IDEA_SELECT =
-  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at), review_points:content_idea_review_points(id, is_resolved, created_at), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
+  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), reviewer:profiles!content_ideas_reviewed_by_fkey(full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at, uploader:profiles!content_idea_attachments_created_by_fkey(full_name, email)), review_points:content_idea_review_points(id, is_resolved, created_at, resolved_at, author:profiles!content_idea_review_points_created_by_fkey(full_name, email)), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
 
 export async function createContentIdea(
   supabase: SupabaseClient<any>,
@@ -195,7 +195,17 @@ export async function listContentIdeas(
   return data ?? [];
 }
 
+type EmbeddedPerson = { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
+
+// PostgREST may give an embedded person as one object or a list.
+function personName(person: EmbeddedPerson | undefined) {
+  const one = Array.isArray(person) ? person[0] : person;
+  return one?.full_name || one?.email || null;
+}
+
 type IdeaWithEmbeds = {
+  reviewed_at?: string | null;
+  reviewer?: EmbeddedPerson;
   attachments?:
     | {
         id: string;
@@ -204,9 +214,12 @@ type IdeaWithEmbeds = {
         sort_order: number;
         created_by?: string;
         created_at?: string;
+        uploader?: EmbeddedPerson;
       }[]
     | null;
-  review_points?: { id: string; is_resolved: boolean; created_at?: string }[] | null;
+  review_points?:
+    | { id: string; is_resolved: boolean; created_at?: string; resolved_at?: string | null; author?: EmbeddedPerson }[]
+    | null;
 };
 
 export type CardThumbnail = { kind: "image" | "pdf" | "link"; url: string | null };
@@ -247,6 +260,16 @@ export async function attachCardPreviews<T extends IdeaWithEmbeds>(supabase: Sup
       review_count: points.length,
       open_review_count: points.filter((point) => !point.is_resolved).length,
       first_feedback_at: feedbackTimes[0] ?? null,
+      latest_activity: latestActivity({
+        reviewedAt: idea.reviewed_at ?? null,
+        reviewerName: personName(idea.reviewer),
+        points: points
+          .filter((point) => point.created_at)
+          .map((point) => ({ createdAt: point.created_at as string, resolvedAt: point.resolved_at ?? null, authorName: personName(point.author) })),
+        uploads: attachments
+          .filter((item) => item.created_at)
+          .map((item) => ({ createdAt: item.created_at as string, uploaderName: personName(item.uploader) })),
+      }),
       thumbnail,
     };
   });
@@ -272,6 +295,14 @@ export async function moveContentIdea(
   ]);
   if (error) throw error;
   if (!idea) throw new Error("This idea no longer exists.");
+  // Already there (someone else moved it, or this screen was out of date): nothing to refuse. A
+  // posting day chosen at the same time is still saved.
+  if (idea.status === to) {
+    if (options.scheduledFor) {
+      return updateContentIdea(supabase, workspaceId, ideaId, actorId, { scheduledFor: options.scheduledFor });
+    }
+    return idea;
+  }
   const isAssignee = (idea.assignees ?? []).some((row: { user_id: string }) => row.user_id === actorId);
   if (!canMoveIdea({ from: idea.status, to, isAdmin, isAssignee })) {
     throw new Error(

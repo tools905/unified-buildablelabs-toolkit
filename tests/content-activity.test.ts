@@ -8,6 +8,7 @@ function data(overrides: Partial<IdeaPanelData> = {}): IdeaPanelData {
     currentUserId: "u",
     currentUserName: "Me",
     isAdmin: false,
+    status: "feedback",
     history: {
       createdAt: "2026-09-01T09:00:00Z",
       creatorName: "Mridul",

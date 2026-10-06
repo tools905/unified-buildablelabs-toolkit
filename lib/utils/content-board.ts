@@ -142,34 +142,72 @@ export function nextStep(input: {
   }
 }
 
+export type LatestActivity = {
+  kind: "reviewed" | "comment" | "resolved" | "upload";
+  at: string;
+  // Who did it, when that is recorded (ticking a comment done is not).
+  by: string | null;
+};
+
+// The most recent review activity on an idea: marked as reviewed, a review comment added, a comment
+// ticked done, or a file uploaded. Orders the Feedback column and labels its cards.
+export function latestActivity(input: {
+  reviewedAt?: string | null;
+  reviewerName?: string | null;
+  points?: { createdAt: string; resolvedAt?: string | null; authorName?: string | null }[];
+  uploads?: { createdAt: string; uploaderName?: string | null }[];
+}): LatestActivity | null {
+  const events: LatestActivity[] = [];
+  if (input.reviewedAt) events.push({ kind: "reviewed", at: input.reviewedAt, by: input.reviewerName ?? null });
+  for (const point of input.points ?? []) {
+    events.push({ kind: "comment", at: point.createdAt, by: point.authorName ?? null });
+    if (point.resolvedAt) events.push({ kind: "resolved", at: point.resolvedAt, by: null });
+  }
+  for (const upload of input.uploads ?? []) events.push({ kind: "upload", at: upload.createdAt, by: upload.uploaderName ?? null });
+  const valid = events.filter((event) => !Number.isNaN(new Date(event.at).getTime()));
+  if (valid.length === 0) return null;
+  return valid.reduce((latest, event) => (new Date(event.at).getTime() > new Date(latest.at).getTime() ? event : latest));
+}
+
+// "Reviewed by Aditi", "Comment by Mridul", "Comment marked done", "New upload by Ankitha".
+export function describeActivity(activity: LatestActivity) {
+  const by = activity.by ? ` by ${activity.by}` : "";
+  switch (activity.kind) {
+    case "reviewed":
+      return `Reviewed${by}`;
+    case "comment":
+      return `Comment${by}`;
+    case "resolved":
+      return "Comment marked done";
+    default:
+      return `New upload${by}`;
+  }
+}
+
 type SortableIdea = {
   status: ContentIdeaStatus;
   created_at: string;
   first_feedback_at?: string | null;
-  reviewed_at?: string | null;
+  latest_activity?: LatestActivity | null;
 };
 
 const time = (value: string | null | undefined) => (value ? new Date(value).getTime() : Number.POSITIVE_INFINITY);
 
 // The order cards are shown in inside one column. Ideas: the first one added comes first.
-// Feedback: ideas marked as reviewed come first, in the order they were reviewed (the first one
-// reviewed on top); the ones not reviewed yet follow, the one that got feedback earliest first.
+// Feedback: the idea with the most recent review activity (reviewed, commented, a comment ticked
+// done, a new upload) on top, reviewed or not.
 // Other columns keep the order they arrive in (newest first).
 export function sortColumnIdeas<T extends SortableIdea>(status: ContentIdeaStatus, ideas: T[]): T[] {
   if (status === "idea") {
     return [...ideas].sort((a, b) => time(a.created_at) - time(b.created_at));
   }
   if (status === "feedback") {
-    return [...ideas].sort((a, b) => {
-      const aReviewed = Boolean(a.reviewed_at);
-      const bReviewed = Boolean(b.reviewed_at);
-      if (aReviewed !== bReviewed) return aReviewed ? -1 : 1;
-      if (aReviewed && bReviewed) return time(a.reviewed_at) - time(b.reviewed_at) || time(a.created_at) - time(b.created_at);
-      return (
-        time(a.first_feedback_at ?? a.created_at) - time(b.first_feedback_at ?? b.created_at) ||
-        time(a.created_at) - time(b.created_at)
-      );
-    });
+    const lastActive = (idea: T) => {
+      const value = idea.latest_activity?.at ?? idea.first_feedback_at ?? idea.created_at;
+      const parsed = new Date(value).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+    return [...ideas].sort((a, b) => lastActive(b) - lastActive(a) || time(b.created_at) - time(a.created_at));
   }
   return ideas;
 }
