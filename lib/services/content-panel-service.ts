@@ -66,6 +66,7 @@ export async function getIdeaPanelData(
       thumbUrl: item.thumb_path ? (signed.get(item.thumb_path) ?? null) : null,
       createdAt: item.created_at,
       uploaderName: nameOf(item.created_by),
+      uploadedVia: item.uploaded_via ?? null,
     })),
     points: points.map((point) => {
       const author = Array.isArray(point.author) ? point.author[0] : point.author;

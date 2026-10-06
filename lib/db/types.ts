@@ -588,6 +588,8 @@ export type Database = {
           file_name: string | null;
           size_bytes: number | null;
           sort_order: number;
+          // The app a file came through when it was not added on the board; null for the board itself.
+          uploaded_via: string | null;
           created_by: string;
           created_at: string;
         };
@@ -602,6 +604,7 @@ export type Database = {
           file_name?: string | null;
           size_bytes?: number | null;
           sort_order?: number;
+          uploaded_via?: string | null;
           created_by: string;
           created_at?: string;
         };

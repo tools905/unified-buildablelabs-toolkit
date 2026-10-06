@@ -15,6 +15,11 @@ export type ActivityEvent = {
   detail?: string;
 };
 
+// "Mridul", or "Mridul through <app>" when the file came through a connected app instead of the board.
+export function uploaderLabel(name: string, via: string | null) {
+  return via ? `${name} through ${via}` : name;
+}
+
 function clip(text: string, max = 80) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
@@ -30,7 +35,7 @@ export function buildActivity(data: IdeaPanelData): ActivityEvent[] {
     events.push({
       id: `file-${item.id}`,
       at: item.createdAt,
-      label: `${what} uploaded by ${item.uploaderName}`,
+      label: `${what} uploaded by ${uploaderLabel(item.uploaderName, item.uploadedVia)}`,
       detail: item.kind === "link" ? undefined : (item.fileName ?? undefined),
     });
   }
@@ -74,6 +79,8 @@ export type UploadGroup = {
   // 1 for the first draft uploaded, counting up.
   number: number;
   uploaderName: string;
+  // The app the whole draft came through; null when it was added on the board or the files differ.
+  uploadedVia: string | null;
   at: string;
   // Each file with its position in the full list (what the viewer shows when it is picked).
   items: { attachment: PanelAttachment; index: number }[];
@@ -88,13 +95,17 @@ export function groupUploads(attachments: PanelAttachment[]): UploadGroup[] {
     (item) => item.attachment.uploaderName,
     (item) => item.attachment.createdAt,
   );
-  return drafts.map((items, position) => ({
-    key: items[0].attachment.id,
-    number: position + 1,
-    uploaderName: items[0].attachment.uploaderName,
-    at: items[0].attachment.createdAt,
-    items,
-  }));
+  return drafts.map((items, position) => {
+    const via = items[0].attachment.uploadedVia;
+    return {
+      key: items[0].attachment.id,
+      number: position + 1,
+      uploaderName: items[0].attachment.uploaderName,
+      uploadedVia: items.every((item) => item.attachment.uploadedVia === via) ? via : null,
+      at: items[0].attachment.createdAt,
+      items,
+    };
+  });
 }
 
 // The draft a file belongs to.

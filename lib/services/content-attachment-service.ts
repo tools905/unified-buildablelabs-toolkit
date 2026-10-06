@@ -14,6 +14,7 @@ export type ContentAttachmentRow = {
   file_name: string | null;
   size_bytes: number | null;
   sort_order: number;
+  uploaded_via: string | null;
   created_by: string;
   created_at: string;
 };
@@ -85,6 +86,8 @@ export async function addStoredAttachment(
     thumbPath?: string | null;
     fileName: string;
     sizeBytes: number;
+    // The app the file came through, when it was not added on the board. Shown as "through <app>".
+    uploadedVia?: string | null;
   },
 ) {
   const prefix = `${input.workspaceId}/${input.ideaId}/`;
@@ -106,6 +109,7 @@ export async function addStoredAttachment(
     file_name: input.fileName,
     size_bytes: input.sizeBytes,
     sort_order: existing.length ? Math.max(...existing.map((item) => item.sort_order)) + 1 : 0,
+    ...(input.uploadedVia ? { uploaded_via: input.uploadedVia } : {}),
     created_by: input.userId,
   });
   if (error) {

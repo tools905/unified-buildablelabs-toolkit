@@ -10,7 +10,13 @@ import {
   listIdeasInput,
   listReviewPointsInput,
   resolveReviewPointInput,
+  MCP_ERROR_CODES,
+  MCP_UPLOAD_API_PATH,
+  MCP_UPLOAD_PAGE_PATH,
+  UPLOAD_FORM_FIELDS,
   startUploadInput,
+  uploadLinkStateSchema,
+  uploadResultSchema,
 } from "@/lib/mcp/contract";
 
 const ID = "7b6f1f0e-6f0a-4d0e-9c56-2d9f6a3e8f11";
@@ -99,5 +105,48 @@ describe("MCP contract: limits match the app", () => {
     expect(MCP_LIMITS.maxFileBytes).toBe(15 * 1024 * 1024);
     expect(MCP_LIMITS.maxFilesPerIdea).toBe(12);
     expect(MCP_LIMITS.maxResultChars).toBeLessThan(150_000);
+  });
+});
+
+describe("MCP contract: the upload page", () => {
+  const limits = { max_bytes: 15 * 1024 * 1024, allowed_extensions: [".pdf", ".png"], files_used: 3, files_max: 12 };
+
+  it("agrees where the page and the backend live and what the form fields are called", () => {
+    expect(MCP_UPLOAD_PAGE_PATH).toBe("/mcp-upload");
+    expect(MCP_UPLOAD_API_PATH).toBe("/api/mcp-upload");
+    expect(UPLOAD_FORM_FIELDS).toEqual({ file: "file", thumbnail: "thumbnail" });
+  });
+
+  it("describes a link that can still be used with everything the page shows", () => {
+    const ready = {
+      status: "ready",
+      idea_title: "Carousel: five gaps",
+      file_name: "carousel-v2.pdf",
+      replaces_file_name: "carousel-v1.pdf",
+      expires_at: "2026-10-06T12:15:00.000Z",
+      limits,
+    };
+    expect(uploadLinkStateSchema.parse(ready)).toEqual(ready);
+    expect(uploadLinkStateSchema.safeParse({ ...ready, limits: undefined }).success).toBe(false);
+  });
+
+  it("describes the other states with a status alone, and refuses an unknown one", () => {
+    for (const status of ["expired", "used", "unknown"]) {
+      expect(uploadLinkStateSchema.safeParse({ status }).success).toBe(true);
+    }
+    expect(uploadLinkStateSchema.safeParse({ status: "pending" }).success).toBe(false);
+  });
+
+  it("describes a stored file and a refused one", () => {
+    expect(uploadResultSchema.safeParse({ ok: true, attachment_id: ID, file_name: "a.pdf", kind: "pdf", replaced: false }).success).toBe(true);
+    expect(uploadResultSchema.safeParse({ ok: false, code: "limit_reached", message: "This idea already has 12 files." }).success).toBe(true);
+  });
+
+  it("only answers a refusal with one of the agreed error codes", () => {
+    for (const code of MCP_ERROR_CODES) {
+      expect(uploadResultSchema.safeParse({ ok: false, code, message: "x" }).success).toBe(true);
+    }
+    expect(uploadResultSchema.safeParse({ ok: false, code: "oops", message: "x" }).success).toBe(false);
+    expect(uploadResultSchema.safeParse({ ok: true, attachment_id: "nope", file_name: "a.pdf", kind: "pdf", replaced: false }).success).toBe(false);
   });
 });

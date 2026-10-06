@@ -176,7 +176,7 @@ export type StartUploadOutput = {
   upload_url: string; // one-time, opened by the person in their browser
   expires_at: string;
   replaces_attachment_id: string | null;
-  limits: { max_bytes: number; allowed_extensions: readonly string[]; files_used: number; files_max: number };
+  limits: UploadLimits;
 };
 export type ConfirmUploadOutput = {
   attachment_id: string;
@@ -184,6 +184,67 @@ export type ConfirmUploadOutput = {
   page_count: number | null; // null for an image
   replaced_attachment_id: string | null;
 };
+
+// ---- The upload page -------------------------------------------------------------------------------
+// The page at <site>/teams/mcp-upload/<token> (Mridul) talks to one route of the upload backend (Ananya):
+// <site>/teams/api/mcp-upload/<token>. The token in the address is the only credential, so neither the page
+// nor the route needs a sign-in. Build `upload_url` from the request's own address, never a fixed host.
+//
+// GET answers with status 200 and an UploadLinkState, whatever state the link is in.
+// POST receives multipart/form-data and answers with an UploadResult (the body, not the HTTP status, is
+// what the page reads). The fields are UPLOAD_FORM_FIELDS:
+//   file       required. The PDF, or an image the browser has already shrunk, under its original name.
+//   thumbnail  optional. A small JPEG or WebP picture of it (the first page for a PDF), made in the
+//              browser exactly as the board does, so the card shows a picture. Without it the card shows
+//              a plain "PDF" or no picture.
+// A successful POST stores the file and adds it to the idea like the board does (under the person who
+// started the upload, with `uploaded_via` set to the app's name), replaces the old file when the link
+// said so, and uses the link up. confirm_upload then only reports that result to the AI, and gives the
+// same answer if it is called again. A refused file (wrong type, too big, idea full) does not use the link,
+// so the person can try again until it expires. The server checks type and size itself and never trusts
+// the browser.
+export const MCP_UPLOAD_PAGE_PATH = "/mcp-upload";
+export const MCP_UPLOAD_API_PATH = "/api/mcp-upload";
+export const UPLOAD_FORM_FIELDS = { file: "file", thumbnail: "thumbnail" } as const;
+
+export const uploadLimitsSchema = z.object({
+  max_bytes: z.number().int().positive(),
+  allowed_extensions: z.array(z.string()),
+  files_used: z.number().int().min(0),
+  files_max: z.number().int().positive(),
+});
+export type UploadLimits = z.infer<typeof uploadLimitsSchema>;
+
+export const uploadLinkStateSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("ready"),
+    idea_title: z.string(),
+    file_name: z.string(), // the name start_upload was given: shown to the person as what is expected
+    replaces_file_name: z.string().nullable(), // set when the file swaps an existing one
+    expires_at: z.string(),
+    limits: uploadLimitsSchema,
+  }),
+  z.object({ status: z.literal("expired") }),
+  z.object({ status: z.literal("used") }),
+  z.object({ status: z.literal("unknown") }), // never existed, or not a link this server made
+]);
+export type UploadLinkState = z.infer<typeof uploadLinkStateSchema>;
+
+export const uploadResultSchema = z.discriminatedUnion("ok", [
+  z.object({
+    ok: z.literal(true),
+    attachment_id: z.string().uuid(),
+    file_name: z.string(),
+    kind: z.enum(["pdf", "image"]),
+    replaced: z.boolean(),
+  }),
+  z.object({
+    ok: z.literal(false),
+    code: z.enum(MCP_ERROR_CODES), // link_expired, invalid_input (type or size), limit_reached, not_found, ...
+    message: z.string(), // plain words the page can show to the person as they are
+  }),
+]);
+export type UploadResult = z.infer<typeof uploadResultSchema>;
 
 // ---- The tools -------------------------------------------------------------------------------------
 // `readOnly` becomes the tool's "read only" hint for the connected app, so it can run read tools without asking.
@@ -202,7 +263,7 @@ export const MCP_TOOLS = {
 export type McpToolName = keyof typeof MCP_TOOLS;
 export const MCP_TOOL_NAMES = Object.keys(MCP_TOOLS) as McpToolName[];
 
-// ---- Table rows (Ananya's spec; Mridul writes migrations 049 to 051) -------------------------------
+// ---- Table rows (Ananya's spec; Mridul writes migrations 049 to 052) -------------------------------
 // 049 mcp_upload_links. Only the server reads and writes it; the link's secret is stored only as a hash.
 export type McpUploadLinkRow = {
   id: string;
@@ -230,5 +291,9 @@ export type McpAuditRow = {
   created_at: string;
 };
 
-// 051 safety rules: on every table outside the Content Board, a restrictive rule that blocks any token
-// carrying a client_id, so these tokens can't read other data through Supabase directly.
+// 051 content_idea_attachments.uploaded_via (text, empty for files added on the board). The upload backend
+// sets it to the name of the app the file came through, at most 60 characters, when it adds the file. The
+// board shows it as "uploaded by <person> through <app>" on the file and in the activity list.
+
+// 052 safety rules, the last migration: on every table outside the Content Board, a restrictive rule that
+// blocks any token carrying a client_id, so these tokens can't read other data through Supabase directly.

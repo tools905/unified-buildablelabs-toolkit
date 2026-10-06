@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   MessageCircle,
   Newspaper,
+  Plug,
   Settings,
   Share2,
   Users,
@@ -31,7 +32,10 @@ type NavItem = {
 
 // The Dashboard is the one place for every tool (it replaced the separate Tools catalog) and,
 // for admins, the workspace overview that used to be Admin Reports.
-const baseLinks: NavItem[] = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true }];
+const baseLinks: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/connected-apps", label: "Connected apps", icon: Plug, exact: true },
+];
 
 // Only admins see these, and each page also turns non-admins away on the server.
 const adminLinks: NavItem[] = [

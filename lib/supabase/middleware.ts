@@ -13,6 +13,8 @@ const protectedPrefixes = [
   "/notifications",
   // The consent screen for connectors: a signed-out visitor logs in first, then comes back to approve.
   "/oauth",
+  // The list of apps a person has connected, with a way to disconnect them.
+  "/connected-apps",
 ];
 
 export async function updateSession(request: NextRequest) {
