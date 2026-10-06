@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { canMoveIdea, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
+import { canMoveIdea, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
 import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
@@ -25,6 +25,14 @@ export async function createContentIdea(
   rawInput: CreateContentIdeaInput,
 ) {
   const input = createContentIdeaSchema.parse(rawInput);
+  // Any one of the text fields is enough; the card's title is taken from whichever was filled in.
+  const title = deriveIdeaTitle({
+    title: input.title,
+    description: input.description,
+    caption: input.caption,
+    referenceLinks: input.referenceLinks,
+  });
+  if (!title) throw new Error("Add a title, details, a caption or a reference post.");
 
   // Check the assignment is allowed before anything is saved, so a refused assignment can't leave
   // behind an idea the person never meant to create without it.
@@ -35,7 +43,7 @@ export async function createContentIdea(
     .from("content_ideas")
     .insert({
       workspace_id: workspaceId,
-      title: input.title,
+      title,
       description: input.description ?? null,
       caption: input.caption?.trim() || null,
       platform: input.platforms[0],
@@ -57,7 +65,7 @@ export async function createContentIdea(
   });
 
   if (assigneeIds.length) {
-    await setIdeaAssignees(supabase, workspaceId, idea.id, createdBy, assigneeIds, { ideaTitle: input.title });
+    await setIdeaAssignees(supabase, workspaceId, idea.id, createdBy, assigneeIds, { ideaTitle: title });
   }
 
   return idea;

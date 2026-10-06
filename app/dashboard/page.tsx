@@ -108,7 +108,8 @@ export default async function DashboardPage() {
   const [tools, admin] = await Promise.all([listToolkitTools(), isWorkspaceAdmin(workspace.id, user.id, supabase)]);
   const stats = admin ? await loadAdminStats(supabase, workspace.id) : null;
   const companyTools = tools.filter((tool) => tool.group === "company");
-  const contentTools = tools.filter((tool) => tool.group === "content");
+  // Newsletter now lives inside Content Board (its sidebar, below Calendar), so it has no card of its own.
+  const contentTools = tools.filter((tool) => tool.group === "content" && tool.slug !== "newsletter");
 
   const displayName =
     (user.user_metadata?.full_name as string | undefined)?.split(" ")[0] ||

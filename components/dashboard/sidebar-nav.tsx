@@ -45,12 +45,13 @@ const adminLinks: NavItem[] = [
 ];
 
 const toolNav: Array<{
-  match: string;
+  // The pages this section belongs to.
+  match: string[];
   title: string;
   items: Array<NavItem & { adminOnly?: boolean }>;
 }> = [
   {
-    match: "/tools/peer-review",
+    match: ["/tools/peer-review"],
     title: "Peer Review",
     items: [
       { href: "/tools/peer-review", label: "Overview", icon: ClipboardCheck, exact: true },
@@ -60,7 +61,7 @@ const toolNav: Array<{
     ],
   },
   {
-    match: "/tools/linkedin-assessor",
+    match: ["/tools/linkedin-assessor"],
     title: "LinkedIn Assessor",
     items: [
       { href: "/tools/linkedin-assessor", label: "Overview", icon: Share2, exact: true },
@@ -70,7 +71,7 @@ const toolNav: Array<{
     ],
   },
   {
-    match: "/tools/hr-bot",
+    match: ["/tools/hr-bot"],
     title: "HR Bot",
     items: [
       { href: "/tools/hr-bot", label: "Overview", icon: Bot, exact: true },
@@ -79,7 +80,7 @@ const toolNav: Array<{
     ],
   },
   {
-    match: "/tools/tickets",
+    match: ["/tools/tickets"],
     title: "Tickets",
     items: [
       { href: "/tools/tickets", label: "Board", icon: KanbanSquare, exact: true },
@@ -88,7 +89,7 @@ const toolNav: Array<{
     ],
   },
   {
-    match: "/tools/resources",
+    match: ["/tools/resources"],
     title: "Upskill",
     items: [
       { href: "/tools/resources", label: "Browse", icon: BookOpen, exact: true },
@@ -96,21 +97,19 @@ const toolNav: Array<{
     ],
   },
   {
-    match: "/tools/meetings",
+    match: ["/tools/meetings"],
     title: "Meetings",
     items: [{ href: "/tools/meetings", label: "Recaps", icon: CalendarClock, exact: true }],
   },
   {
-    match: "/tools/newsletter",
-    title: "Newsletter",
-    items: [{ href: "/tools/newsletter", label: "Posts", icon: Newspaper, exact: true }],
-  },
-  {
-    match: "/tools/content-board",
+    // Newsletter is part of Content Board: it sits right below Calendar, and its pages show this
+    // same section.
+    match: ["/tools/content-board", "/tools/newsletter"],
     title: "Content Board",
     items: [
       { href: "/tools/content-board", label: "Board", icon: KanbanSquare, exact: true },
       { href: "/tools/content-board/calendar", label: "Calendar", icon: CalendarDays, exact: true },
+      { href: "/tools/newsletter", label: "Newsletter", icon: Newspaper },
     ],
   },
 ];
@@ -149,7 +148,7 @@ function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: strin
 export function SidebarNav({ admin, collapsed = false }: { admin: boolean; collapsed?: boolean }) {
   const pathname = usePathname();
   const globalLinks = admin ? [...baseLinks, ...adminLinks] : baseLinks;
-  const activeTool = toolNav.find((tool) => pathname.startsWith(tool.match));
+  const activeTool = toolNav.find((tool) => tool.match.some((prefix) => pathname.startsWith(prefix)));
   const activeToolItems =
     activeTool?.items.filter((item) => admin || !item.adminOnly) ?? [];
 

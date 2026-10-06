@@ -60,10 +60,6 @@ export function IdeaDetail({
               event.preventDefault();
               const formData = new FormData(event.currentTarget);
               formData.set("ideaId", idea.id);
-              if (formData.getAll("platforms").length === 0) {
-                setError("Pick at least one platform.");
-                return;
-              }
               setError(null);
               startTransition(async () => {
                 const result = await updateIdeaAction(formData);

@@ -84,10 +84,15 @@ export function CreateIdeaDialog({
             event.preventDefault();
             if (created) return;
             const formData = new FormData(event.currentTarget);
-            if (formData.getAll("platforms").length === 0) {
-              setError("Pick at least one platform.");
+            // Any one thing is enough: a title, details, a caption, a reference post or a file.
+            const typed = ["title", "description", "caption"].some((field) => String(formData.get(field) ?? "").trim());
+            const linked = formData.getAll("referenceLinks").some((link) => String(link).trim());
+            if (!typed && !linked && files.length === 0) {
+              setError("Add a title, details, a caption, a reference post or a file.");
               return;
             }
+            // Only files: the first file's name becomes the title.
+            if (!typed && !linked) formData.set("title", files[0].name.replace(/\.[^.]+$/, ""));
             setError(null);
             startTransition(async () => {
               const result = await createIdeaAction(formData);
@@ -127,7 +132,7 @@ export function CreateIdeaDialog({
           </div>
           <div>
             <Label htmlFor="title">What are we posting?</Label>
-            <Input id="title" name="title" required minLength={2} className="mt-1" />
+            <Input id="title" name="title" className="mt-1" />
           </div>
           <div>
             <Label htmlFor="description">Details</Label>

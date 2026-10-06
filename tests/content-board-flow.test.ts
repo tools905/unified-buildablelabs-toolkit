@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { canMoveIdea, columnOrderNote, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
+import { canMoveIdea, columnOrderNote, deriveIdeaTitle, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
+import { platformsSchema } from "@/lib/validation/content-idea-schema";
+import { matchesPlatform } from "@/components/content-board/types";
 import { activityTone, describeUploads, groupUploads } from "@/components/content-board/activity";
 
 describe("who can move an idea between columns", () => {
@@ -143,5 +145,25 @@ describe("the idea panel's uploads and activity", () => {
     expect(activityTone("idea", 0)).toBeNull();
     expect(activityTone("approved", 1)).toBe("shortlisted");
     expect(activityTone("posted", 0)).toBe("shortlisted");
+  });
+});
+
+describe("a new idea needs only one thing filled in", () => {
+  it("takes the card's title from whatever was filled in", () => {
+    expect(deriveIdeaTitle({ title: "  Founder Bingo " })).toBe("Founder Bingo");
+    expect(deriveIdeaTitle({ description: "\n  Talk about agent pricing\nmore notes" })).toBe("Talk about agent pricing");
+    expect(deriveIdeaTitle({ caption: "If you're a founder, read this." })).toBe("If you're a founder, read this.");
+    expect(deriveIdeaTitle({ referenceLinks: ["https://www.linkedin.com/posts/abc"] })).toBe("Reference: linkedin.com/posts/abc");
+    expect(deriveIdeaTitle({ fileName: "dots-carousel.pdf" })).toBe("dots-carousel");
+    expect(deriveIdeaTitle({ description: "x".repeat(120) })).toHaveLength(80);
+    expect(deriveIdeaTitle({ title: " ", description: "", referenceLinks: [] })).toBeNull();
+  });
+
+  it("saves an idea with no platform picked as Any, and shows Any ideas under every platform", () => {
+    expect(platformsSchema.parse([])).toEqual(["any"]);
+    expect(platformsSchema.parse(["linkedin", "linkedin"])).toEqual(["linkedin"]);
+    expect(matchesPlatform({ platform: "any", platforms: ["any"] }, "instagram")).toBe(true);
+    expect(matchesPlatform({ platform: "linkedin", platforms: ["linkedin"] }, "instagram")).toBe(false);
+    expect(matchesPlatform({ platform: "linkedin", platforms: ["linkedin"] }, "")).toBe(true);
   });
 });

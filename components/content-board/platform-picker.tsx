@@ -7,14 +7,17 @@ import type { ContentPlatform } from "@/lib/db/types";
 import { PLATFORM_META, PLATFORM_OPTIONS } from "@/components/content-board/types";
 
 // Pick one or more platforms for an idea. Each chosen platform is posted as a hidden `platforms`
-// field, so it works inside a plain <form> / FormData.
+// field, so it works inside a plain <form> / FormData. "Any" stands on its own: picking it clears the
+// others and picking a platform clears it. Leaving everything unpicked saves the idea as "Any".
 export function PlatformPicker({ defaultValue = [] }: { defaultValue?: string[] }) {
   const [selected, setSelected] = useState<string[]>(defaultValue);
 
   function toggle(platform: ContentPlatform) {
-    setSelected((current) =>
-      current.includes(platform) ? current.filter((value) => value !== platform) : [...current, platform],
-    );
+    setSelected((current) => {
+      if (current.includes(platform)) return current.filter((value) => value !== platform);
+      if (platform === "any") return ["any"];
+      return [...current.filter((value) => value !== "any"), platform];
+    });
   }
 
   return (
@@ -46,9 +49,7 @@ export function PlatformPicker({ defaultValue = [] }: { defaultValue?: string[] 
           );
         })}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {selected.length === 0 ? "Pick at least one." : "You can pick more than one."}
-      </p>
+      <p className="mt-1 text-xs text-muted-foreground">You can pick more than one.</p>
     </div>
   );
 }

@@ -7,21 +7,20 @@ describe("platformsSchema", () => {
     expect(platformsSchema.parse(["linkedin", "instagram", "linkedin"])).toEqual(["linkedin", "instagram"]);
   });
 
-  it("needs at least one platform", () => {
-    const result = platformsSchema.safeParse([]);
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.issues[0].message).toBe("Pick at least one platform.");
+  it("counts no platform picked as Any", () => {
+    expect(platformsSchema.parse([])).toEqual(["any"]);
   });
 
   it("rejects unknown platforms", () => {
     expect(platformsSchema.safeParse(["linkedin", "tiktok"]).success).toBe(false);
   });
 
-  it("is required when creating, optional when editing", () => {
+  it("is sent when creating (empty means Any) and optional when editing", () => {
     expect(createContentIdeaSchema.safeParse({ title: "Hello" }).success).toBe(false);
+    expect(createContentIdeaSchema.parse({ title: "Hello", platforms: [] }).platforms).toEqual(["any"]);
     expect(createContentIdeaSchema.safeParse({ title: "Hello", platforms: ["blog", "newsletter"] }).success).toBe(true);
     expect(updateContentIdeaSchema.safeParse({ title: "Hello" }).success).toBe(true);
-    expect(updateContentIdeaSchema.safeParse({ platforms: [] }).success).toBe(false);
+    expect(updateContentIdeaSchema.parse({ platforms: [] }).platforms).toEqual(["any"]);
   });
 });
 

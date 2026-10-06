@@ -1,4 +1,4 @@
-import { FaFacebook, FaInstagram, FaLinkedin, FaXTwitter, FaYoutube } from "react-icons/fa6";
+import { FaFacebook, FaGlobe, FaInstagram, FaLinkedin, FaXTwitter, FaYoutube } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 import type { ContentAttachmentKind, ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
 import type { LatestActivity } from "@/lib/utils/content-board";
@@ -118,6 +118,8 @@ export const CONTENT_COLUMNS: { status: ContentIdeaStatus; label: string }[] = [
 ];
 
 export const PLATFORM_META: Record<ContentPlatform, { label: string; color: string; icon: IconType | null }> = {
+  // Not tied to one platform yet.
+  any: { label: "Any", color: "#475569", icon: FaGlobe },
   instagram: { label: "Instagram", color: "#E4405F", icon: FaInstagram },
   linkedin: { label: "LinkedIn", color: "#0A66C2", icon: FaLinkedin },
   x: { label: "X", color: "#14171A", icon: FaXTwitter },
@@ -150,4 +152,12 @@ export function ideaPlatforms(idea: { platform: string; platforms?: string[] | n
   return [...known, ...unknown];
 }
 
-export const PLATFORM_OPTIONS: ContentPlatform[] = ["instagram", "linkedin", "x", "youtube", "facebook", "blog", "newsletter"];
+export const PLATFORM_OPTIONS: ContentPlatform[] = ["any", "instagram", "linkedin", "x", "youtube", "facebook", "blog", "newsletter"];
+
+// Whether an idea belongs under a platform filter. An idea for "any" platform could go out on any of
+// them, so it shows under every platform as well as under "Any".
+export function matchesPlatform(idea: { platform: string; platforms?: string[] | null }, filter: string) {
+  if (!filter) return true;
+  const platforms = ideaPlatforms(idea);
+  return platforms.includes(filter) || platforms.includes("any");
+}

@@ -13,7 +13,7 @@ import {
   CONTENT_COLUMNS,
   PLATFORM_META,
   PLATFORM_OPTIONS,
-  ideaPlatforms,
+  matchesPlatform,
   type ContentIdeaWithRelations,
   type ContentMemberOption,
 } from "@/components/content-board/types";
@@ -51,7 +51,7 @@ export function KanbanBoard({
 
   const filtered = useMemo(() => {
     return ideas.filter((idea) => {
-      if (platformFilter && !ideaPlatforms(idea).includes(platformFilter)) return false;
+      if (!matchesPlatform(idea, platformFilter)) return false;
       if (proposerFilter === "me" && idea.created_by !== currentUserId) return false;
       if (proposerFilter && proposerFilter !== "me" && idea.created_by !== proposerFilter) return false;
       const assignedIds = (idea.assignees ?? []).map((assignee) => assignee.user_id);

@@ -143,6 +143,39 @@ export function nextStep(input: {
 }
 
 // The board's column names, for labels made outside the board components.
+// A title for an idea saved without one, taken from whatever was filled in: the details, the caption,
+// a reference post or an uploaded file's name. Null when there is nothing to take it from.
+export function deriveIdeaTitle(input: {
+  title?: string | null;
+  description?: string | null;
+  caption?: string | null;
+  referenceLinks?: string[] | null;
+  fileName?: string | null;
+}): string | null {
+  const firstLine = (text: string | null | undefined) =>
+    (text ?? "")
+      .split("\n")
+      .map((line) => line.trim())
+      .find(Boolean) ?? "";
+  const clip = (text: string) => (text.length > 80 ? `${text.slice(0, 79).trimEnd()}…` : text);
+  const fromLink = (link: string | undefined) => {
+    if (!link) return "";
+    try {
+      const url = new URL(link);
+      return `Reference: ${url.hostname.replace(/^www\./, "")}${url.pathname === "/" ? "" : url.pathname}`;
+    } catch {
+      return "";
+    }
+  };
+  const candidate =
+    firstLine(input.title) ||
+    firstLine(input.description) ||
+    firstLine(input.caption) ||
+    fromLink(input.referenceLinks?.find((link) => link.trim())) ||
+    (input.fileName ?? "").replace(/\.[^.]+$/, "").trim();
+  return candidate ? clip(candidate) : null;
+}
+
 export const COLUMN_LABELS: Record<ContentIdeaStatus, string> = {
   idea: "Ideas",
   feedback: "Feedback",

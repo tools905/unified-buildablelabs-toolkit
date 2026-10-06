@@ -24,7 +24,7 @@ export type NotificationType =
 export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";
-export type ContentPlatform = "instagram" | "linkedin" | "x" | "youtube" | "facebook" | "blog" | "newsletter";
+export type ContentPlatform = "any" | "instagram" | "linkedin" | "x" | "youtube" | "facebook" | "blog" | "newsletter";
 export type ContentIdeaStatus = "idea" | "feedback" | "approved" | "in_progress" | "posted";
 export type ContentAttachmentKind = "image" | "pdf" | "link";
 

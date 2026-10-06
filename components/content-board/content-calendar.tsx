@@ -27,6 +27,7 @@ import {
   CONTENT_COLUMNS,
   PLATFORM_META,
   ideaPlatforms,
+  matchesPlatform,
   platformMeta,
   PLATFORM_OPTIONS,
   type ContentIdeaWithRelations,
@@ -91,7 +92,7 @@ export function ContentCalendar({
   const { values, push, pop } = useUrlState(URL_KEYS);
 
   const visibleIdeas = useMemo(
-    () => liveIdeas.filter((idea) => !platformFilter || ideaPlatforms(idea).includes(platformFilter)),
+    () => liveIdeas.filter((idea) => matchesPlatform(idea, platformFilter)),
     [liveIdeas, platformFilter],
   );
 

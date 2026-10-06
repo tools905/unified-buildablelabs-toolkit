@@ -8,12 +8,14 @@ import {
   MIN_REVIEW_POINT_LENGTH,
 } from "@/lib/utils/content-board";
 
-export const contentPlatformSchema = z.enum(["instagram", "linkedin", "x", "youtube", "facebook", "blog", "newsletter"]);
-// The platforms an idea is planned for: at least one, each only once.
+export const contentPlatformSchema = z.enum(["any", "instagram", "linkedin", "x", "youtube", "facebook", "blog", "newsletter"]);
+// The platforms an idea is planned for, each only once. Nothing picked means "any" platform.
 export const platformsSchema = z
   .array(contentPlatformSchema)
-  .transform((platforms) => [...new Set(platforms)])
-  .pipe(z.array(contentPlatformSchema).min(1, "Pick at least one platform."));
+  .transform((platforms): z.infer<typeof contentPlatformSchema>[] => {
+    const unique = [...new Set(platforms)];
+    return unique.length ? unique : ["any"];
+  });
 
 export const contentIdeaStatusSchema = z.enum(["idea", "feedback", "approved", "in_progress", "posted"]);
 
@@ -48,8 +50,9 @@ export const assigneeIdsSchema = z
 // The post text. Kept exactly as typed (line breaks matter in a caption); blank is cleaned up by the service.
 export const captionSchema = z.string().max(MAX_CAPTION_LENGTH, `Keep the caption under ${MAX_CAPTION_LENGTH} characters.`);
 
+// Every text field of a new idea is optional; createContentIdea only needs one of them filled in.
 export const createContentIdeaSchema = z.object({
-  title: z.string().min(2, "Title must be at least 2 characters."),
+  title: z.string().trim().max(300, "Keep the title under 300 characters.").optional(),
   description: z.string().optional(),
   caption: captionSchema.optional(),
   platforms: platformsSchema,
