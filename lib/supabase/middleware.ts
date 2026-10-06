@@ -11,6 +11,8 @@ const protectedPrefixes = [
   "/my-reviews",
   "/onboarding",
   "/notifications",
+  // The consent screen for connectors: a signed-out visitor logs in first, then comes back to approve.
+  "/oauth",
 ];
 
 export async function updateSession(request: NextRequest) {
