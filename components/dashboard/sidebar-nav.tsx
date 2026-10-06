@@ -120,7 +120,7 @@ function isActive(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: string; collapsed: boolean }) {
   const Icon = item.icon;
   const active = isActive(pathname, item);
 
@@ -129,20 +129,24 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
       href={item.href}
       prefetch
       aria-current={active ? "page" : undefined}
+      // Collapsed to icons: the name shows on hover and is read out by screen readers.
+      title={collapsed ? item.label : undefined}
+      aria-label={collapsed ? item.label : undefined}
       className={cn(
-        "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex min-h-10 items-center gap-3 rounded-md py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        collapsed ? "justify-center px-0" : "px-3",
         active
           ? "bg-primary text-primary-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      <span>{item.label}</span>
+      {collapsed ? null : <span>{item.label}</span>}
     </Link>
   );
 }
 
-export function SidebarNav({ admin }: { admin: boolean }) {
+export function SidebarNav({ admin, collapsed = false }: { admin: boolean; collapsed?: boolean }) {
   const pathname = usePathname();
   const globalLinks = admin ? [...baseLinks, ...adminLinks] : baseLinks;
   const activeTool = toolNav.find((tool) => pathname.startsWith(tool.match));
@@ -152,23 +156,25 @@ export function SidebarNav({ admin }: { admin: boolean }) {
   return (
     <nav className="space-y-5">
       <div>
-        <div className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">
-          Workspace
-        </div>
+        {collapsed ? null : (
+          <div className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">Workspace</div>
+        )}
         <div className="grid gap-1">
           {globalLinks.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} />
+            <NavLink key={item.href} item={item} pathname={pathname} collapsed={collapsed} />
           ))}
         </div>
       </div>
       {activeTool && activeToolItems.length > 0 ? (
         <div>
-          <div className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">
-            {activeTool.title}
-          </div>
+          {collapsed ? (
+            <div className="mx-2 mb-2 border-t border-border" aria-hidden="true" />
+          ) : (
+            <div className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">{activeTool.title}</div>
+          )}
           <div className="grid gap-1">
             {activeToolItems.map((item) => (
-              <NavLink key={item.href} item={item} pathname={pathname} />
+              <NavLink key={item.href} item={item} pathname={pathname} collapsed={collapsed} />
             ))}
           </div>
         </div>

@@ -232,14 +232,14 @@ export function IdeaCard({
       </div>
       {idea.thumbnail ? <Thumbnail thumbnail={idea.thumbnail} fileCount={idea.file_count} /> : null}
       <p className="mt-2 flex-1 text-sm font-medium leading-snug">{idea.title}</p>
-      {idea.status === "feedback" && idea.latest_activity ? (
-        // Why this card sits where it does in Feedback: its latest review activity.
+      {idea.latest_activity ? (
+        // Why this card sits where it does in its column: its latest activity.
         <p
-          className="mt-1.5 flex items-center gap-1 text-xs font-medium text-primary"
+          className="mt-1.5 flex items-start gap-1 text-xs font-medium leading-snug text-primary"
           title={`Latest activity: ${formatWhen(idea.latest_activity.at)}`}
         >
-          <History className="h-3 w-3 shrink-0" />
-          <span className="min-w-0 truncate">
+          <History className="mt-0.5 h-3 w-3 shrink-0" />
+          <span className="min-w-0 break-words">
             {describeActivity(idea.latest_activity)} ·{" "}
             <span suppressHydrationWarning>{formatDistanceToNowStrict(new Date(idea.latest_activity.at), { addSuffix: true })}</span>
           </span>

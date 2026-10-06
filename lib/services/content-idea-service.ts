@@ -16,7 +16,7 @@ import {
 } from "@/lib/validation/content-idea-schema";
 
 export const CONTENT_IDEA_SELECT =
-  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), reviewer:profiles!content_ideas_reviewed_by_fkey(full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at, uploader:profiles!content_idea_attachments_created_by_fkey(full_name, email)), review_points:content_idea_review_points(id, is_resolved, created_at, resolved_at, author:profiles!content_idea_review_points_created_by_fkey(full_name, email)), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
+  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), reviewer:profiles!content_ideas_reviewed_by_fkey(full_name, email), mover:profiles!content_ideas_status_changed_by_fkey(full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at, uploader:profiles!content_idea_attachments_created_by_fkey(full_name, email)), review_points:content_idea_review_points(id, is_resolved, created_at, resolved_at, author:profiles!content_idea_review_points_created_by_fkey(full_name, email)), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
 
 export async function createContentIdea(
   supabase: SupabaseClient<any>,
@@ -204,6 +204,9 @@ function personName(person: EmbeddedPerson | undefined) {
 }
 
 type IdeaWithEmbeds = {
+  status?: ContentIdeaStatus;
+  status_changed_at?: string | null;
+  mover?: EmbeddedPerson;
   reviewed_at?: string | null;
   reviewer?: EmbeddedPerson;
   attachments?:
@@ -261,6 +264,9 @@ export async function attachCardPreviews<T extends IdeaWithEmbeds>(supabase: Sup
       open_review_count: points.filter((point) => !point.is_resolved).length,
       first_feedback_at: feedbackTimes[0] ?? null,
       latest_activity: latestActivity({
+        movedAt: idea.status_changed_at ?? null,
+        moverName: personName(idea.mover),
+        movedTo: idea.status,
         reviewedAt: idea.reviewed_at ?? null,
         reviewerName: personName(idea.reviewer),
         points: points

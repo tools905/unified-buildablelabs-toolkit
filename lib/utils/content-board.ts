@@ -142,22 +142,44 @@ export function nextStep(input: {
   }
 }
 
+// The board's column names, for labels made outside the board components.
+export const COLUMN_LABELS: Record<ContentIdeaStatus, string> = {
+  idea: "Ideas",
+  feedback: "Feedback",
+  approved: "Shortlisted",
+  in_progress: "In Progress",
+  posted: "Posted",
+};
+
+// How each column is ordered, shown in small under its title.
+export function columnOrderNote(status: ContentIdeaStatus) {
+  return status === "idea" ? "Oldest idea first" : "Most recent activity first";
+}
+
 export type LatestActivity = {
-  kind: "reviewed" | "comment" | "resolved" | "upload";
+  kind: "reviewed" | "comment" | "resolved" | "upload" | "moved";
   at: string;
   // Who did it, when that is recorded (ticking a comment done is not).
   by: string | null;
+  // For a move: the column it went to.
+  to?: ContentIdeaStatus;
 };
 
-// The most recent review activity on an idea: marked as reviewed, a review comment added, a comment
-// ticked done, or a file uploaded. Orders the Feedback column and labels its cards.
+// The most recent activity on an idea: marked as reviewed, a review comment added, a comment ticked
+// done, a file uploaded, or moved to another column. Orders the columns and labels the cards.
 export function latestActivity(input: {
+  movedAt?: string | null;
+  moverName?: string | null;
+  movedTo?: ContentIdeaStatus;
   reviewedAt?: string | null;
   reviewerName?: string | null;
   points?: { createdAt: string; resolvedAt?: string | null; authorName?: string | null }[];
   uploads?: { createdAt: string; uploaderName?: string | null }[];
 }): LatestActivity | null {
   const events: LatestActivity[] = [];
+  if (input.movedAt && input.movedTo) {
+    events.push({ kind: "moved", at: input.movedAt, by: input.moverName ?? null, to: input.movedTo });
+  }
   if (input.reviewedAt) events.push({ kind: "reviewed", at: input.reviewedAt, by: input.reviewerName ?? null });
   for (const point of input.points ?? []) {
     events.push({ kind: "comment", at: point.createdAt, by: point.authorName ?? null });
@@ -169,10 +191,13 @@ export function latestActivity(input: {
   return valid.reduce((latest, event) => (new Date(event.at).getTime() > new Date(latest.at).getTime() ? event : latest));
 }
 
-// "Reviewed by Aditi", "Comment by Mridul", "Comment marked done", "New upload by Ankitha".
+// "Reviewed by Aditi", "Comment by Mridul", "Comment marked done", "New upload by Ankitha",
+// "Moved to Shortlisted by Akhil".
 export function describeActivity(activity: LatestActivity) {
   const by = activity.by ? ` by ${activity.by}` : "";
   switch (activity.kind) {
+    case "moved":
+      return `Moved to ${activity.to ? COLUMN_LABELS[activity.to] : "this column"}${by}`;
     case "reviewed":
       return `Reviewed${by}`;
     case "comment":
@@ -193,23 +218,19 @@ type SortableIdea = {
 
 const time = (value: string | null | undefined) => (value ? new Date(value).getTime() : Number.POSITIVE_INFINITY);
 
-// The order cards are shown in inside one column. Ideas: the first one added comes first.
-// Feedback: the idea with the most recent review activity (reviewed, commented, a comment ticked
-// done, a new upload) on top, reviewed or not.
-// Other columns keep the order they arrive in (newest first).
+// The order cards are shown in inside one column. Ideas: the first one added comes first. Every other
+// column: the idea with the most recent activity on top (moved into the column, reviewed, commented,
+// a comment ticked done, a new upload).
 export function sortColumnIdeas<T extends SortableIdea>(status: ContentIdeaStatus, ideas: T[]): T[] {
   if (status === "idea") {
     return [...ideas].sort((a, b) => time(a.created_at) - time(b.created_at));
   }
-  if (status === "feedback") {
-    const lastActive = (idea: T) => {
-      const value = idea.latest_activity?.at ?? idea.first_feedback_at ?? idea.created_at;
-      const parsed = new Date(value).getTime();
-      return Number.isNaN(parsed) ? 0 : parsed;
-    };
-    return [...ideas].sort((a, b) => lastActive(b) - lastActive(a) || time(b.created_at) - time(a.created_at));
-  }
-  return ideas;
+  const lastActive = (idea: T) => {
+    const value = idea.latest_activity?.at ?? idea.first_feedback_at ?? idea.created_at;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+  return [...ideas].sort((a, b) => lastActive(b) - lastActive(a) || time(b.created_at) - time(a.created_at));
 }
 
 // Uploads more than this far apart count as separate drafts, even from the same person.

@@ -547,6 +547,8 @@ export type Database = {
           status: ContentIdeaStatus;
           post_url: string | null;
           posted_at: string | null;
+          status_changed_at: string | null;
+          status_changed_by: string | null;
           reviewed_at: string | null;
           reviewed_by: string | null;
           scheduled_for: string | null;
@@ -566,6 +568,8 @@ export type Database = {
           status?: ContentIdeaStatus;
           post_url?: string | null;
           posted_at?: string | null;
+          status_changed_at?: string | null;
+          status_changed_by?: string | null;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           scheduled_for?: string | null;

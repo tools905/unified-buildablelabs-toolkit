@@ -17,7 +17,7 @@ import {
   type ContentIdeaWithRelations,
   type ContentMemberOption,
 } from "@/components/content-board/types";
-import { sortColumnIdeas } from "@/lib/utils/content-board";
+import { columnOrderNote, sortColumnIdeas } from "@/lib/utils/content-board";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -218,8 +218,12 @@ export function KanbanBoard({
                 isDragOver ? "border-primary/60 bg-primary/5" : "border-border",
               )}
             >
-              <div className="mb-3 flex shrink-0 items-center justify-between">
-                <h2 className="text-sm font-semibold">{column.label}</h2>
+              <div className="mb-3 flex shrink-0 items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold">{column.label}</h2>
+                  {/* Ideas and the other columns are ordered differently, so each says how. */}
+                  <p className="text-[11px] text-muted-foreground">{columnOrderNote(column.status)}</p>
+                </div>
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{column.ideas.length}</span>
               </div>
               {/* A little room on every side so a card can grow on hover without being cut off. */}

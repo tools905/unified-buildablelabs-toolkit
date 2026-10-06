@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canMoveIdea, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
+import { canMoveIdea, columnOrderNote, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
 import { activityTone, describeUploads, groupUploads } from "@/components/content-board/activity";
 
 describe("who can move an idea between columns", () => {
@@ -90,12 +90,21 @@ describe("the order of cards inside a column", () => {
     expect(latestActivity({})).toBeNull();
   });
 
-  it("leaves other columns in the order they came in", () => {
+  it("puts the most recent card first in every other column, a move into it counting as activity", () => {
     const ideas = [
-      { id: "x", status: "posted" as const, created_at: "2026-10-02T00:00:00Z" },
-      { id: "y", status: "posted" as const, created_at: "2026-09-02T00:00:00Z" },
+      { id: "posted-long-ago", status: "posted" as const, created_at: "2026-10-02T00:00:00Z", latest_activity: { kind: "moved" as const, at: "2026-09-10T00:00:00Z", by: "Akhil", to: "posted" as const } },
+      { id: "just-posted", status: "posted" as const, created_at: "2026-09-02T00:00:00Z", latest_activity: { kind: "moved" as const, at: "2026-10-06T00:00:00Z", by: "Aditi", to: "posted" as const } },
     ];
-    expect(sortColumnIdeas("posted", ideas).map((idea) => idea.id)).toEqual(["x", "y"]);
+    expect(sortColumnIdeas("posted", ideas).map((idea) => idea.id)).toEqual(["just-posted", "posted-long-ago"]);
+    expect(describeActivity(ideas[1].latest_activity)).toBe("Moved to Posted by Aditi");
+  });
+
+  it("counts a move into the column as the latest activity when it is the newest thing", () => {
+    expect(
+      latestActivity({ movedAt: "2026-10-06T12:00:00Z", moverName: "Aditi", movedTo: "approved", reviewedAt: "2026-10-06T11:00:00Z" }),
+    ).toEqual({ kind: "moved", at: "2026-10-06T12:00:00Z", by: "Aditi", to: "approved" });
+    expect(columnOrderNote("idea")).toBe("Oldest idea first");
+    expect(columnOrderNote("approved")).toBe("Most recent activity first");
   });
 });
 
