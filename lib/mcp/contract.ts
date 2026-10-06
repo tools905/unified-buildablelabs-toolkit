@@ -1,4 +1,4 @@
-// Content Board connector for AI assistants: the shapes both sides of the build agree on.
+// Content Board connector for AI apps: the shapes both sides of the build agree on.
 // The server side (endpoint, caller, read and upload tools) returns these; the review tools, the upload
 // page and the consent screen use them. If you change a field here, tell the other person: this file is
 // the contract. It holds no logic, only shapes, limits and input checks.
@@ -19,9 +19,9 @@ export const MCP_LIMITS = {
   uploadLinkMinutes: 15, // a one-time upload link stops working after this long, or after one use
   callsPerMinute: 60, // per person
   pdfPagesPerCall: 10,
-  pdfPageMaxPixels: 1200, // longest side of a page image sent to the assistant
+  pdfPageMaxPixels: 1200, // longest side of a page image sent to the connected app
   auditKeepDays: 90,
-  // The assistant's client accepts about 150,000 characters from a tool; stay well under it.
+  // The connecting app accepts about 150,000 characters from a tool; stay well under it.
   maxResultChars: 100_000,
   listIdeasDefault: 25,
   listIdeasMax: 100,
@@ -35,12 +35,12 @@ export const MCP_LIMITS = {
 export type McpCaller = {
   userId: string;
   workspaceId: string;
-  clientId: string; // the "client_id" claim of the token: marks a token issued to the assistant
+  clientId: string; // the "client_id" claim of the token: marks a token issued to a connected app
   supabase: SupabaseClient<any>;
 };
 
 // ---- Errors ----------------------------------------------------------------------------------------
-// The only error codes a tool answers with, so the assistant (and the audit record) see the same words.
+// The only error codes a tool answers with, so the caller (and the audit record) see the same words.
 export const MCP_ERROR_CODES = [
   "not_found", // the idea, point or file doesn't exist, or the person can't see it
   "forbidden", // it exists but this person may not do that
@@ -59,7 +59,7 @@ const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026
 const ALLOWED_UPLOAD_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".webp"] as const;
 
 // ---- Tool inputs -----------------------------------------------------------------------------------
-// Each tool's input as a zod schema. `.describe()` text is what the assistant reads, so write it for the assistant.
+// Each tool's input as a zod schema. `.describe()` text is what the AI using the tool reads, so write it for that reader.
 export const listIdeasInput = z.object({
   platform: contentPlatformSchema.optional().describe("Only ideas planned for this platform."),
   column: contentIdeaStatusSchema.optional().describe("Only ideas in this board column."),
@@ -186,7 +186,7 @@ export type ConfirmUploadOutput = {
 };
 
 // ---- The tools -------------------------------------------------------------------------------------
-// `readOnly` becomes the tool's "read only" hint for the assistant, so it can run read tools without asking.
+// `readOnly` becomes the tool's "read only" hint for the connected app, so it can run read tools without asking.
 export const MCP_TOOLS = {
   list_ideas: { readOnly: true, input: listIdeasInput },
   get_idea: { readOnly: true, input: getIdeaInput },
@@ -202,8 +202,8 @@ export const MCP_TOOLS = {
 export type McpToolName = keyof typeof MCP_TOOLS;
 export const MCP_TOOL_NAMES = Object.keys(MCP_TOOLS) as McpToolName[];
 
-// ---- Table rows (Ananya's spec; Mridul writes migrations 047 to 049) -------------------------------
-// 047 mcp_upload_links. Only the server reads and writes it; the link's secret is stored only as a hash.
+// ---- Table rows (Ananya's spec; Mridul writes migrations 049 to 051) -------------------------------
+// 049 mcp_upload_links. Only the server reads and writes it; the link's secret is stored only as a hash.
 export type McpUploadLinkRow = {
   id: string;
   workspace_id: string;
@@ -217,7 +217,7 @@ export type McpUploadLinkRow = {
   created_at: string;
 };
 
-// 048 mcp_audit_log. Members can read their own rows, admins all; only the server writes.
+// 050 mcp_audit_log. Members can read their own rows, admins all; only the server writes.
 export type McpAuditRow = {
   id: string;
   workspace_id: string;
@@ -230,5 +230,5 @@ export type McpAuditRow = {
   created_at: string;
 };
 
-// 049 safety rules: on every table outside the Content Board, a restrictive rule that blocks any token
+// 051 safety rules: on every table outside the Content Board, a restrictive rule that blocks any token
 // carrying a client_id, so these tokens can't read other data through Supabase directly.

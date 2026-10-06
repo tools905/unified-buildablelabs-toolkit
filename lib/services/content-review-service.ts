@@ -13,11 +13,25 @@ export async function listReviewPoints(supabase: SupabaseClient<any>, ideaId: st
   return data ?? [];
 }
 
+// One point by id, in one workspace, or null when it doesn't exist or the person can't see it.
+export async function getReviewPoint(supabase: SupabaseClient<any>, pointId: string, workspaceId: string) {
+  const { data, error } = await supabase
+    .from("content_idea_review_points")
+    .select(REVIEW_POINT_SELECT)
+    .eq("id", pointId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// `id` is optional: a caller that needs to read the new point back can choose its id up front.
 export async function addReviewPoint(
   supabase: SupabaseClient<any>,
-  input: { workspaceId: string; ideaId: string; userId: string; body: string },
+  input: { workspaceId: string; ideaId: string; userId: string; body: string; id?: string },
 ) {
   const { error } = await supabase.from("content_idea_review_points").insert({
+    ...(input.id ? { id: input.id } : {}),
     workspace_id: input.workspaceId,
     idea_id: input.ideaId,
     body: input.body,
