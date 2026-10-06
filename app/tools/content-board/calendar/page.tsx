@@ -2,13 +2,10 @@ import Link from "next/link";
 import { CalendarDays, Sheet } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ContentCalendar } from "@/components/content-board/content-calendar";
-import { LiveWorkbook } from "@/components/content-board/sheet/live-workbook";
-import { WORKBOOK_TITLE } from "@/components/content-board/sheet/types";
+import { CREATORS_SHEET, GoogleSheetEmbed } from "@/components/content-board/google-sheet-embed";
 import { requireUser } from "@/lib/auth/require-user";
 import { attachCardPreviews, listContentIdeas } from "@/lib/services/content-idea-service";
-import { loadWorkbook } from "@/lib/services/content-sheet-service";
 import { getWorkspaceMembers, isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { BASE_PATH } from "@/lib/utils/app-url";
 import { cn } from "@/lib/utils/cn";
 import { toMemberOptions } from "@/lib/utils/content-board";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
@@ -16,11 +13,11 @@ import { requireEnabledTool } from "@/modules/core/tools/registry";
 
 export const dynamic = "force-dynamic";
 
-// Two tabs: the posting calendar, and the team's shared "Creators Profiles Ideas" spreadsheet.
+// Two tabs: the posting calendar, and the team's Google Sheet of creators, profiles and ideas.
 function PageTabs({ sheet }: { sheet: boolean }) {
   const tabs = [
     { href: "/tools/content-board/calendar", label: "Calendar", icon: CalendarDays, active: !sheet },
-    { href: "/tools/content-board/calendar?view=sheet", label: WORKBOOK_TITLE, icon: Sheet, active: sheet },
+    { href: "/tools/content-board/calendar?view=sheet", label: CREATORS_SHEET.title, icon: Sheet, active: sheet },
   ];
   return (
     <nav aria-label="Calendar views" className="mb-5 flex gap-1 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -50,8 +47,6 @@ export default async function ContentCalendarPage({ searchParams }: { searchPara
   const workspace = await requireDefaultWorkspace(supabase, user.id);
 
   if (sheet) {
-    const [workbook, members] = await Promise.all([loadWorkbook(supabase, workspace.id), getWorkspaceMembers(supabase, workspace.id)]);
-    const people = Object.fromEntries(toMemberOptions(members).map((member) => [member.id, member.label]));
     return (
       <>
         <PageHeader
@@ -60,13 +55,7 @@ export default async function ContentCalendarPage({ searchParams }: { searchPara
           description="Every post with a posting day, and the team's shared sheet of creators to learn from."
         />
         <PageTabs sheet />
-        <LiveWorkbook
-          initial={workbook}
-          workspaceId={workspace.id}
-          currentUserId={user.id}
-          people={people}
-          exportUrl={`${BASE_PATH}/api/content-board/sheet/export`}
-        />
+        <GoogleSheetEmbed title={CREATORS_SHEET.title} url={CREATORS_SHEET.url} />
       </>
     );
   }
