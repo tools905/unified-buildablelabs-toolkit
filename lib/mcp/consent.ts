@@ -55,11 +55,11 @@ export function describeScopes(scope: string): string[] {
 // or removed there, update this list too.
 export const CONNECTOR_CAN = [
   "See your Content Board ideas, their files and review points, and the month's schedule.",
-  "Add review points and tick them off. They show under your name.",
+  "Add review points and tick them off. They show under your name, and the first one on a new idea moves it to Feedback, as on the board.",
   "Upload a PDF or image to an idea, or replace one that is already there.",
 ] as const;
 
 export const CONNECTOR_CANNOT = [
-  "Delete ideas, move them between columns, or change their details.",
+  "Delete ideas, change their details, or move them between columns in any other way.",
   "Use any other part of the toolkit.",
 ] as const;

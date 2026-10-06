@@ -91,7 +91,9 @@ export function PreviewViewer({
           {currentDraft && currentDraft.items.length > 1
             ? `file ${currentDraft.items.findIndex((item) => item.index === index) + 1} of ${currentDraft.items.length} · `
             : ""}
-          uploaded by <span className="font-medium text-foreground">{current.uploaderName}</span> · {formatWhen(current.createdAt)}
+          uploaded by <span className="font-medium text-foreground">{current.uploaderName}</span>
+          {current.uploadedVia ? <> through <span className="font-medium text-foreground">{current.uploadedVia}</span></> : null} ·{" "}
+          {formatWhen(current.createdAt)}
         </p>
         <div className="flex shrink-0 items-center gap-1">
           {current.kind === "link" && current.url ? (
@@ -175,7 +177,8 @@ function DraftList({
                       {selected ? <span className="text-[11px] font-medium text-primary">Viewing</span> : null}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      <span className="text-foreground">{draft.uploaderName}</span> · {formatWhen(draft.at)}
+                      <span className="text-foreground">{draft.uploaderName}</span>
+                      {draft.uploadedVia ? ` through ${draft.uploadedVia}` : ""} · {formatWhen(draft.at)}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">{describeUploads(draft.items)}</span>
                   </span>

@@ -6,7 +6,7 @@ import { Download, ExternalLink, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { ActivityTimeline } from "@/components/content-board/activity-timeline";
-import { draftOf, groupUploads, hasChangesSinceReview } from "@/components/content-board/activity";
+import { draftOf, groupUploads, hasChangesSinceReview, uploaderLabel } from "@/components/content-board/activity";
 import { AttachmentAdder } from "@/components/content-board/attachment-adder";
 import { PostPreview } from "@/components/content-board/post-preview/post-preview";
 import { PreviewViewer } from "@/components/content-board/preview-viewer";
@@ -340,7 +340,7 @@ export function IdeaPanel({
                   attachments={currentDraft ? currentDraft.items.map((item) => item.attachment) : attachments}
                   draftLabel={
                     drafts.length > 1 && currentDraft
-                      ? `Draft ${currentDraft.number}${currentDraft === latestDraft ? " (latest)" : ""} by ${currentDraft.uploaderName}`
+                      ? `Draft ${currentDraft.number}${currentDraft === latestDraft ? " (latest)" : ""} by ${uploaderLabel(currentDraft.uploaderName, currentDraft.uploadedVia)}`
                       : null
                   }
                   caption={idea.caption ?? null}

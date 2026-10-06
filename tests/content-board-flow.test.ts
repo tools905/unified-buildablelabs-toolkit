@@ -105,6 +105,7 @@ describe("the idea panel's uploads and activity", () => {
     thumbUrl: null,
     createdAt,
     uploaderName,
+    uploadedVia: null,
   });
 
   it("groups uploads by who added them and when, in the order they happened", () => {

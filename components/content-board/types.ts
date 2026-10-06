@@ -65,6 +65,8 @@ export type PanelAttachment = {
   thumbUrl: string | null;
   createdAt: string;
   uploaderName: string;
+  // The app it came through (a connected AI app), or null when it was added on the board.
+  uploadedVia: string | null;
 };
 
 export type PanelReviewPoint = {
