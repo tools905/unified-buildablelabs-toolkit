@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContentAttachmentKind } from "@/lib/db/types";
 import { CONTENT_BUCKET, MAX_ATTACHMENTS_PER_IDEA } from "@/lib/utils/content-board";
@@ -88,6 +89,10 @@ export async function addStoredAttachment(
     sizeBytes: number;
     // The app the file came through, when it was not added on the board. Shown as "through <app>".
     uploadedVia?: string | null;
+    // Takes the place of this file (same position on the idea) instead of being added next to it.
+    replacesAttachmentId?: string | null;
+    // Chosen by the caller when it needs to refer to the new file afterwards.
+    id?: string;
   },
 ) {
   const prefix = `${input.workspaceId}/${input.ideaId}/`;
@@ -95,12 +100,16 @@ export async function addStoredAttachment(
   if (paths.some((path) => !path.startsWith(prefix))) throw new Error("Invalid file path.");
 
   const existing = await listAttachments(supabase, input.ideaId);
-  if (existing.length >= MAX_ATTACHMENTS_PER_IDEA) {
+  // A file that takes another's place doesn't count twice. If that file is already gone it is just added.
+  const replaced = input.replacesAttachmentId ? existing.find((item) => item.id === input.replacesAttachmentId) : undefined;
+  if (existing.length - (replaced ? 1 : 0) >= MAX_ATTACHMENTS_PER_IDEA) {
     await supabase.storage.from(CONTENT_BUCKET).remove(paths);
     throw new Error(`An idea can have up to ${MAX_ATTACHMENTS_PER_IDEA} attachments.`);
   }
 
+  const id = input.id ?? randomUUID();
   const { error } = await supabase.from("content_idea_attachments").insert({
+    id,
     idea_id: input.ideaId,
     workspace_id: input.workspaceId,
     kind: input.kind,
@@ -108,7 +117,7 @@ export async function addStoredAttachment(
     thumb_path: input.thumbPath ?? null,
     file_name: input.fileName,
     size_bytes: input.sizeBytes,
-    sort_order: existing.length ? Math.max(...existing.map((item) => item.sort_order)) + 1 : 0,
+    sort_order: replaced ? replaced.sort_order : existing.length ? Math.max(...existing.map((item) => item.sort_order)) + 1 : 0,
     ...(input.uploadedVia ? { uploaded_via: input.uploadedVia } : {}),
     created_by: input.userId,
   });
@@ -116,6 +125,10 @@ export async function addStoredAttachment(
     await supabase.storage.from(CONTENT_BUCKET).remove(paths);
     throw error;
   }
+
+  // Only now that the new file is saved is the old one removed, so a failure never leaves the idea without either.
+  if (replaced) await removeAttachment(supabase, replaced.id);
+  return { id, replacedAttachmentId: replaced?.id ?? null };
 }
 
 export async function addLinkAttachment(

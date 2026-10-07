@@ -10,6 +10,8 @@ import { contentIdeaStatusSchema, contentPlatformSchema } from "@/lib/validation
 import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_IDEA,
+  MAX_CAPTION_LENGTH,
+  MAX_REFERENCE_LINKS,
   MAX_REVIEW_POINT_LENGTH,
   MIN_REVIEW_POINT_LENGTH,
 } from "@/lib/utils/content-board";
@@ -54,6 +56,12 @@ export type McpToolError = { code: McpErrorCode; message: string };
 
 // ---- Shared input pieces ---------------------------------------------------------------------------
 const id = z.string().uuid();
+// A day like "2026-10-12" that exists in the calendar (the database refuses "2026-02-31").
+function isRealDay(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026-10.");
 
 const ALLOWED_UPLOAD_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".webp"] as const;
@@ -69,6 +77,34 @@ export const listIdeasInput = z.object({
 });
 
 export const getIdeaInput = z.object({ idea_id: id });
+
+export const createIdeaInput = z.object({
+  title: z.string().trim().min(2).max(200).describe("A short, clear title for the idea."),
+  platforms: z.array(contentPlatformSchema).min(1).describe("Where it will be posted. At least one."),
+  description: z
+    .string()
+    .trim()
+    .max(5000)
+    .optional()
+    .describe("Internal notes for the team: the angle, the audience, what the post should do. Not the post text."),
+  caption: z
+    .string()
+    .trim()
+    .max(MAX_CAPTION_LENGTH)
+    .optional()
+    .describe("The post text, as it would be written under the images."),
+  scheduled_for: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a day like 2026-10-12.")
+    .refine(isRealDay, "That day does not exist in the calendar. Use a real day like 2026-10-12.")
+    .optional()
+    .describe("The day it should go out, like 2026-10-12."),
+  reference_links: z
+    .array(z.string().url())
+    .max(MAX_REFERENCE_LINKS)
+    .optional()
+    .describe("https links to posts or pages that inspired it."),
+});
 
 export const getMonthScheduleInput = z.object({ month });
 
@@ -129,6 +165,8 @@ export type IdeaSummary = {
   updated_at: string;
 };
 export type ListIdeasOutput = { ideas: IdeaSummary[]; truncated: boolean };
+// A new idea starts in the Ideas column with no files and no review points.
+export type CreateIdeaOutput = { idea: IdeaSummary };
 
 export type IdeaFile = {
   id: string;
@@ -137,6 +175,7 @@ export type IdeaFile = {
   size_bytes: number | null;
   link_url: string | null; // only for design links
   uploaded_by: string; // a name
+  uploaded_via: string | null; // the app it came through, when it was not added on the board
   uploaded_at: string;
 };
 
@@ -186,26 +225,33 @@ export type ConfirmUploadOutput = {
 };
 
 // ---- The upload page -------------------------------------------------------------------------------
-// The page at <site>/teams/mcp-upload/<token> (Mridul) talks to one route of the upload backend (Ananya):
-// <site>/teams/api/mcp-upload/<token>. The token in the address is the only credential, so neither the page
-// nor the route needs a sign-in. Build `upload_url` from the request's own address, never a fixed host.
+// The page at <site>/teams/mcp-upload/<token> talks to three routes of the server, all under
+// <site>/teams/api/mcp-upload/<token>. The token in the address is the only credential, so neither the
+// page nor the routes need a sign-in. `upload_url` is built from the address the app used, never a fixed host.
 //
-// GET answers with status 200 and an UploadLinkState, whatever state the link is in.
-// POST receives multipart/form-data and answers with an UploadResult (the body, not the HTTP status, is
-// what the page reads). The fields are UPLOAD_FORM_FIELDS:
-//   file       required. The PDF, or an image the browser has already shrunk, under its original name.
-//   thumbnail  optional. A small JPEG or WebP picture of it (the first page for a PDF), made in the
-//              browser exactly as the board does, so the card shows a picture. Without it the card shows
-//              a plain "PDF" or no picture.
-// A successful POST stores the file and adds it to the idea like the board does (under the person who
-// started the upload, with `uploaded_via` set to the app's name), replaces the old file when the link
-// said so, and uses the link up. confirm_upload then only reports that result to the AI, and gives the
-// same answer if it is called again. A refused file (wrong type, too big, idea full) does not use the link,
-// so the person can try again until it expires. The server checks type and size itself and never trusts
-// the browser.
+// A file can't go through the server: a request to it is capped at 4.5 MB and PDFs can be 15 MB. So, as on
+// the board, the browser sends the file straight to storage and the server only checks it:
+//
+//   GET  .../<token>           answers with an UploadLinkState (status 200 whatever the state of the link).
+//   POST .../<token>/prepare   takes an UploadFileInput, checks the type, size and room on the idea, and
+//                              answers with a place in storage to put the file (and a small picture of it)
+//                              and an `attempt` code. The places are chosen by the server and include the
+//                              attempt, so the token can only ever write there, and a second try never reuses
+//                              a place (storage's cache would serve the first try's file from it).
+//                              Every try is a new prepare.
+//   (the browser then uploads to those places)
+//   POST .../<token>/complete  takes the same input plus the attempt, reads what arrived, checks it really is what it
+//                              says (the first bytes, and for a PDF that it opens), adds it to the idea like
+//                              the board does (as the person who started the upload, with `uploaded_via` set
+//                              to the app's name), replaces the old file when the link said so, and uses the
+//                              link up. It answers with an UploadResult.
+//
+// confirm_upload only reports that result to the app, and gives the same answer if it is called again.
+// A refused file (wrong type, too big, idea full, damaged PDF) does not use the link, so the person can
+// try again until it expires. The server never trusts the browser: it checks again in `complete`.
 export const MCP_UPLOAD_PAGE_PATH = "/mcp-upload";
 export const MCP_UPLOAD_API_PATH = "/api/mcp-upload";
-export const UPLOAD_FORM_FIELDS = { file: "file", thumbnail: "thumbnail" } as const;
+export const UPLOAD_THUMBNAIL_MAX_BYTES = 1024 * 1024;
 
 export const uploadLimitsSchema = z.object({
   max_bytes: z.number().int().positive(),
@@ -230,19 +276,46 @@ export const uploadLinkStateSchema = z.discriminatedUnion("status", [
 ]);
 export type UploadLinkState = z.infer<typeof uploadLinkStateSchema>;
 
+// What the browser says it is about to send (prepare) and what it sent (complete).
+export const uploadFileInput = z.object({
+  file_name: z.string().trim().min(1).max(200),
+  content_type: z.string().max(100),
+  size_bytes: z.number().int().positive(),
+  // The small picture of the file the browser will also send (the first page of a PDF), if it made one.
+  thumbnail_type: z.enum(["image/jpeg", "image/webp"]).nullable().default(null),
+});
+export type UploadFileInput = z.infer<typeof uploadFileInput>;
+
+// What `prepare` handed out: the code that names this try's places in storage.
+export const UPLOAD_ATTEMPT_PATTERN = /^[a-f0-9]{12}$/;
+export const uploadCompleteInput = uploadFileInput.extend({ attempt: z.string().regex(UPLOAD_ATTEMPT_PATTERN) });
+export type UploadCompleteInput = z.infer<typeof uploadCompleteInput>;
+
+const uploadFailure = z.object({
+  ok: z.literal(false),
+  code: z.enum(MCP_ERROR_CODES), // link_expired, invalid_input (type, size, damaged), limit_reached, not_found
+  message: z.string(), // plain words the page can show to the person as they are
+});
+
+// A place in storage the browser may write one file to, with the token that allows exactly that.
+const uploadTarget = z.object({ path: z.string(), upload_token: z.string() });
+
+export const uploadPrepareResultSchema = z.discriminatedUnion("ok", [
+  z.object({ ok: z.literal(true), attempt: z.string().regex(UPLOAD_ATTEMPT_PATTERN), file: uploadTarget, thumbnail: uploadTarget.nullable() }),
+  uploadFailure,
+]);
+export type UploadPrepareResult = z.infer<typeof uploadPrepareResultSchema>;
+
 export const uploadResultSchema = z.discriminatedUnion("ok", [
   z.object({
     ok: z.literal(true),
     attachment_id: z.string().uuid(),
     file_name: z.string(),
     kind: z.enum(["pdf", "image"]),
-    replaced: z.boolean(),
+    page_count: z.number().int().positive().nullable(), // null for an image
+    replaced_attachment_id: z.string().uuid().nullable(),
   }),
-  z.object({
-    ok: z.literal(false),
-    code: z.enum(MCP_ERROR_CODES), // link_expired, invalid_input (type or size), limit_reached, not_found, ...
-    message: z.string(), // plain words the page can show to the person as they are
-  }),
+  uploadFailure,
 ]);
 export type UploadResult = z.infer<typeof uploadResultSchema>;
 
@@ -253,6 +326,7 @@ export const MCP_TOOLS = {
   get_idea: { readOnly: true, input: getIdeaInput },
   get_month_schedule: { readOnly: true, input: getMonthScheduleInput },
   get_pdf_pages: { readOnly: true, input: getPdfPagesInput },
+  create_idea: { readOnly: false, input: createIdeaInput },
   list_review_points: { readOnly: true, input: listReviewPointsInput },
   add_review_point: { readOnly: false, input: addReviewPointInput },
   resolve_review_point: { readOnly: false, input: resolveReviewPointInput },
@@ -263,7 +337,7 @@ export const MCP_TOOLS = {
 export type McpToolName = keyof typeof MCP_TOOLS;
 export const MCP_TOOL_NAMES = Object.keys(MCP_TOOLS) as McpToolName[];
 
-// ---- Table rows (Ananya's spec; Mridul writes migrations 049 to 052) -------------------------------
+// ---- Table rows (migrations 049 to 057) -------------------------------
 // 049 mcp_upload_links. Only the server reads and writes it; the link's secret is stored only as a hash.
 export type McpUploadLinkRow = {
   id: string;
@@ -275,7 +349,17 @@ export type McpUploadLinkRow = {
   token_hash: string; // unique
   expires_at: string; // created_at plus MCP_LIMITS.uploadLinkMinutes
   used_at: string | null; // empty until the link is used
+  uploaded_via: string | null; // the app that started the upload (056)
+  result: McpUploadResultRecord | null; // what a used link produced (056)
   created_at: string;
+};
+
+export type McpUploadResultRecord = {
+  attachment_id: string;
+  file_name: string;
+  kind: "pdf" | "image";
+  page_count: number | null;
+  replaced_attachment_id: string | null;
 };
 
 // 050 mcp_audit_log. Members can read their own rows, admins all; only the server writes.
@@ -295,5 +379,6 @@ export type McpAuditRow = {
 // sets it to the name of the app the file came through, at most 60 characters, when it adds the file. The
 // board shows it as "uploaded by <person> through <app>" on the file and in the activity list.
 
-// 052 safety rules, the last migration: on every table outside the Content Board, a restrictive rule that
+// 056 mcp_upload_links gets `uploaded_via` (the app that started the upload) and `result` (what the upload
+// made, for confirm_upload), and a nightly clean-up job. 057 safety rules, the last migration: on every table outside the Content Board, a restrictive rule that
 // blocks any token carrying a client_id, so these tokens can't read other data through Supabase directly.
