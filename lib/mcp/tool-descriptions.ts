@@ -52,6 +52,16 @@ export const MCP_TOOL_TEXT: Record<McpToolName, McpToolText> = {
     ].join(" "),
   },
 
+  create_idea: {
+    title: "Create a new idea on the Content Board",
+    description: [
+      "Adds a new idea to the Ideas column, as the signed-in person, like the New idea button on the board. Only create an idea the person asked for.",
+      "Give it a clear title and at least one platform. Add notes for the team (description), the post text (caption), the day it should go out (scheduled_for) and reference_links when you have them.",
+      "It returns the new idea with its id. To add the post itself, call start_upload with that idea_id next.",
+      "Call list_ideas first so you don't create a duplicate of an idea that already exists.",
+    ].join(" "),
+  },
+
   list_review_points: {
     title: "List the review points on an idea",
     description: [

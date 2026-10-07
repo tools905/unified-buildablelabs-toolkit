@@ -5,6 +5,7 @@ import {
   MCP_TOOL_NAMES,
   addReviewPointInput,
   confirmUploadInput,
+  createIdeaInput,
   getMonthScheduleInput,
   getPdfPagesInput,
   listIdeasInput,
@@ -13,20 +14,23 @@ import {
   MCP_ERROR_CODES,
   MCP_UPLOAD_API_PATH,
   MCP_UPLOAD_PAGE_PATH,
-  UPLOAD_FORM_FIELDS,
   startUploadInput,
+  uploadCompleteInput,
+  uploadFileInput,
   uploadLinkStateSchema,
+  uploadPrepareResultSchema,
   uploadResultSchema,
 } from "@/lib/mcp/contract";
 
 const ID = "7b6f1f0e-6f0a-4d0e-9c56-2d9f6a3e8f11";
 
 describe("MCP contract: the tools", () => {
-  it("lists exactly the nine agreed tools", () => {
+  it("lists exactly the ten agreed tools", () => {
     expect([...MCP_TOOL_NAMES].sort()).toEqual(
       [
         "add_review_point",
         "confirm_upload",
+        "create_idea",
         "get_idea",
         "get_month_schedule",
         "get_pdf_pages",
@@ -94,6 +98,16 @@ describe("MCP contract: input checks", () => {
     expect(startUploadInput.safeParse({ idea_id: ID, file_name: "a.pdf", replaces_attachment_id: "x" }).success).toBe(false);
   });
 
+  it("needs a title and at least one platform to create an idea, and keeps the optional parts optional", () => {
+    expect(createIdeaInput.safeParse({ title: "A title", platforms: ["linkedin"] }).success).toBe(true);
+    expect(createIdeaInput.safeParse({ title: "A title", platforms: [] }).success).toBe(false);
+    expect(createIdeaInput.safeParse({ title: "A", platforms: ["linkedin"] }).success).toBe(false);
+    expect(createIdeaInput.safeParse({ title: "A title", platforms: ["tiktok"] }).success).toBe(false);
+    expect(createIdeaInput.safeParse({ title: "A title", platforms: ["x"], scheduled_for: "2026-10-12" }).success).toBe(true);
+    expect(createIdeaInput.safeParse({ title: "A title", platforms: ["x"], scheduled_for: "12 Oct" }).success).toBe(false);
+    expect(createIdeaInput.safeParse({ title: "A title", platforms: ["x"], scheduled_for: "2026-02-31" }).success).toBe(false);
+  });
+
   it("needs a real upload id to confirm", () => {
     expect(confirmUploadInput.safeParse({ upload_id: ID }).success).toBe(true);
     expect(confirmUploadInput.safeParse({ upload_id: "abc" }).success).toBe(false);
@@ -111,10 +125,9 @@ describe("MCP contract: limits match the app", () => {
 describe("MCP contract: the upload page", () => {
   const limits = { max_bytes: 15 * 1024 * 1024, allowed_extensions: [".pdf", ".png"], files_used: 3, files_max: 12 };
 
-  it("agrees where the page and the backend live and what the form fields are called", () => {
+  it("agrees where the page and the backend live", () => {
     expect(MCP_UPLOAD_PAGE_PATH).toBe("/mcp-upload");
     expect(MCP_UPLOAD_API_PATH).toBe("/api/mcp-upload");
-    expect(UPLOAD_FORM_FIELDS).toEqual({ file: "file", thumbnail: "thumbnail" });
   });
 
   it("describes a link that can still be used with everything the page shows", () => {
@@ -137,8 +150,42 @@ describe("MCP contract: the upload page", () => {
     expect(uploadLinkStateSchema.safeParse({ status: "pending" }).success).toBe(false);
   });
 
-  it("describes a stored file and a refused one", () => {
-    expect(uploadResultSchema.safeParse({ ok: true, attachment_id: ID, file_name: "a.pdf", kind: "pdf", replaced: false }).success).toBe(true);
+  it("describes the file the browser is about to send, with the picture optional", () => {
+    expect(uploadFileInput.parse({ file_name: " a.pdf ", content_type: "application/pdf", size_bytes: 10 })).toEqual({
+      file_name: "a.pdf",
+      content_type: "application/pdf",
+      size_bytes: 10,
+      thumbnail_type: null,
+    });
+    expect(uploadFileInput.safeParse({ file_name: "a.pdf", content_type: "application/pdf", size_bytes: 10, thumbnail_type: "image/png" }).success).toBe(false);
+    expect(uploadFileInput.safeParse({ file_name: "", content_type: "application/pdf", size_bytes: 10 }).success).toBe(false);
+    expect(uploadFileInput.safeParse({ file_name: "a.pdf", content_type: "application/pdf", size_bytes: 0 }).success).toBe(false);
+  });
+
+  it("needs the attempt code from prepare to complete a try, and only that kind of code", () => {
+    const base = { file_name: "a.pdf", content_type: "application/pdf", size_bytes: 10 };
+    expect(uploadCompleteInput.safeParse({ ...base, attempt: "abcdef012345" }).success).toBe(true);
+    expect(uploadCompleteInput.safeParse(base).success).toBe(false);
+    for (const attempt of ["", "short", "ABCDEF012345", "../../etc/pw", "abcdef0123456"]) {
+      expect(uploadCompleteInput.safeParse({ ...base, attempt }).success, attempt).toBe(false);
+    }
+  });
+
+  it("answers prepare with where to put the file, or a refusal", () => {
+    const target = { path: "w/i/mcp-x.pdf", upload_token: "t" };
+    const attempt = "abcdef012345";
+    expect(uploadPrepareResultSchema.safeParse({ ok: true, attempt, file: target, thumbnail: null }).success).toBe(true);
+    expect(uploadPrepareResultSchema.safeParse({ ok: true, attempt, file: target, thumbnail: target }).success).toBe(true);
+    expect(uploadPrepareResultSchema.safeParse({ ok: true, attempt, file: target }).success).toBe(false);
+    expect(uploadPrepareResultSchema.safeParse({ ok: true, file: target, thumbnail: null }).success).toBe(false);
+    expect(uploadPrepareResultSchema.safeParse({ ok: true, attempt: "../x", file: target, thumbnail: null }).success).toBe(false);
+    expect(uploadPrepareResultSchema.safeParse({ ok: false, code: "invalid_input", message: "Too big." }).success).toBe(true);
+  });
+
+  it("answers complete with the stored file or a refusal", () => {
+    const stored = { ok: true, attachment_id: ID, file_name: "a.pdf", kind: "pdf", page_count: 4, replaced_attachment_id: null };
+    expect(uploadResultSchema.safeParse(stored).success).toBe(true);
+    expect(uploadResultSchema.safeParse({ ...stored, kind: "image", page_count: null }).success).toBe(true);
     expect(uploadResultSchema.safeParse({ ok: false, code: "limit_reached", message: "This idea already has 12 files." }).success).toBe(true);
   });
 
@@ -147,6 +194,6 @@ describe("MCP contract: the upload page", () => {
       expect(uploadResultSchema.safeParse({ ok: false, code, message: "x" }).success).toBe(true);
     }
     expect(uploadResultSchema.safeParse({ ok: false, code: "oops", message: "x" }).success).toBe(false);
-    expect(uploadResultSchema.safeParse({ ok: true, attachment_id: "nope", file_name: "a.pdf", kind: "pdf", replaced: false }).success).toBe(false);
+    expect(uploadResultSchema.safeParse({ ok: true, attachment_id: "nope", file_name: "a.pdf", kind: "pdf", page_count: 1, replaced_attachment_id: null }).success).toBe(false);
   });
 });
