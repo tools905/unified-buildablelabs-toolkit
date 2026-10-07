@@ -1,7 +1,7 @@
 import "server-only";
 
-import { createRequire } from "node:module";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { MCP_LIMITS } from "@/lib/mcp/contract";
 import { McpToolFailure } from "@/lib/mcp/errors";
@@ -13,10 +13,26 @@ import type { McpImage } from "@/lib/mcp/tool-result";
 
 const JPEG_QUALITY = 80;
 
+// Found by its place under node_modules instead of by resolving its name: a bundler turns a resolve call into a
+// module number, which is not a path.
+function pdfjsFolder() {
+  return path.join(process.cwd(), "node_modules", "pdfjs-dist");
+}
+
+// The PDF reader is opened from its own file at run time instead of being bundled: it finds its worker by its own
+// path, which a bundle would move, and the board's browser code bundles the same package for its own use. The
+// ignore comments keep both builds (webpack and Turbopack) from touching this import, and next.config.ts makes
+// sure the file ships with the routes that draw or open PDFs.
+type Pdfjs = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+async function loadPdfjs(): Promise<Pdfjs> {
+  const file = path.join(pdfjsFolder(), "legacy", "build", "pdf.mjs");
+  return import(/* webpackIgnore: true */ /* turbopackIgnore: true */ pathToFileURL(file).href);
+}
+
 // The fonts and character maps pdfjs needs for PDFs that don't carry their own (a server has no system fonts to
 // fall back on). They sit inside the pdfjs-dist package, and next.config.ts makes sure they ship with the routes.
 function pdfjsFiles() {
-  const folder = path.dirname(createRequire(path.join(process.cwd(), "package.json")).resolve("pdfjs-dist/package.json"));
+  const folder = pdfjsFolder();
   return {
     standardFontDataUrl: path.join(folder, "standard_fonts") + path.sep,
     cMapUrl: path.join(folder, "cmaps") + path.sep,
@@ -57,7 +73,7 @@ async function drawPage(doc: OpenedPdf, number: number, longestSide: number): Pr
 
 // How many pages a PDF has, or null when it can't be opened. Used to check a stored file really is a PDF.
 export async function countPdfPages(pdf: Uint8Array): Promise<number | null> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await loadPdfjs();
   const task = pdfjs.getDocument(openOptions(pdf));
   try {
     return (await task.promise).numPages;
@@ -70,7 +86,7 @@ export async function countPdfPages(pdf: Uint8Array): Promise<number | null> {
 
 // A small JPEG of the first page, for the board card, when the browser did not send one.
 export async function renderPdfThumbnail(pdf: Uint8Array): Promise<Uint8Array | null> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await loadPdfjs();
   const task = pdfjs.getDocument(openOptions(pdf));
   try {
     await loadDrawingSurface();
@@ -86,7 +102,7 @@ export type RenderedPages = { pageCount: number; firstPage: number; lastPage: nu
 
 export async function renderPdfPages(pdf: Uint8Array, firstPage: number, lastPage: number | undefined): Promise<RenderedPages> {
   await loadDrawingSurface();
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await loadPdfjs();
   const task = pdfjs.getDocument(openOptions(pdf));
   try {
     let doc;
