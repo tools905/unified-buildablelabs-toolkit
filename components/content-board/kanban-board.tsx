@@ -17,7 +17,7 @@ import {
   type ContentIdeaWithRelations,
   type ContentMemberOption,
 } from "@/components/content-board/types";
-import { columnOrderNote, sortColumnIdeas } from "@/lib/utils/content-board";
+import { canMoveIdea, canTeamMoveFrom, columnOrderNote, sortColumnIdeas } from "@/lib/utils/content-board";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -80,8 +80,18 @@ export function KanbanBoard({
     [filtered],
   );
 
+  // A column takes the card being dragged only if this person may make that move (see canMoveIdea):
+  // admins anywhere, everyone else between Shortlisted, In Progress and Posted.
+  const draggingIdea = draggingId ? (ideas.find((idea) => idea.id === draggingId) ?? null) : null;
+  const canDropOn = (status: ContentIdeaStatus) =>
+    draggingIdea !== null && (draggingIdea.status === status || canMoveIdea({ from: draggingIdea.status, to: status, isAdmin }));
+
   function handleDrop(status: ContentIdeaStatus) {
-    if (!draggingId) return;
+    if (!draggingId || !canDropOn(status)) {
+      setDraggingId(null);
+      setDragOverStatus(null);
+      return;
+    }
     void moveIdea(draggingId, status);
     setDraggingId(null);
     setDragOverStatus(null);
@@ -207,7 +217,7 @@ export function KanbanBoard({
               key={column.status}
               aria-label={column.label}
               onDragOver={(event) => {
-                if (!isAdmin) return;
+                if (!canDropOn(column.status)) return;
                 event.preventDefault();
                 if (dragOverStatus !== column.status) setDragOverStatus(column.status);
               }}
@@ -235,7 +245,7 @@ export function KanbanBoard({
                     currentUserId={currentUserId}
                     isAdmin={isAdmin}
                     active={panelIdea?.id === idea.id}
-                    canDrag={isAdmin}
+                    canDrag={isAdmin || canTeamMoveFrom(idea.status)}
                     isDragging={draggingId === idea.id}
                     onOpen={() => push({ idea: idea.id, view: null })}
                     onEdit={() => push({ idea: idea.id, view: "edit" })}

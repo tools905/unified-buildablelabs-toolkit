@@ -144,7 +144,7 @@ export function IdeaCard({
   isAdmin: boolean;
   // Its side panel is open: shown with the same highlight as a card under the pointer.
   active: boolean;
-  // Only admins drag cards between columns; everyone else uses the next-step buttons.
+  // Admins can drag any card; everyone else the cards in Shortlisted, In Progress and Posted.
   canDrag: boolean;
   onOpen: () => void;
   onEdit: () => void;
@@ -346,7 +346,6 @@ export function IdeaCard({
         <CardMenu
           idea={idea}
           isAdmin={isAdmin}
-          isAssignee={assignedToMe}
           onOpen={onOpen}
           onEdit={onEdit}
           onAssign={onAssign}

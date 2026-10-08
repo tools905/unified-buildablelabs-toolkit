@@ -74,42 +74,35 @@ export function checkAttachmentFile(file: { type: string; size: number }): strin
 //  - Ideas → Feedback happens by itself when the first review point is added.
 //  - Ideas or Feedback → Shortlisted is an admin's call ("satisfied with the changes"). Open review
 //    points are pointed out but don't stop an admin who is satisfied anyway.
-//  - Shortlisted → In Progress → Posted is done by the people assigned to post it.
-//  - Admins can move any card anywhere (dragging is their override).
-// Assignees may also take one step back, to undo a click made by mistake.
-export function canMoveIdea(input: {
-  from: ContentIdeaStatus;
-  to: ContentIdeaStatus;
-  isAdmin: boolean;
-  isAssignee: boolean;
-}) {
+//  - Shortlisted → In Progress → Posted can be done by anyone on the team, and anyone can take one
+//    step back (In Progress → Shortlisted, Posted → In Progress) to undo a click made by mistake.
+//  - Admins can move any card anywhere.
+const TEAM_MOVES: Partial<Record<ContentIdeaStatus, ContentIdeaStatus[]>> = {
+  approved: ["in_progress"],
+  in_progress: ["posted", "approved"],
+  posted: ["in_progress"],
+};
+
+export function canMoveIdea(input: { from: ContentIdeaStatus; to: ContentIdeaStatus; isAdmin: boolean }) {
   if (input.from === input.to) return false;
   if (input.isAdmin) return true;
-  if (!input.isAssignee) return false;
-  const assigneeMoves: Partial<Record<ContentIdeaStatus, ContentIdeaStatus[]>> = {
-    approved: ["in_progress"],
-    in_progress: ["posted", "approved"],
-    posted: ["in_progress"],
-  };
-  return assigneeMoves[input.from]?.includes(input.to) ?? false;
+  return TEAM_MOVES[input.from]?.includes(input.to) ?? false;
+}
+
+// Whether a team member can pick a card up at all (to drag it between columns).
+export function canTeamMoveFrom(status: ContentIdeaStatus) {
+  return Boolean(TEAM_MOVES[status]?.length);
 }
 
 // The one step forward a person can take on an idea from where it is now, if any.
 export type NextStep =
   // `note` is a reminder shown next to the button; it never stops the move.
   | { kind: "move"; to: ContentIdeaStatus; label: string; note?: string }
-  | { kind: "blocked"; label: string; reason: string }
   | { kind: "wait"; reason: string }
   | null;
 
-export function nextStep(input: {
-  status: ContentIdeaStatus;
-  isAdmin: boolean;
-  isAssignee: boolean;
-  hasAssignees: boolean;
-  openReviewCount: number;
-}): NextStep {
-  const { status, isAdmin, isAssignee, hasAssignees, openReviewCount } = input;
+export function nextStep(input: { status: ContentIdeaStatus; isAdmin: boolean; openReviewCount: number }): NextStep {
+  const { status, isAdmin, openReviewCount } = input;
   switch (status) {
     case "idea":
       return isAdmin
@@ -126,17 +119,9 @@ export function nextStep(input: {
           }
         : { kind: "move", to: "approved", label: "Shortlist" };
     case "approved":
-      if (isAssignee || isAdmin) {
-        if (!hasAssignees && isAdmin) {
-          return { kind: "blocked", label: "Start working", reason: "Assign someone to post it first." };
-        }
-        return { kind: "move", to: "in_progress", label: "Start working" };
-      }
-      return { kind: "wait", reason: hasAssignees ? "Waiting for the assigned people to start." : "Waiting for an admin to assign it." };
+      return { kind: "move", to: "in_progress", label: "Start working" };
     case "in_progress":
-      return isAssignee || isAdmin
-        ? { kind: "move", to: "posted", label: "Mark as posted" }
-        : { kind: "wait", reason: "The assigned people mark it posted once it is live." };
+      return { kind: "move", to: "posted", label: "Mark as posted" };
     default:
       return null;
   }

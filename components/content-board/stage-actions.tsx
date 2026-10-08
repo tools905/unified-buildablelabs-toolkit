@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CONTENT_COLUMNS, type ContentIdeaWithRelations } from "@/components/content-board/types";
+import { CONTENT_COLUMNS, assigneeLabel, type ContentIdeaWithRelations } from "@/components/content-board/types";
 import { nextStep } from "@/lib/utils/content-board";
 import { cn } from "@/lib/utils/cn";
 import type { ContentIdeaStatus } from "@/lib/db/types";
@@ -35,13 +35,14 @@ export function StageActions({
   const [error, setError] = useState<string | null>(null);
   const [date, setDate] = useState(idea.scheduled_for ?? "");
   const assignees = idea.assignees ?? [];
-  const step = nextStep({
-    status: idea.status,
-    isAdmin,
-    isAssignee: assignees.some((assignee) => assignee.user_id === currentUserId),
-    hasAssignees: assignees.length > 0,
-    openReviewCount,
-  });
+  const step = nextStep({ status: idea.status, isAdmin, openReviewCount });
+  // Anyone can start a shortlisted idea; with nobody assigned yet, the person who starts it is added.
+  const startNote =
+    step?.kind === "move" && step.to === "in_progress" && assignees.length === 0
+      ? "Nobody is assigned yet. Starting it assigns you."
+      : step?.kind === "move" && step.to === "in_progress" && !assignees.some((assignee) => assignee.user_id === currentUserId)
+        ? `Assigned to ${assignees.map(assigneeLabel).join(", ")}. Anyone on the team can start it.`
+        : null;
   const currentIndex = CONTENT_COLUMNS.findIndex((column) => column.status === idea.status);
   const shortlisting = step?.kind === "move" && step.to === "approved";
 
@@ -80,6 +81,7 @@ export function StageActions({
       {step?.kind === "move" ? (
         <div className="flex flex-wrap items-end gap-2">
           {step.note ? <p className="w-full text-xs text-amber-500">{step.note}</p> : null}
+          {startNote ? <p className="w-full text-xs text-muted-foreground">{startNote}</p> : null}
           {shortlisting ? (
             <label className="min-w-[10rem] flex-1 text-xs text-muted-foreground">
               Posting day (optional, puts it on the calendar)
@@ -89,13 +91,6 @@ export function StageActions({
           <Button type="button" size="sm" disabled={pending} onClick={() => move(step.to)}>
             {step.to === "posted" ? <Check className="h-4 w-4" /> : null}
             {pending ? "Moving…" : step.label}
-          </Button>
-        </div>
-      ) : step?.kind === "blocked" ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">{step.reason}</p>
-          <Button type="button" size="sm" disabled>
-            {step.label}
           </Button>
         </div>
       ) : step?.kind === "wait" ? (

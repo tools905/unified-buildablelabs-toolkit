@@ -19,7 +19,6 @@ import type { ContentIdeaStatus } from "@/lib/db/types";
 export function CardMenu({
   idea,
   isAdmin,
-  isAssignee,
   onOpen,
   onEdit,
   onAssign,
@@ -27,14 +26,13 @@ export function CardMenu({
 }: {
   idea: ContentIdeaWithRelations;
   isAdmin: boolean;
-  isAssignee: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onAssign: () => void;
   onMove: (status: ContentIdeaStatus) => void;
 }) {
   const moves = CONTENT_COLUMNS.filter((column) =>
-    canMoveIdea({ from: idea.status, to: column.status, isAdmin, isAssignee }),
+    canMoveIdea({ from: idea.status, to: column.status, isAdmin }),
   );
 
   return (

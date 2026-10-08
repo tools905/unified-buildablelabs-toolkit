@@ -317,17 +317,37 @@ export async function moveContentIdea(
     }
     return idea;
   }
-  const isAssignee = (idea.assignees ?? []).some((row: { user_id: string }) => row.user_id === actorId);
-  if (!canMoveIdea({ from: idea.status, to, isAdmin, isAssignee })) {
+  if (!canMoveIdea({ from: idea.status, to, isAdmin })) {
     throw new Error(
-      isAdmin || isAssignee
-        ? "That move isn't allowed from here."
-        : "Only admins and the people assigned to this idea can move it.",
+      isAdmin ? "That move isn't allowed from here." : "Only admins can move an idea into or out of that column.",
     );
   }
-  return updateContentIdea(supabase, workspaceId, ideaId, actorId, {
+  const moved = await updateContentIdea(supabase, workspaceId, ideaId, actorId, {
     status: to,
     ...(options.scheduledFor ? { scheduledFor: options.scheduledFor } : {}),
+  });
+  // Starting work on an idea nobody is assigned to makes whoever started it the assignee, so the card
+  // shows who is posting it. Best effort: the move itself has already been saved.
+  if (to === "in_progress" && (idea.assignees ?? []).length === 0) {
+    await assignSelf(supabase, workspaceId, ideaId, actorId).catch(() => undefined);
+  }
+  return moved;
+}
+
+// Adds the person themselves as an assignee (anyone in the workspace may do this; assigning other
+// people stays with admins).
+async function assignSelf(supabase: SupabaseClient<any>, workspaceId: string, ideaId: string, actorId: string) {
+  const { error } = await supabase
+    .from("content_idea_assignees")
+    .insert({ idea_id: ideaId, user_id: actorId, workspace_id: workspaceId, assigned_by: actorId });
+  if (error && !/duplicate|unique/i.test(error.message)) throw error;
+  await writeAuditLog(supabase, {
+    workspaceId,
+    actorId,
+    action: "content_idea.assigned",
+    entityType: "content_idea",
+    entityId: ideaId,
+    metadata: { added: [actorId], removed: [], reason: "started work" },
   });
 }
 

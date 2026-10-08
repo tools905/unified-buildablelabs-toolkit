@@ -1,40 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { canMoveIdea, columnOrderNote, deriveIdeaTitle, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
+import { canMoveIdea, canTeamMoveFrom, columnOrderNote, deriveIdeaTitle, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
 import { platformsSchema } from "@/lib/validation/content-idea-schema";
 import { matchesPlatform } from "@/components/content-board/types";
 import { activityTone, describeUploads, groupUploads } from "@/components/content-board/activity";
 
 describe("who can move an idea between columns", () => {
   it("lets admins move a card anywhere", () => {
-    expect(canMoveIdea({ from: "idea", to: "posted", isAdmin: true, isAssignee: false })).toBe(true);
-    expect(canMoveIdea({ from: "posted", to: "feedback", isAdmin: true, isAssignee: false })).toBe(true);
+    expect(canMoveIdea({ from: "idea", to: "posted", isAdmin: true })).toBe(true);
+    expect(canMoveIdea({ from: "posted", to: "feedback", isAdmin: true })).toBe(true);
   });
 
-  it("lets the assigned people start, post and step back once", () => {
-    const assignee = { isAdmin: false, isAssignee: true };
-    expect(canMoveIdea({ from: "approved", to: "in_progress", ...assignee })).toBe(true);
-    expect(canMoveIdea({ from: "in_progress", to: "posted", ...assignee })).toBe(true);
-    expect(canMoveIdea({ from: "in_progress", to: "approved", ...assignee })).toBe(true);
-    expect(canMoveIdea({ from: "posted", to: "in_progress", ...assignee })).toBe(true);
+  it("lets anyone on the team take a shortlisted idea through to posted, and one step back", () => {
+    const member = { isAdmin: false };
+    expect(canMoveIdea({ from: "approved", to: "in_progress", ...member })).toBe(true);
+    expect(canMoveIdea({ from: "in_progress", to: "posted", ...member })).toBe(true);
+    expect(canMoveIdea({ from: "in_progress", to: "approved", ...member })).toBe(true);
+    expect(canMoveIdea({ from: "posted", to: "in_progress", ...member })).toBe(true);
+    expect(canTeamMoveFrom("approved")).toBe(true);
+    expect(canTeamMoveFrom("posted")).toBe(true);
   });
 
-  it("does not let assignees shortlist their own idea", () => {
-    expect(canMoveIdea({ from: "feedback", to: "approved", isAdmin: false, isAssignee: true })).toBe(false);
-    expect(canMoveIdea({ from: "approved", to: "posted", isAdmin: false, isAssignee: true })).toBe(false);
-  });
-
-  it("does not let other members move cards", () => {
-    expect(canMoveIdea({ from: "approved", to: "in_progress", isAdmin: false, isAssignee: false })).toBe(false);
-    expect(canMoveIdea({ from: "idea", to: "feedback", isAdmin: false, isAssignee: false })).toBe(false);
+  it("keeps shortlisting and every other move with admins", () => {
+    const member = { isAdmin: false };
+    expect(canMoveIdea({ from: "feedback", to: "approved", ...member })).toBe(false);
+    expect(canMoveIdea({ from: "idea", to: "feedback", ...member })).toBe(false);
+    expect(canMoveIdea({ from: "approved", to: "posted", ...member })).toBe(false);
+    expect(canMoveIdea({ from: "approved", to: "feedback", ...member })).toBe(false);
+    expect(canTeamMoveFrom("idea")).toBe(false);
+    expect(canTeamMoveFrom("feedback")).toBe(false);
   });
 
   it("treats a move to the same column as no move", () => {
-    expect(canMoveIdea({ from: "idea", to: "idea", isAdmin: true, isAssignee: true })).toBe(false);
+    expect(canMoveIdea({ from: "idea", to: "idea", isAdmin: true })).toBe(false);
   });
 });
 
 describe("the next step shown on an idea", () => {
-  const base = { isAdmin: false, isAssignee: false, hasAssignees: true, openReviewCount: 0 };
+  const base = { isAdmin: false, openReviewCount: 0 };
 
   it("lets an admin shortlist from Feedback, pointing out review points still open", () => {
     expect(nextStep({ ...base, status: "feedback", isAdmin: true, openReviewCount: 2 })).toMatchObject({
@@ -46,13 +48,9 @@ describe("the next step shown on an idea", () => {
     expect(nextStep({ ...base, status: "feedback" })).toMatchObject({ kind: "wait" });
   });
 
-  it("asks an admin to assign someone before work starts", () => {
-    expect(nextStep({ ...base, status: "approved", isAdmin: true, hasAssignees: false })).toMatchObject({ kind: "blocked" });
-  });
-
-  it("lets the assignee start and then mark it posted", () => {
-    expect(nextStep({ ...base, status: "approved", isAssignee: true })).toMatchObject({ kind: "move", to: "in_progress" });
-    expect(nextStep({ ...base, status: "in_progress", isAssignee: true })).toMatchObject({ kind: "move", to: "posted" });
+  it("lets anyone start a shortlisted idea and then mark it posted", () => {
+    expect(nextStep({ ...base, status: "approved" })).toEqual({ kind: "move", to: "in_progress", label: "Start working" });
+    expect(nextStep({ ...base, status: "in_progress" })).toEqual({ kind: "move", to: "posted", label: "Mark as posted" });
   });
 
   it("has nothing further once posted", () => {
