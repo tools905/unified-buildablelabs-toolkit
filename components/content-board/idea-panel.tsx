@@ -10,6 +10,7 @@ import { draftOf, groupUploads, hasChangesSinceReview, uploaderLabel } from "@/c
 import { AttachmentAdder } from "@/components/content-board/attachment-adder";
 import { PostPreview } from "@/components/content-board/post-preview/post-preview";
 import { PreviewViewer } from "@/components/content-board/preview-viewer";
+import { PencilReviews } from "@/components/content-board/markup/pencil-reviews";
 import { ReviewPoints } from "@/components/content-board/review-points";
 import { StageActions, type MoveIdea } from "@/components/content-board/stage-actions";
 import { ideaPdfUrl } from "@/components/content-board/idea-pdf";
@@ -366,6 +367,16 @@ export function IdeaPanel({
                   {removeError}
                 </p>
               ) : null}
+              <PencilReviews
+                ideaId={idea.id}
+                attachments={attachments}
+                drafts={drafts}
+                currentDraft={currentDraft}
+                reviews={data.markupReviews ?? []}
+                currentUserId={data.currentUserId}
+                isAdmin={data.isAdmin}
+                onChanged={() => afterChange()}
+              />
               <AttachmentAdder
                 ideaId={idea.id}
                 workspaceId={data.workspaceId}

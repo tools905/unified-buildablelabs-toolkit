@@ -2,6 +2,7 @@ import { FaFacebook, FaGlobe, FaInstagram, FaLinkedin, FaXTwitter, FaYoutube } f
 import type { IconType } from "react-icons";
 import type { ContentAttachmentKind, ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
 import type { LatestActivity } from "@/lib/utils/content-board";
+import type { MarkupReviewSummary } from "@/lib/utils/markup";
 
 export type ContentIdeaProfile = {
   id: string;
@@ -101,6 +102,8 @@ export type IdeaPanelData = {
   history: IdeaPanelHistory;
   attachments: PanelAttachment[];
   points: PanelReviewPoint[];
+  // Pencil reviews (marks drawn on a draft), newest first, without their strokes.
+  markupReviews: MarkupReviewSummary[];
 };
 
 export type ContentMemberOption = {

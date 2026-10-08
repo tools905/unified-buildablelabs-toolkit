@@ -114,3 +114,46 @@ export const addReviewPointSchema = z.object({
     .min(MIN_REVIEW_POINT_LENGTH, "Write at least a couple of words.")
     .max(MAX_REVIEW_POINT_LENGTH, `Keep it under ${MAX_REVIEW_POINT_LENGTH} characters.`),
 });
+
+// A Pencil review being submitted: the draft it is on, an optional note and the strokes of each page that
+// was drawn on. Bounded so one review can't grow without limit.
+const markupPointSchema = z.number().min(-0.2).max(1.2);
+export const markupStrokeSchema = z.object({
+  tool: z.enum(["pen", "highlighter"]),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  width: z.number().positive().max(0.1),
+  points: z
+    .array(markupPointSchema)
+    .min(2)
+    .max(8000)
+    .refine((points) => points.length % 2 === 0, "Each point needs an x and a y."),
+});
+
+export const markupSubmissionSchema = z
+  .object({
+    ideaId: z.string().uuid(),
+    fileIds: z.array(z.string().uuid()).min(1).max(12),
+    note: z.string().trim().max(3000).optional(),
+    pages: z
+      .array(
+        z.object({
+          attachmentId: z.string().uuid(),
+          pageNumber: z.number().int().min(1).max(500),
+          // Where the page sits in the draft (1 = first page), for "Marked up pages 2 and 5".
+          position: z.number().int().min(1).max(1000),
+          strokes: z.array(markupStrokeSchema).min(1).max(1500),
+        }),
+      )
+      .min(1, "Draw on at least one page first.")
+      .max(60),
+  })
+  .refine(
+    (input) => input.pages.every((page) => input.fileIds.includes(page.attachmentId)),
+    "Those pages aren't part of this draft.",
+  )
+  .refine(
+    (input) => input.pages.reduce((total, page) => total + page.strokes.reduce((sum, stroke) => sum + stroke.points.length, 0), 0) <= 400_000,
+    "This review is too large to save. Split it into two reviews.",
+  );
+
+export type MarkupSubmissionInput = z.infer<typeof markupSubmissionSchema>;

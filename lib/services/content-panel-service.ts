@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as attachmentService from "@/lib/services/content-attachment-service";
 import * as reviewService from "@/lib/services/content-review-service";
+import { listMarkupReviews } from "@/lib/services/content-markup-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { toEmbedUrl } from "@/lib/utils/design-links";
 import type { IdeaPanelData } from "@/components/content-board/types";
@@ -14,7 +15,7 @@ export async function getIdeaPanelData(
   workspace: { id: string },
   ideaId: string,
 ): Promise<IdeaPanelData> {
-  const [attachments, points, admin, ideaResult] = await Promise.all([
+  const [attachments, points, admin, ideaResult, markupReviews] = await Promise.all([
     attachmentService.listAttachments(supabase, ideaId),
     reviewService.listReviewPoints(supabase, ideaId),
     isWorkspaceAdmin(workspace.id, user.id, supabase),
@@ -23,6 +24,7 @@ export async function getIdeaPanelData(
       .select("status, created_at, created_by, posted_at, reviewed_at, reviewed_by")
       .eq("id", ideaId)
       .single(),
+    listMarkupReviews(supabase, ideaId),
   ]);
   if (ideaResult.error) throw ideaResult.error;
   const idea = ideaResult.data;
@@ -69,6 +71,7 @@ export async function getIdeaPanelData(
       uploaderName: nameOf(item.created_by),
       uploadedVia: item.uploaded_via ?? null,
     })),
+    markupReviews,
     points: points.map((point) => {
       const author = Array.isArray(point.author) ? point.author[0] : point.author;
       return {

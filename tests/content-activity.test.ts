@@ -18,6 +18,7 @@ function data(overrides: Partial<IdeaPanelData> = {}): IdeaPanelData {
     },
     attachments: [],
     points: [],
+    markupReviews: [],
     ...overrides,
   };
 }
