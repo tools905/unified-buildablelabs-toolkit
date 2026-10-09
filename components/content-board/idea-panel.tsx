@@ -373,6 +373,7 @@ export function IdeaPanel({
                 drafts={drafts}
                 currentDraft={currentDraft}
                 reviews={data.markupReviews ?? []}
+                saved={data.savedMarkupReviews ?? []}
                 currentUserId={data.currentUserId}
                 isAdmin={data.isAdmin}
                 onChanged={() => afterChange()}

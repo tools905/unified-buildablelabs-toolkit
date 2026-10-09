@@ -104,6 +104,8 @@ export type IdeaPanelData = {
   points: PanelReviewPoint[];
   // Pencil reviews (marks drawn on a draft), newest first, without their strokes.
   markupReviews: MarkupReviewSummary[];
+  // The current user's own Pencil reviews saved but not submitted yet (private to them), newest first.
+  savedMarkupReviews?: { fileIds: string[]; pageCount: number; updatedAt: string }[];
 };
 
 export type ContentMemberOption = {

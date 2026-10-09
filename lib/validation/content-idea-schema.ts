@@ -129,31 +129,39 @@ export const markupStrokeSchema = z.object({
     .refine((points) => points.length % 2 === 0, "Each point needs an x and a y."),
 });
 
+const markupPageSchema = z.object({
+  attachmentId: z.string().uuid(),
+  pageNumber: z.number().int().min(1).max(500),
+  // Where the page sits in the draft (1 = first page), for "Marked up pages 2 and 5".
+  position: z.number().int().min(1).max(1000),
+  strokes: z.array(markupStrokeSchema).min(1).max(1500),
+});
+type MarkupPages = { fileIds: string[]; pages: z.infer<typeof markupPageSchema>[] };
+const pagesOnDraft = (input: MarkupPages) => input.pages.every((page) => input.fileIds.includes(page.attachmentId));
+const smallEnough = (input: MarkupPages) =>
+  input.pages.reduce((total, page) => total + page.strokes.reduce((sum, stroke) => sum + stroke.points.length, 0), 0) <= 400_000;
+
 export const markupSubmissionSchema = z
   .object({
     ideaId: z.string().uuid(),
     fileIds: z.array(z.string().uuid()).min(1).max(12),
     note: z.string().trim().max(3000).optional(),
-    pages: z
-      .array(
-        z.object({
-          attachmentId: z.string().uuid(),
-          pageNumber: z.number().int().min(1).max(500),
-          // Where the page sits in the draft (1 = first page), for "Marked up pages 2 and 5".
-          position: z.number().int().min(1).max(1000),
-          strokes: z.array(markupStrokeSchema).min(1).max(1500),
-        }),
-      )
-      .min(1, "Draw on at least one page first.")
-      .max(60),
+    pages: z.array(markupPageSchema).min(1, "Draw on at least one page first.").max(60),
   })
-  .refine(
-    (input) => input.pages.every((page) => input.fileIds.includes(page.attachmentId)),
-    "Those pages aren't part of this draft.",
-  )
-  .refine(
-    (input) => input.pages.reduce((total, page) => total + page.strokes.reduce((sum, stroke) => sum + stroke.points.length, 0), 0) <= 400_000,
-    "This review is too large to save. Split it into two reviews.",
-  );
+  .refine(pagesOnDraft, "Those pages aren't part of this draft.")
+  .refine(smallEnough, "This review is too large to save. Split it into two reviews.");
+
+// A review saved part-way through: like a submission, but it may have no marks yet (just a note, or
+// everything erased).
+export const markupDraftSchema = z
+  .object({
+    ideaId: z.string().uuid(),
+    fileIds: z.array(z.string().uuid()).min(1).max(12),
+    note: z.string().max(3000).optional(),
+    pages: z.array(markupPageSchema).max(60),
+  })
+  .refine(pagesOnDraft, "Those pages aren't part of this draft.")
+  .refine(smallEnough, "This review is too large to save. Split it into two reviews.");
 
 export type MarkupSubmissionInput = z.infer<typeof markupSubmissionSchema>;
+export type MarkupDraftInput = z.infer<typeof markupDraftSchema>;

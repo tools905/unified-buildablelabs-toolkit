@@ -7,10 +7,10 @@ vi.mock("@/lib/services/content-review-service", () => ({ addReviewPoint: vi.fn(
 import { decodePDFRawStream, PDFArray, PDFDocument, PDFRawStream } from "pdf-lib";
 import { createNotification } from "@/lib/services/notification-service";
 import { addReviewPoint } from "@/lib/services/content-review-service";
-import { submitMarkupReview } from "@/lib/services/content-markup-service";
+import { saveMarkupReview, submitMarkupReview } from "@/lib/services/content-markup-service";
 import { getIdeaPdfDownloadUrl } from "@/lib/services/content-export-service";
 import { describePages, eraseAt, simplifyPoints, strokePath, strokeWidth, type MarkupStroke } from "@/lib/utils/markup";
-import { markupSubmissionSchema } from "@/lib/validation/content-idea-schema";
+import { markupDraftSchema, markupSubmissionSchema } from "@/lib/validation/content-idea-schema";
 
 const IDEA = "11111111-1111-4111-8111-111111111111";
 const FILE_A = "22222222-2222-4222-8222-222222222222";
@@ -21,11 +21,11 @@ const red = (points: number[]): MarkupStroke => ({ tool: "pen", color: "#E5372B"
 
 describe("drawing marks", () => {
   it("keeps strokes small without changing their shape", () => {
-    const dense = Array.from({ length: 200 }, (_, i) => [i * 0.0001, 0.5]).flat();
+    const dense = Array.from({ length: 201 }, (_, i) => [i * 0.00005, 0.5]).flat();
     const simplified = simplifyPoints(dense);
     expect(simplified.length).toBeLessThan(dense.length / 5);
     expect(simplified.slice(0, 2)).toEqual([0, 0.5]);
-    expect(simplified.slice(-2)).toEqual([0.0199, 0.5]);
+    expect(simplified.slice(-2)).toEqual([0.01, 0.5]);
   });
 
   it("presses harder for a thicker Pencil line", () => {
@@ -36,6 +36,15 @@ describe("drawing marks", () => {
   it("turns a stroke into a path on a page of any size", () => {
     expect(strokePath([0, 0, 0.5, 1], 1000, 1250)).toBe("M0.00 0.00 L500.00 1250.00");
     expect(strokePath([0.5, 0.5], 100, 100)).toBe("M50.00 50.00 L50.01 50.00");
+  });
+
+  it("joins handwriting up in smooth curves rather than straight pieces", () => {
+    expect(strokePath([0, 0, 0.1, 0.2, 0.2, 0], 100, 100)).toBe("M0.00 0.00 Q10.00 20.00 15.00 10.00 L20.00 0.00");
+  });
+
+  it("keeps a pen line the same thickness on screen when zoomed in", () => {
+    expect(strokeWidth("pen", 0.5, 2)).toBeCloseTo(strokeWidth("pen", 0.5) / 2, 4);
+    expect(strokeWidth("highlighter", 0.5, 3)).toBe(strokeWidth("highlighter", 0.5));
   });
 
   it("erases only the strokes the eraser passes over", () => {
@@ -68,11 +77,15 @@ describe("a submitted review", () => {
 
   function fakeSupabase() {
     const inserted: Record<string, unknown[]> = {};
+    const deleted: string[] = [];
     const from = (table: string) => {
       const builder: Record<string, unknown> = {
         select: () => builder,
         eq: () => builder,
-        delete: () => builder,
+        delete: () => {
+          deleted.push(table);
+          return builder;
+        },
         maybeSingle: async () => ({
           data: {
             id: IDEA,
@@ -91,11 +104,11 @@ describe("a submitted review", () => {
       };
       return builder;
     };
-    return { client: { from } as never, inserted };
+    return { client: { from } as never, inserted, deleted };
   }
 
   it("is saved as a layer, adds a review comment and tells the assignees (not the reviewer)", async () => {
-    const { client, inserted } = fakeSupabase();
+    const { client, inserted, deleted } = fakeSupabase();
     const result = await submitMarkupReview(client, {
       workspaceId: "w",
       userId: ADITI,
@@ -112,6 +125,8 @@ describe("a submitted review", () => {
       expect.objectContaining({ ideaId: IDEA, body: "Marked up pages 2 and 5 with Pencil. Tighten the headline" }),
     );
     expect(vi.mocked(createNotification).mock.calls.map(([input]) => input.userId)).toEqual([MRIDUL]);
+    // The copy saved while drawing goes once the review is submitted.
+    expect(deleted).toEqual(["content_idea_review_drafts"]);
   });
 
   it("refuses files that aren't on the idea any more", async () => {
@@ -125,6 +140,62 @@ describe("a submitted review", () => {
         submission: { ideaId: IDEA, fileIds: [missing], pages: [{ ...page, attachmentId: missing }] },
       }),
     ).rejects.toThrow(/removed while you were reviewing/);
+  });
+});
+
+describe("saving a review part-way through", () => {
+  const page = { attachmentId: FILE_A, pageNumber: 2, position: 2, strokes: [red([0.1, 0.1, 0.2, 0.2])] };
+
+  it("may be saved with nothing drawn yet, but only on the draft's own pages", () => {
+    expect(markupDraftSchema.safeParse({ ideaId: IDEA, fileIds: [FILE_A], pages: [] }).success).toBe(true);
+    expect(markupDraftSchema.safeParse({ ideaId: IDEA, fileIds: [FILE_B], pages: [page] }).success).toBe(false);
+  });
+
+  function fakeTable() {
+    const calls: { op: string; row?: Record<string, unknown>; options?: unknown }[] = [];
+    const builder: Record<string, unknown> = {
+      eq: () => builder,
+      select: () => builder,
+      single: async () => ({ data: { updated_at: "2026-10-09T05:12:00Z" }, error: null }),
+      then: (resolve: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(resolve),
+    };
+    const client = {
+      from: () => ({
+        upsert: (row: Record<string, unknown>, options: unknown) => {
+          calls.push({ op: "upsert", row, options });
+          return builder;
+        },
+        delete: () => {
+          calls.push({ op: "delete" });
+          return builder;
+        },
+      }),
+    } as never;
+    return { client, calls };
+  }
+
+  it("keeps one private copy per person per draft", async () => {
+    const { client, calls } = fakeTable();
+    const result = await saveMarkupReview(client, {
+      workspaceId: "w",
+      userId: ADITI,
+      draft: { ideaId: IDEA, fileIds: [FILE_A], note: "Half way", pages: [page] },
+    });
+    expect(result).toEqual({ updatedAt: "2026-10-09T05:12:00Z" });
+    expect(calls).toEqual([
+      {
+        op: "upsert",
+        row: expect.objectContaining({ idea_id: IDEA, user_id: ADITI, file_ids: [FILE_A], note: "Half way", pages: [page] }),
+        options: { onConflict: "idea_id,user_id,file_ids" },
+      },
+    ]);
+  });
+
+  it("removes the saved copy when everything has been erased", async () => {
+    const { client, calls } = fakeTable();
+    const result = await saveMarkupReview(client, { workspaceId: "w", userId: ADITI, draft: { ideaId: IDEA, fileIds: [FILE_A], note: " ", pages: [] } });
+    expect(result).toEqual({ updatedAt: null });
+    expect(calls.map((call) => call.op)).toEqual(["delete"]);
   });
 });
 

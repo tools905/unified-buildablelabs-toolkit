@@ -23,6 +23,7 @@ export function MarkupPage({
   tool,
   color,
   fingerDraws,
+  zoom,
   onStroke,
   onErase,
   onDrawingChange,
@@ -38,6 +39,8 @@ export function MarkupPage({
   tool: MarkupInput;
   color: string;
   fingerDraws: boolean;
+  // How far the page is zoomed in, so a pen line keeps its thickness on screen.
+  zoom: number;
   onStroke: (stroke: MarkupStroke) => void;
   // Called for every point the eraser passes over (x and y between 0 and 1).
   onErase: (x: number, y: number) => void;
@@ -81,6 +84,24 @@ export function MarkupPage({
     };
   }, [pdf, width, height]);
 
+  // iPad Safari treats a Pencil held on the page as a press: it can pop up the magnifier or start
+  // selecting, which swallows the start of the next letter. Stopping that needs a listener React can't
+  // add (React's touch listeners can't cancel the browser's own handling).
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface || !editable) return;
+    const stop = (event: TouchEvent) => {
+      const stylus = [...event.changedTouches].some((touch) => (touch as Touch & { touchType?: string }).touchType === "stylus");
+      if (stylus || fingerDraws) event.preventDefault();
+    };
+    surface.addEventListener("touchstart", stop, { passive: false });
+    surface.addEventListener("touchmove", stop, { passive: false });
+    return () => {
+      surface.removeEventListener("touchstart", stop);
+      surface.removeEventListener("touchmove", stop);
+    };
+  }, [editable, fingerDraws]);
+
   function pointFrom(event: { clientX: number; clientY: number }) {
     const rect = surfaceRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return null;
@@ -95,8 +116,12 @@ export function MarkupPage({
       onErase(point.x, point.y);
       return;
     }
+    const count = current.points.length;
+    // The same spot again (the Pencil reports some twice) adds nothing but a kink.
+    if (count >= 2 && current.points[count - 2] === point.x && current.points[count - 1] === point.y) return;
     current.points.push(point.x, point.y);
-    if (event.pointerType === "pen") current.pressures.push(event.pressure);
+    // The first report of a touch-down can say 0 pressure; that's not how hard the line is pressed.
+    if (event.pointerType === "pen" && event.pressure > 0) current.pressures.push(event.pressure);
     livePathRef.current?.setAttribute("d", strokePath(current.points, VIEW_WIDTH, viewHeight));
   }
 
@@ -109,10 +134,10 @@ export function MarkupPage({
     const pressure = current.pressures.length
       ? current.pressures.reduce((total, value) => total + value, 0) / current.pressures.length
       : 0.5;
-    onStroke({ tool, color, width: strokeWidth(tool, pressure), points: current.points });
+    onStroke({ tool, color, width: strokeWidth(tool, pressure, zoom), points: current.points });
   }
 
-  const liveWidth = strokeWidth(tool === "eraser" ? "pen" : tool, 0.5) * VIEW_WIDTH;
+  const liveWidth = strokeWidth(tool === "eraser" ? "pen" : tool, 0.5, zoom) * VIEW_WIDTH;
 
   return (
     <div
@@ -126,6 +151,9 @@ export function MarkupPage({
         if (event.pointerType === "pen") onPenSeen();
         event.stopPropagation();
         event.preventDefault();
+        // Writing quickly, the next letter can start before the last one's lift arrives: keep that line
+        // rather than losing it.
+        if (live.current) finish();
         try {
           // Keeps the line going when the Pencil slides off the page's edge.
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -145,7 +173,10 @@ export function MarkupPage({
         (all.length ? all : [native]).forEach(addPoint);
       }}
       onPointerUp={(event) => {
-        if (live.current?.pointerId === event.pointerId) finish();
+        if (live.current?.pointerId !== event.pointerId) return;
+        // Where the Pencil lifted, so the end of a quick flick (the cross of a t) isn't cut short.
+        addPoint(event.nativeEvent);
+        finish();
       }}
       onPointerCancel={(event) => {
         if (live.current?.pointerId === event.pointerId) finish();

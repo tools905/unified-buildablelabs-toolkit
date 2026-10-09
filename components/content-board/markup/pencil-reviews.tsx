@@ -22,6 +22,7 @@ export function PencilReviews({
   drafts,
   currentDraft,
   reviews,
+  saved = [],
   currentUserId,
   isAdmin,
   onChanged,
@@ -31,6 +32,8 @@ export function PencilReviews({
   drafts: UploadGroup[];
   currentDraft: UploadGroup | null;
   reviews: MarkupReviewSummary[];
+  // The user's own reviews saved but not submitted yet.
+  saved?: { fileIds: string[]; pageCount: number; updatedAt: string }[];
   currentUserId: string;
   isAdmin: boolean;
   onChanged: () => void;
@@ -39,7 +42,23 @@ export function PencilReviews({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
 
-  const draftFiles = (currentDraft?.items ?? []).map((item) => item.attachment).filter((item) => item.kind !== "link");
+  const filesOfDraft = (draft: UploadGroup | null) => (draft?.items ?? []).map((item) => item.attachment).filter((item) => item.kind !== "link");
+  const sameFiles = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
+  // Which draft each unfinished review is of (drafts can be removed, which leaves nothing to continue).
+  const unfinished = saved
+    .map((item) => ({ ...item, draft: drafts.find((draft) => sameFiles(filesOfDraft(draft).map((file) => file.id), item.fileIds)) ?? null }))
+    .filter((item): item is typeof item & { draft: UploadGroup } => item.draft !== null);
+
+  // ?markup=draw reviews the draft on screen; ?markup=draw:3 carries on with draft 3.
+  const open = values.markup;
+  const drawDraft = open?.startsWith("draw")
+    ? open.startsWith("draw:")
+      ? (drafts.find((draft) => String(draft.number) === open.slice(5)) ?? null)
+      : currentDraft
+    : null;
+  const draftFiles = filesOfDraft(drawDraft ?? currentDraft);
+  const currentUnfinished = unfinished.find((item) => item.draft === currentDraft) ?? null;
+  const otherUnfinished = unfinished.filter((item) => item.draft !== currentDraft);
   const draftName = (draft: UploadGroup | null) => (draft ? (drafts.length > 1 ? `draft ${draft.number}` : "the draft") : "the draft");
   const draftOfReview = (review: MarkupReviewSummary) =>
     drafts.find((draft) => draft.items.some((item) => review.fileIds.includes(item.attachment.id))) ?? null;
@@ -48,8 +67,7 @@ export function PencilReviews({
   const filesOf = (fileIds: string[]) =>
     fileIds.map((id) => attachments.find((item) => item.id === id)).filter((item): item is PanelAttachment => Boolean(item));
 
-  const open = values.markup;
-  const openReview = open && open !== "draw" ? reviews.find((review) => review.id === open) ?? null : null;
+  const openReview = open && !open.startsWith("draw") ? reviews.find((review) => review.id === open) ?? null : null;
   const openReviewDraft = openReview ? draftOfReview(openReview) : null;
 
   async function remove(review: MarkupReviewSummary) {
@@ -69,12 +87,25 @@ export function PencilReviews({
 
   return (
     <div className="space-y-3">
-      {draftFiles.length > 0 ? (
+      {filesOfDraft(currentDraft).length > 0 ? (
         <Button type="button" variant="outline" className="w-full justify-center gap-2" onClick={() => push({ markup: "draw" })}>
           <PenLine className="h-4 w-4" />
-          Review {draftName(currentDraft)} with Pencil
+          {currentUnfinished ? `Continue your Pencil review of ${draftName(currentDraft)}` : `Review ${draftName(currentDraft)} with Pencil`}
         </Button>
       ) : null}
+      {currentUnfinished ? (
+        <p className="-mt-1.5 text-center text-[11px] text-muted-foreground">
+          Saved {formatWhen(currentUnfinished.updatedAt)}, not submitted yet. Only you can see it.
+        </p>
+      ) : null}
+      {otherUnfinished.map((item) => (
+        <p key={item.fileIds.join(",")} className="text-xs text-muted-foreground">
+          You have an unsubmitted Pencil review of {draftName(item.draft)} (saved {formatWhen(item.updatedAt)}).{" "}
+          <button type="button" className="font-medium text-foreground underline underline-offset-2" onClick={() => push({ markup: `draw:${item.draft.number}` })}>
+            Continue it
+          </button>
+        </p>
+      ))}
 
       {reviews.length > 0 ? (
         <section aria-label="Pencil reviews" className="space-y-2">
@@ -132,13 +163,18 @@ export function PencilReviews({
         </section>
       ) : null}
 
-      {open === "draw" && draftFiles.length > 0 ? (
+      {drawDraft && draftFiles.length > 0 ? (
         <MarkupReviewer
+          key={drawDraft.number}
           mode="draw"
           ideaId={ideaId}
-          draftLabel={drafts.length > 1 && currentDraft ? `Draft ${currentDraft.number}` : "Draft"}
+          draftLabel={drafts.length > 1 ? `Draft ${drawDraft.number}` : "Draft"}
           attachments={draftFiles}
-          onClose={() => pop({ markup: null })}
+          onClose={(saving) => {
+            pop({ markup: null });
+            // The panel's "Continue your Pencil review" shows once the last save is in.
+            void Promise.resolve(saving).finally(onChanged);
+          }}
           onSubmitted={() => {
             pop({ markup: null });
             onChanged();

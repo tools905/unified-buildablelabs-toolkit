@@ -14,6 +14,7 @@ import {
   Minus,
   Plus,
   Redo2,
+  Save,
   Send,
   Trash2,
   Undo2,
@@ -35,6 +36,7 @@ import {
   type MarkupReviewPage,
   type MarkupStroke,
 } from "@/lib/utils/markup";
+import { formatWhen } from "@/components/content-board/activity";
 
 type Pages = Record<string, MarkupStroke[]>;
 
@@ -52,13 +54,60 @@ const slideKey = (slide: LoadedSlide) => {
 
 const storageKey = (ideaId: string, fileIds: string[]) => `tc-markup:${ideaId}:${fileIds.join(",")}`;
 
-function readSaved(key: string): Pages {
+// The review in progress, as kept on this device: a copy of everything, and whether it has changes the
+// server hasn't saved yet (`dirty`), so a crash or a dropped connection loses nothing.
+type LocalCopy = { pages: Pages; note: string; dirty: boolean };
+
+function readLocal(key: string): LocalCopy | null {
   try {
     const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as Pages) : {};
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalCopy> | Pages;
+    // Marks kept before reviews were saved to the server: just the pages, none of them saved.
+    if (!("pages" in parsed) || typeof parsed.pages !== "object" || Array.isArray(parsed.pages)) {
+      return { pages: parsed as Pages, note: "", dirty: true };
+    }
+    return { pages: (parsed.pages ?? {}) as Pages, note: typeof parsed.note === "string" ? parsed.note : "", dirty: Boolean(parsed.dirty) };
   } catch {
-    return {};
+    return null;
   }
+}
+
+function writeLocal(key: string, copy: LocalCopy) {
+  try {
+    const hasMarks = Object.values(copy.pages).some((strokes) => strokes.length > 0);
+    if (hasMarks || copy.note.trim() || copy.dirty) window.localStorage.setItem(key, JSON.stringify(copy));
+    else window.localStorage.removeItem(key);
+  } catch {
+    // Storage can be unavailable (private browsing); the server copy still saves.
+  }
+}
+
+function clearLocal(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Nothing to clean up.
+  }
+}
+
+type SaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved"; at: string }
+  | { kind: "offline" };
+
+// How long after the last line the review saves itself, and how soon a failed save is tried again.
+const AUTOSAVE_DELAY = 2000;
+const RETRY_DELAY = 10000;
+// A touch landing this soon after the Pencil lifts is a palm or wrist, not a finger moving the page.
+const PALM_GRACE = 600;
+
+function saveStatusText(state: SaveState) {
+  if (state.kind === "saving") return "Saving…";
+  if (state.kind === "saved") return `Saved ${formatWhen(state.at)}`;
+  if (state.kind === "offline") return "Not saved yet: kept on this iPad";
+  return "";
 }
 
 const MIN_ZOOM = 1;
@@ -74,7 +123,8 @@ export function MarkupReviewer(
         ideaId: string;
         draftLabel: string;
         attachments: PanelAttachment[];
-        onClose: () => void;
+        // Called with the last save, when one is still on its way.
+        onClose: (saving?: Promise<void>) => void;
         onSubmitted: () => void;
       }
     | {
@@ -94,7 +144,7 @@ export function MarkupReviewer(
   const saveKey = storageKey(ideaId, fileIds);
 
   // ---- the marks -------------------------------------------------------------------------------
-  const [pages, setPagesState] = useState<Pages>(() => (drawing ? readSaved(saveKey) : {}));
+  const [pages, setPagesState] = useState<Pages>(() => (drawing ? (readLocal(saveKey)?.pages ?? {}) : {}));
   // The marks as they are right now, also between screen updates: a quick Pencil sweep can erase, lift
   // and undo before React has drawn the screen again, and every step must see the latest marks.
   const pagesRef = useRef(pages);
@@ -104,10 +154,10 @@ export function MarkupReviewer(
   }, []);
   const [history, setHistory] = useState<{ key: string; before: MarkupStroke[] }[]>([]);
   const [future, setFuture] = useState<{ key: string; before: MarkupStroke[] }[]>([]);
-  const [restored] = useState(() => drawing && Object.values(readSaved(saveKey)).some((strokes) => strokes.length > 0));
+  const [restored, setRestored] = useState<{ at: string | null } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Drawing needs nothing more; looking at a review waits for its marks to load.
-  const [viewLoaded, setViewLoaded] = useState(drawing);
+  // Drawing waits for the review saved so far (if any); looking at a review waits for its marks.
+  const [viewLoaded, setViewLoaded] = useState(false);
 
   // A submitted review's marks.
   useEffect(() => {
@@ -132,18 +182,180 @@ export function MarkupReviewer(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Unsent marks stay on this device until they are submitted, so a reload or a dropped connection
-  // doesn't lose them.
+  // ---- saving as you go -------------------------------------------------------------------------
+  // Every change is kept on this device straight away and saved to the server a moment later, privately
+  // (nobody else sees it until Submit). If the server can't be reached, the copy here is saved as soon
+  // as it can be, including next time the review is opened.
+  const [note, setNoteState] = useState(() => (drawing ? (readLocal(saveKey)?.note ?? "") : ""));
+  const noteRef = useRef(note);
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
+  const dirty = useRef(drawing ? Boolean(readLocal(saveKey)?.dirty) : false);
+  const edits = useRef(0);
+  const saving = useRef<Promise<void> | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finished = useRef(false);
+  const flushRef = useRef<() => void>(() => undefined);
+  const savedUrl = `${BASE_PATH}/api/content-board/ideas/${encodeURIComponent(ideaId)}/reviews/saved`;
+
+  const markedPages = useCallback(
+    (from: Pages) =>
+      allSlides
+        .map((slide, position) => ({ slide, position: position + 1, strokes: from[slideKey(slide)] ?? [] }))
+        .filter((page) => page.strokes.length > 0)
+        .map(({ slide, position, strokes }) => ({ ...slidePlace(slide), position, strokes })),
+    [allSlides],
+  );
+
+  const saveBody = useCallback(
+    () => JSON.stringify({ fileIds, note: noteRef.current, pages: markedPages(pagesRef.current) }),
+    [fileIds, markedPages],
+  );
+
+  const saveNow = useCallback(async (): Promise<void> => {
+    if (!drawing || finished.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    // One save at a time; a change made meanwhile is saved straight after.
+    if (saving.current) {
+      await saving.current;
+      if (dirty.current && !finished.current) return saveNow();
+      return;
+    }
+    const editsAtStart = edits.current;
+    setSaveState({ kind: "saving" });
+    const run = (async () => {
+      try {
+        const response = await fetch(savedUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: saveBody() });
+        if (!response.ok) throw new Error();
+        if (edits.current === editsAtStart) {
+          dirty.current = false;
+          writeLocal(saveKey, { pages: pagesRef.current, note: noteRef.current, dirty: false });
+        }
+        setSaveState({ kind: "saved", at: new Date().toISOString() });
+      } catch {
+        setSaveState({ kind: "offline" });
+        if (!finished.current) saveTimer.current = setTimeout(() => void saveNow(), RETRY_DELAY);
+      }
+    })();
+    saving.current = run;
+    await run;
+    saving.current = null;
+    if (dirty.current && edits.current !== editsAtStart && !finished.current && !saveTimer.current) {
+      saveTimer.current = setTimeout(() => void saveNow(), AUTOSAVE_DELAY);
+    }
+  }, [drawing, saveBody, saveKey, savedUrl]);
+
+  // Something changed: keep it here now, save it to the server shortly.
+  const edited = useCallback(() => {
+    if (!drawing) return;
+    edits.current += 1;
+    dirty.current = true;
+    writeLocal(saveKey, { pages: pagesRef.current, note: noteRef.current, dirty: true });
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => void saveNow(), AUTOSAVE_DELAY);
+    setSaveState((state) => (state.kind === "offline" ? state : { kind: "idle" }));
+  }, [drawing, saveKey, saveNow]);
+
+  const setNote = (value: string) => {
+    noteRef.current = value;
+    setNoteState(value);
+    edited();
+  };
+
+  // Opening: pick up the review saved so far. Changes on this device that never reached the server win
+  // (they are the newest work); otherwise the server's copy does, so a review started on another device
+  // carries on here.
+  useEffect(() => {
+    if (!drawing || loading) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    const giveUp = setTimeout(() => controller.abort(), 8000);
+    void (async () => {
+      const local = readLocal(saveKey);
+      const localHasMarks = Boolean(local && Object.values(local.pages).some((strokes) => strokes.length > 0));
+      try {
+        const response = await fetch(`${savedUrl}?files=${fileIds.join(",")}`, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error();
+        const { saved } = (await response.json()) as {
+          saved: { pages: { attachmentId: string; pageNumber: number; strokes: MarkupStroke[] }[]; note: string; updatedAt: string } | null;
+        };
+        if (cancelled) return;
+        if (local?.dirty) {
+          if (localHasMarks || local.note.trim()) setRestored({ at: null });
+          void saveNow();
+        } else if (saved) {
+          const fromServer = Object.fromEntries(saved.pages.map((page) => [markupPageKey(page.attachmentId, page.pageNumber), page.strokes])) as Pages;
+          setPages(fromServer);
+          noteRef.current = saved.note ?? "";
+          setNoteState(noteRef.current);
+          writeLocal(saveKey, { pages: fromServer, note: noteRef.current, dirty: false });
+          setSaveState({ kind: "saved", at: saved.updatedAt });
+          setRestored({ at: saved.updatedAt });
+        } else if (local) {
+          // Saved before, and gone from the server since: submitted or cleared on another device.
+          setPages({});
+          noteRef.current = "";
+          setNoteState("");
+          clearLocal(saveKey);
+        }
+      } catch {
+        if (cancelled) return;
+        // Offline: carry on with the copy on this device, and save it when the connection is back.
+        if (localHasMarks) setRestored({ at: null });
+        if (local?.dirty) {
+          setSaveState({ kind: "offline" });
+          saveTimer.current = setTimeout(() => void saveNow(), RETRY_DELAY);
+        }
+      } finally {
+        clearTimeout(giveUp);
+        if (!cancelled) setViewLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(giveUp);
+    };
+    // Runs once, when the pages have loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawing, loading]);
+
+  // Leaving (closing the tab, switching apps, the iPad locking): send what isn't saved yet. `keepalive`
+  // lets the save finish after the page has gone, within the browser's size limit for that.
   useEffect(() => {
     if (!drawing) return;
-    try {
-      const marked = Object.fromEntries(Object.entries(pages).filter(([, strokes]) => strokes.length > 0));
-      if (Object.keys(marked).length) window.localStorage.setItem(saveKey, JSON.stringify(marked));
-      else window.localStorage.removeItem(saveKey);
-    } catch {
-      // Storage can be unavailable (private browsing); the marks are just not kept then.
-    }
-  }, [drawing, pages, saveKey]);
+    const flush = () => {
+      if (!dirty.current || finished.current || saving.current) return;
+      const body = saveBody();
+      void fetch(savedUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body, keepalive: body.length < 60000 }).then(
+        (response) => {
+          if (response.ok && !finished.current) {
+            dirty.current = false;
+            writeLocal(saveKey, { pages: pagesRef.current, note: noteRef.current, dirty: false });
+          }
+        },
+        () => undefined,
+      );
+    };
+    flushRef.current = flush;
+    const onHidden = () => document.visibilityState === "hidden" && flush();
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [drawing, saveBody, saveKey, savedUrl]);
+
+  // Closed some other way (the Back button): send what isn't saved yet on the way out.
+  useEffect(
+    () => () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      flushRef.current();
+    },
+    [],
+  );
 
   // In view mode only the pages that were marked are shown.
   const slides = useMemo(
@@ -162,6 +374,7 @@ export function MarkupReviewer(
     setHistory((items) => [...items.slice(-199), { key, before }]);
     setFuture([]);
     setPages({ ...pagesRef.current, [key]: next });
+    edited();
   }
 
   function undo() {
@@ -172,6 +385,7 @@ export function MarkupReviewer(
     setHistory((items) => items.slice(0, -1));
     setFuture((items) => [...items, { key: last.key, before: current }]);
     setPages({ ...pagesRef.current, [last.key]: last.before });
+    edited();
   }
 
   function redo() {
@@ -181,6 +395,7 @@ export function MarkupReviewer(
     setFuture((items) => items.slice(0, -1));
     setHistory((items) => [...items, { key: next.key, before: current }]);
     setPages({ ...pagesRef.current, [next.key]: next.before });
+    edited();
   }
 
   // ---- tools -----------------------------------------------------------------------------------
@@ -230,6 +445,8 @@ export function MarkupReviewer(
 
   // Fingers on the page: one finger moves a zoomed page (or swipes to the next page), two fingers zoom.
   const touches = useRef(new Map<number, { x: number; y: number }>());
+  // When the Pencil last touched down or lifted, to tell a resting palm from a finger.
+  const penAt = useRef(-Infinity);
   const gesture = useRef<{ startDistance: number; startZoom: number; startMid: { x: number; y: number }; startView: typeof view; startX: number; startY: number } | null>(null);
 
   function startGesture() {
@@ -250,7 +467,7 @@ export function MarkupReviewer(
       if ((event.target as HTMLElement | null)?.tagName === "TEXTAREA") return;
       // Keys used here must not also reach the idea panel underneath (Escape would close it too).
       if (["Escape", "ArrowRight", "ArrowLeft"].includes(event.key)) event.stopPropagation();
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
       if (event.key === "ArrowRight") goTo(index + 1);
       if (event.key === "ArrowLeft") goTo(index - 1);
       if (drawing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
@@ -270,7 +487,6 @@ export function MarkupReviewer(
 
   // ---- submitting --------------------------------------------------------------------------------
   const [confirming, setConfirming] = useState(false);
-  const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -278,33 +494,40 @@ export function MarkupReviewer(
     if (props.mode !== "draw") return;
     setSubmitting(true);
     setSubmitError(null);
-    const marked = allSlides
-      .map((slide, position) => ({ slide, position: position + 1, strokes: pages[slideKey(slide)] ?? [] }))
-      .filter((page) => page.strokes.length > 0)
-      .map(({ slide, position, strokes }) => ({ ...slidePlace(slide), position, strokes }));
+    // No saving while submitting: a save landing after the submit would bring the saved copy back.
+    finished.current = true;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    if (saving.current) await saving.current;
+    const marked = markedPages(pagesRef.current);
     try {
       const response = await fetch(`${BASE_PATH}/api/content-board/ideas/${encodeURIComponent(ideaId)}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileIds, note: note.trim() || undefined, pages: marked }),
+        body: JSON.stringify({ fileIds, note: noteRef.current.trim() || undefined, pages: marked }),
       });
       const result = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Couldn't save the review. Please try again.");
-      try {
-        window.localStorage.removeItem(saveKey);
-      } catch {
-        // Nothing to clean up.
-      }
+      if (!response.ok) throw new Error(result.error ?? "Couldn't submit the review. Please try again.");
+      dirty.current = false;
+      clearLocal(saveKey);
       props.onSubmitted();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Couldn't save the review. Please try again.");
+      // Not submitted: carry on saving as before, so nothing drawn is lost.
+      finished.current = false;
+      if (dirty.current) void saveNow();
+      setSubmitError(
+        error instanceof Error
+          ? `${error.message} Your marks are saved and stay here.`
+          : "Couldn't submit the review. Your marks are saved and stay here.",
+      );
       setSubmitting(false);
     }
   }
 
   function requestClose() {
-    // Unsent marks are kept on this device, so closing loses nothing; just say so.
-    onClose();
+    // Everything is kept on this device and saved to the server; send what's left on the way out.
+    const pending = dirty.current || saving.current ? saveNow() : undefined;
+    onClose(pending);
   }
 
   const strokes = pages[currentKey] ?? [];
@@ -326,9 +549,11 @@ export function MarkupReviewer(
           <p className="truncate text-sm font-semibold">{drawing ? `Pencil review · ${draftLabel}` : props.reviewTitle}</p>
           <p className="truncate text-[11px] text-white/60">
             {drawing
-              ? penSeen
-                ? "Draw with the Pencil. Fingers move and zoom the page."
-                : "Draw with the Apple Pencil or a mouse. Fingers move and zoom the page; two fingers pinch to zoom."
+              ? saveState.kind === "offline"
+                ? "Not saved yet: no connection. Your marks are kept on this iPad and save when it's back."
+                : penSeen
+                  ? "Draw with the Pencil. Saves as you go; Submit is after the last page."
+                  : "Draw with the Apple Pencil or a mouse. Saves as you go; Submit is after the last page."
               : `${draftLabel} · marks on ${describePages(markedPositions)}`}
           </p>
         </div>
@@ -338,15 +563,21 @@ export function MarkupReviewer(
           </span>
         ) : null}
         {drawing ? (
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            disabled={markedPositions.length === 0}
-            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-40 sm:px-4"
-          >
-            <Send className="h-4 w-4" />
-            Submit{markedPositions.length ? ` (${markedPositions.length})` : ""}
-          </button>
+          <>
+            <span role="status" aria-live="polite" className={cn("hidden max-w-44 shrink-0 truncate text-right text-[11px] sm:inline", saveState.kind === "offline" ? "text-amber-300" : "text-white/60")}>
+              {saveStatusText(saveState)}
+            </span>
+            <button
+              type="button"
+              onClick={() => void saveNow()}
+              disabled={saveState.kind === "saving" || !viewLoaded}
+              title={saveStatusText(saveState) || "Save your marks so far"}
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-white/20 px-3 text-sm font-semibold transition-colors hover:bg-white/10 disabled:opacity-60"
+            >
+              {saveState.kind === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saveState.kind === "saving" ? "Saving…" : "Save"}
+            </button>
+          </>
         ) : (
           <>
             <button
@@ -457,7 +688,7 @@ export function MarkupReviewer(
 
       {restored && drawing ? (
         <p className="shrink-0 bg-amber-500/15 px-3 py-1.5 text-center text-xs text-amber-200">
-          Your unsent marks from last time are back. Keep going, or clear pages you don&apos;t need.
+          Your review so far is back{restored.at ? ` (saved ${formatWhen(restored.at)})` : ""}. Keep going, then Submit after the last page.
         </p>
       ) : null}
 
@@ -465,8 +696,20 @@ export function MarkupReviewer(
       <div
         ref={stageRef}
         className="relative min-h-0 flex-1 touch-none overflow-hidden"
+        onPointerDownCapture={(event) => {
+          // The Pencil touched down: whatever else is on the screen is the hand holding it. Stop treating
+          // it as a finger moving the page, or the page slides about between letters.
+          if (event.pointerType !== "pen" || !drawing) return;
+          penAt.current = performance.now();
+          touches.current.clear();
+          gesture.current = null;
+        }}
+        onPointerUpCapture={(event) => {
+          if (event.pointerType === "pen") penAt.current = performance.now();
+        }}
         onPointerDown={(event) => {
           if (event.pointerType !== "touch" || drawingNow.current) return;
+          if (drawing && performance.now() - penAt.current < PALM_GRACE) return;
           touches.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
           try {
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -547,6 +790,7 @@ export function MarkupReviewer(
                 tool={tool}
                 color={color}
                 fingerDraws={fingerDraws}
+                zoom={view.zoom}
                 onPenSeen={() => setPenSeen(true)}
                 onDrawingChange={(active) => {
                   drawingNow.current = active;
@@ -557,6 +801,7 @@ export function MarkupReviewer(
                     if (removed) {
                       setHistory((items) => [...items.slice(-199), { key: currentKey, before }]);
                       setFuture([]);
+                      edited();
                     }
                   }
                 }}
@@ -604,9 +849,30 @@ export function MarkupReviewer(
             );
           })}
         </div>
-        <button type="button" aria-label="Next page" onClick={() => goTo(index + 1)} disabled={index >= slides.length - 1} className={cn(toolButton, "hover:bg-white/10 disabled:opacity-30")}>
-          <ChevronRight className="h-5 w-5" />
-        </button>
+        {drawing && slides.length > 0 && index >= slides.length - 1 ? (
+          // The end of the post or carousel: the only place to send the review, once every page is seen.
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            disabled={markedPositions.length === 0 || !viewLoaded}
+            title={markedPositions.length === 0 ? "Draw on a page first" : undefined}
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-40 sm:px-4"
+          >
+            <Send className="h-4 w-4" />
+            Submit review{markedPositions.length ? ` (${markedPositions.length})` : ""}
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label="Next page"
+            onClick={() => goTo(index + 1)}
+            disabled={index >= slides.length - 1}
+            className={cn(drawing ? "inline-flex h-10 shrink-0 items-center gap-1 rounded-md px-2.5 text-sm" : toolButton, "hover:bg-white/10 disabled:opacity-30")}
+          >
+            {drawing ? <span className="hidden text-xs text-white/70 sm:inline">Next</span> : null}
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Submit */}
@@ -615,13 +881,15 @@ export function MarkupReviewer(
           <div className="w-full max-w-md rounded-t-lg border border-white/10 bg-neutral-800 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-lg">
             <h2 className="text-base font-semibold">Submit your review</h2>
             <p className="mt-1 text-sm text-white/70">
-              Your marks on {describePages(markedPositions)} of {draftLabel} go to the team, with a review comment.
+              Your marks on {describePages(markedPositions)} of {draftLabel} go to the team, with a review comment. Until
+              you submit, only you can see them.
             </p>
             <label className="mt-3 block text-xs text-white/70">
               Note for the team (optional)
               <textarea
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
+                onBlur={() => dirty.current && void saveNow()}
                 rows={3}
                 maxLength={3000}
                 placeholder="Anything to add to your marks…"

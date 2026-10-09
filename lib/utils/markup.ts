@@ -41,18 +41,21 @@ export const PEN_WIDTH = 0.0045;
 export const HIGHLIGHTER_WIDTH = 0.028;
 export const HIGHLIGHTER_OPACITY = 0.45;
 
-// Width for a stroke from how hard the Pencil was pressed (0 to 1; a mouse reports 0.5).
-export function strokeWidth(tool: MarkupTool, averagePressure: number) {
+// Width for a stroke from how hard the Pencil was pressed (0 to 1; a mouse reports 0.5). A pen line keeps
+// the same thickness on screen at any zoom, like Apple's own Markup: zoom in to write small and neatly. The
+// highlighter stays the width of a line of text on the page.
+export function strokeWidth(tool: MarkupTool, averagePressure: number, zoom = 1) {
   if (tool === "highlighter") return HIGHLIGHTER_WIDTH;
   const pressure = Number.isFinite(averagePressure) && averagePressure > 0 ? Math.min(1, averagePressure) : 0.5;
-  return Number((PEN_WIDTH * (0.55 + pressure * 0.9)).toFixed(5));
+  const scale = Number.isFinite(zoom) && zoom > 1 ? zoom : 1;
+  return Number(Math.max(0.0008, (PEN_WIDTH * (0.55 + pressure * 0.9)) / scale).toFixed(5));
 }
 
 const round = (value: number) => Math.round(value * 10000) / 10000;
 
 // Drops points that add nothing (closer than `minStep` to the last one kept) and rounds the rest, so a
 // review stays small to save and quick to draw. The last point is always kept.
-export function simplifyPoints(points: number[], minStep = 0.0012): number[] {
+export function simplifyPoints(points: number[], minStep = 0.0005): number[] {
   if (points.length < 4) return points.map(round);
   const kept: number[] = [round(points[0]), round(points[1])];
   for (let i = 2; i < points.length; i += 2) {
@@ -68,17 +71,22 @@ export function simplifyPoints(points: number[], minStep = 0.0012): number[] {
   return kept;
 }
 
-// The stroke as an SVG path, for a page drawn `width` by `height` units. A single dot becomes a tiny line
-// so it still shows.
+// The stroke as an SVG path, for a page drawn `width` by `height` units. The line runs in smooth curves
+// through the middle of each step (the points the Pencil reports are joined up the way a pen would move,
+// not with straight, jagged pieces). A single dot becomes a tiny line so it still shows.
 export function strokePath(points: number[], width: number, height: number) {
   if (points.length < 2) return "";
-  const parts: string[] = [];
-  for (let i = 0; i < points.length; i += 2) {
-    const x = (points[i] * width).toFixed(2);
-    const y = (points[i + 1] * height).toFixed(2);
-    parts.push(`${i === 0 ? "M" : "L"}${x} ${y}`);
+  const x = (i: number) => points[i * 2] * width;
+  const y = (i: number) => points[i * 2 + 1] * height;
+  const f = (value: number) => value.toFixed(2);
+  const count = points.length / 2;
+  if (count === 1) return `M${f(x(0))} ${f(y(0))} L${f(x(0) + 0.01)} ${f(y(0))}`;
+  if (count === 2) return `M${f(x(0))} ${f(y(0))} L${f(x(1))} ${f(y(1))}`;
+  const parts = [`M${f(x(0))} ${f(y(0))}`];
+  for (let i = 1; i < count - 1; i++) {
+    parts.push(`Q${f(x(i))} ${f(y(i))} ${f((x(i) + x(i + 1)) / 2)} ${f((y(i) + y(i + 1)) / 2)}`);
   }
-  if (points.length === 2) parts.push(`L${(points[0] * width + 0.01).toFixed(2)} ${(points[1] * height).toFixed(2)}`);
+  parts.push(`L${f(x(count - 1))} ${f(y(count - 1))}`);
   return parts.join(" ");
 }
 

@@ -4,7 +4,12 @@ import { createNotification } from "@/lib/services/notification-service";
 import { addReviewPoint } from "@/lib/services/content-review-service";
 import { describePages, type MarkupStroke } from "@/lib/utils/markup";
 import { MAX_REVIEW_POINT_LENGTH } from "@/lib/utils/content-board";
-import { markupSubmissionSchema, type MarkupSubmissionInput } from "@/lib/validation/content-idea-schema";
+import {
+  markupDraftSchema,
+  markupSubmissionSchema,
+  type MarkupDraftInput,
+  type MarkupSubmissionInput,
+} from "@/lib/validation/content-idea-schema";
 
 import type { MarkupReviewPage, MarkupReviewSummary } from "@/lib/utils/markup";
 export type { MarkupReviewPage, MarkupReviewSummary };
@@ -92,7 +97,102 @@ export async function submitMarkupReview(
     ),
   );
 
+  // The review is in; the copy saved while drawing it isn't needed any more.
+  await supabase
+    .from("content_idea_review_drafts")
+    .delete()
+    .eq("idea_id", idea.id)
+    .eq("user_id", input.userId)
+    .eq("file_ids", toPgArray(submission.fileIds));
+
   return { reviewId: review.id as string };
+}
+
+// Postgres array literal for matching a uuid[] column exactly.
+const toPgArray = (ids: string[]) => `{${ids.join(",")}}`;
+
+export type SavedMarkupReview = {
+  fileIds: string[];
+  pages: MarkupDraftInput["pages"];
+  note: string;
+  updatedAt: string;
+};
+
+// The reviewer's own review of a draft, saved part-way through (nobody else can read it).
+export async function getSavedMarkupReview(
+  supabase: SupabaseClient<any>,
+  input: { ideaId: string; userId: string; fileIds: string[] },
+): Promise<SavedMarkupReview | null> {
+  const { data, error } = await supabase
+    .from("content_idea_review_drafts")
+    .select("file_ids, pages, note, updated_at")
+    .eq("idea_id", input.ideaId)
+    .eq("user_id", input.userId)
+    .eq("file_ids", toPgArray(input.fileIds))
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { fileIds: data.file_ids ?? [], pages: data.pages ?? [], note: data.note ?? "", updatedAt: data.updated_at };
+}
+
+// Saves the review so far. Saving nothing (every mark erased, no note) removes the saved copy.
+export async function saveMarkupReview(
+  supabase: SupabaseClient<any>,
+  input: { workspaceId: string; userId: string; draft: MarkupDraftInput },
+): Promise<{ updatedAt: string | null }> {
+  const draft = markupDraftSchema.parse(input.draft);
+  const note = draft.note?.trim() ? draft.note : null;
+  if (!draft.pages.length && !note) {
+    await discardSavedMarkupReview(supabase, { ideaId: draft.ideaId, userId: input.userId, fileIds: draft.fileIds });
+    return { updatedAt: null };
+  }
+  const { data, error } = await supabase
+    .from("content_idea_review_drafts")
+    .upsert(
+      {
+        idea_id: draft.ideaId,
+        workspace_id: input.workspaceId,
+        user_id: input.userId,
+        file_ids: draft.fileIds,
+        pages: draft.pages,
+        note,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "idea_id,user_id,file_ids" },
+    )
+    .select("updated_at")
+    .single();
+  if (error) throw error;
+  return { updatedAt: data.updated_at as string };
+}
+
+export async function discardSavedMarkupReview(
+  supabase: SupabaseClient<any>,
+  input: { ideaId: string; userId: string; fileIds: string[] },
+) {
+  const { error } = await supabase
+    .from("content_idea_review_drafts")
+    .delete()
+    .eq("idea_id", input.ideaId)
+    .eq("user_id", input.userId)
+    .eq("file_ids", toPgArray(input.fileIds));
+  if (error) throw error;
+}
+
+// Which drafts of an idea the reviewer has an unfinished review of, for "Continue your Pencil review".
+export async function listMySavedMarkupReviews(supabase: SupabaseClient<any>, ideaId: string, userId: string) {
+  const { data, error } = await supabase
+    .from("content_idea_review_drafts")
+    .select("file_ids, pages, updated_at")
+    .eq("idea_id", ideaId)
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: { file_ids: string[]; pages: unknown[] | null; updated_at: string }) => ({
+    fileIds: row.file_ids ?? [],
+    pageCount: (row.pages ?? []).length,
+    updatedAt: row.updated_at,
+  }));
 }
 
 // Every Pencil review of an idea, newest first, without the strokes (those load when a review is opened).
