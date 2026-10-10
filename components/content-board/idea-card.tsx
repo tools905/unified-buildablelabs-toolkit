@@ -186,6 +186,10 @@ export function IdeaCard({
       onDragStart={canDrag ? onDragStart : undefined}
       onDragEnd={canDrag ? onDragEnd : undefined}
       onClick={onOpen}
+      // On a phone or iPad there is no resting pointer: start loading the panel as the finger lands.
+      onPointerDown={(event) => {
+        if (event.pointerType !== "mouse") prefetchPanel(idea.id);
+      }}
       data-active={active ? "true" : undefined}
       aria-current={active ? "true" : undefined}
       onMouseEnter={warmUp}

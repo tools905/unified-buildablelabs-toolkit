@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   // worker, fonts and character maps by path, which the build can't see, so they are listed for the routes that
   // draw or open PDFs.
   outputFileTracingIncludes: Object.fromEntries(
-    ["/api/mcp", "/api/mcp-upload/[token]/complete"].map((route) => [
+    ["/api/mcp", "/api/mcp-upload/[token]/complete", "/api/content-board/attachments/[attachmentId]/pages"].map((route) => [
       route,
       [
         "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",

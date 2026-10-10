@@ -6,8 +6,65 @@ import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs
 import { Button } from "@/components/ui/button";
 
 // Show one PDF page at a time, like flipping through a carousel. Give it a `key`
-// of the URL so switching files starts fresh.
-export function PdfViewer({ url }: { url: string }) {
+// of the URL so switching files starts fresh. With `pages` (the PDF's page pictures) those are shown
+// instead: only the page on screen and the next one are downloaded, and nothing has to be drawn, which
+// is far quicker on a phone than reading the whole PDF.
+export function PdfViewer({ url, pages }: { url: string; pages?: { url: string; width: number; height: number }[] }) {
+  if (pages?.length) return <PagePictures pages={pages} />;
+  return <PdfCanvasViewer url={url} />;
+}
+
+function PagePictures({ pages }: { pages: { url: string; width: number; height: number }[] }) {
+  const [page, setPage] = useState(1);
+  const [loaded, setLoaded] = useState<Set<number>>(() => new Set());
+  const current = pages[page - 1];
+  return (
+    <div className="flex h-full flex-col">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+        {loaded.has(page) ? null : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URLs, not a fixed host */}
+        <img
+          key={current.url}
+          src={current.url}
+          alt={`PDF page ${page}`}
+          width={current.width}
+          height={current.height}
+          onLoad={() => setLoaded((value) => new Set(value).add(page))}
+          className="block h-full w-full object-contain"
+        />
+        {/* The next page loads in the background, so turning to it is instant. */}
+        {pages[page] ? (
+          // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URLs, not a fixed host
+          <img src={pages[page].url} alt="" aria-hidden="true" className="hidden" onLoad={() => setLoaded((value) => new Set(value).add(page + 1))} />
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center justify-between border-t border-border bg-card px-2 py-1.5 text-xs text-muted-foreground">
+        <Button type="button" variant="ghost" size="sm" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span>
+          Page {page} of {pages.length}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label="Next page"
+          disabled={page >= pages.length}
+          onClick={() => setPage((value) => value + 1)}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PdfCanvasViewer({ url }: { url: string }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);

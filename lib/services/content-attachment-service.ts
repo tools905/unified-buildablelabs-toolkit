@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContentAttachmentKind } from "@/lib/db/types";
 import { CONTENT_BUCKET, MAX_ATTACHMENTS_PER_IDEA } from "@/lib/utils/content-board";
+import type { PageImageInfo } from "@/lib/utils/page-images";
+
+// Every stored file of an attachment: the file, its small picture and its page pictures.
+const storedPaths = (row: Pick<ContentAttachmentRow, "storage_path" | "thumb_path" | "page_images">) =>
+  [row.storage_path, row.thumb_path, ...(row.page_images ?? []).map((page) => page.path)].filter((path): path is string => Boolean(path));
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -18,6 +23,8 @@ export type ContentAttachmentRow = {
   uploaded_via: string | null;
   created_by: string;
   created_at: string;
+  page_images?: PageImageInfo[] | null;
+  page_count?: number | null;
 };
 
 export async function listAttachments(supabase: SupabaseClient<any>, ideaId: string): Promise<ContentAttachmentRow[]> {
@@ -154,13 +161,13 @@ export async function addLinkAttachment(
 export async function removeAttachment(supabase: SupabaseClient<any>, attachmentId: string) {
   const { data: row, error: readError } = await supabase
     .from("content_idea_attachments")
-    .select("id, storage_path, thumb_path")
+    .select("id, storage_path, thumb_path, page_images")
     .eq("id", attachmentId)
     .maybeSingle();
   if (readError) throw readError;
   if (!row) return;
 
-  const paths = [row.storage_path, row.thumb_path].filter((path): path is string => Boolean(path));
+  const paths = storedPaths(row);
   if (paths.length) {
     const { error: storageError } = await supabase.storage.from(CONTENT_BUCKET).remove(paths);
     if (storageError) throw storageError;
@@ -179,7 +186,7 @@ export async function removeStoredFilesForIdea(supabase: SupabaseClient<any>, id
   const { data: idea } = await supabase.from("content_ideas").select("workspace_id").eq("id", ideaId).maybeSingle();
   if (idea?.workspace_id) await removeIdeaExports(supabase, idea.workspace_id, ideaId);
   const rows = await listAttachments(supabase, ideaId);
-  const paths = rows.flatMap((row) => [row.storage_path, row.thumb_path]).filter((path): path is string => Boolean(path));
+  const paths = rows.flatMap(storedPaths);
   if (paths.length === 0) return;
   const { error } = await supabase.storage.from(CONTENT_BUCKET).remove(paths);
   if (error) throw error;
@@ -190,14 +197,14 @@ export async function cleanupPostedContentFiles(supabase: SupabaseClient<any>, o
   const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("content_idea_attachments")
-    .select("id, idea_id, workspace_id, storage_path, thumb_path, content_ideas!inner(status, posted_at)")
+    .select("id, idea_id, workspace_id, storage_path, thumb_path, page_images, content_ideas!inner(status, posted_at)")
     .neq("kind", "link")
     .eq("content_ideas.status", "posted")
     .lt("content_ideas.posted_at", cutoff);
   if (error) throw error;
 
   const rows = data ?? [];
-  const paths = rows.flatMap((row) => [row.storage_path, row.thumb_path]).filter((path): path is string => Boolean(path));
+  const paths = rows.flatMap(storedPaths);
   for (let i = 0; i < paths.length; i += 100) {
     const { error: storageError } = await supabase.storage.from(CONTENT_BUCKET).remove(paths.slice(i, i + 100));
     if (storageError) throw storageError;

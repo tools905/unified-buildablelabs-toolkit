@@ -45,7 +45,7 @@ export function PreviewViewer({
           <img src={current.url} alt={current.fileName ?? "Slide"} className="h-full w-full object-contain" />
         ) : null}
 
-        {current.kind === "pdf" && current.url ? <PdfViewer key={current.id} url={current.url} /> : null}
+        {current.kind === "pdf" && current.url ? <PdfViewer key={current.id} url={current.url} pages={current.pages} /> : null}
 
         {current.kind === "link" ? (
           current.embedUrl ? (

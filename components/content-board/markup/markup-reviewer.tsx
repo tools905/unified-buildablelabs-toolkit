@@ -42,10 +42,7 @@ type Pages = Record<string, MarkupStroke[]>;
 
 // Where a slide came from: the uploaded file and, for a PDF, which page.
 function slidePlace(slide: LoadedSlide) {
-  return {
-    attachmentId: slide.pdf ? slide.id.split(":p")[0] : slide.id,
-    pageNumber: slide.pdf?.pageNumber ?? 1,
-  };
+  return { attachmentId: slide.place.attachmentId, pageNumber: slide.place.pageNumber };
 }
 const slideKey = (slide: LoadedSlide) => {
   const place = slidePlace(slide);

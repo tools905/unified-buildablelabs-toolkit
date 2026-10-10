@@ -6,6 +6,7 @@ import * as reviewService from "@/lib/services/content-review-service";
 import { listMarkupReviews, listMySavedMarkupReviews } from "@/lib/services/content-markup-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { toEmbedUrl } from "@/lib/utils/design-links";
+import { pageImagesReady } from "@/lib/utils/page-images";
 import type { IdeaPanelData } from "@/components/content-board/types";
 
 // Everything the idea side panel shows: files (with signed links), review points and history.
@@ -40,7 +41,12 @@ export async function getIdeaPanelData(
     attachmentService.signPaths(
       supabase,
       attachments
-        .flatMap((item) => [item.storage_path, item.thumb_path])
+        .flatMap((item) => [
+          item.storage_path,
+          item.thumb_path,
+          // A PDF's page pictures, once every page has one (until then the PDF itself is shown).
+          ...(item.kind === "pdf" && pageImagesReady(item.page_images, item.page_count) ? (item.page_images ?? []).map((page) => page.path) : []),
+        ])
         .filter((path): path is string => Boolean(path)),
     ),
   ]);
@@ -72,6 +78,13 @@ export async function getIdeaPanelData(
       createdAt: item.created_at,
       uploaderName: nameOf(item.created_by),
       uploadedVia: item.uploaded_via ?? null,
+      ...(item.kind === "pdf"
+        ? pageImagesReady(item.page_images, item.page_count)
+          ? {
+              pages: (item.page_images ?? []).map((page) => ({ url: signed.get(page.path) ?? "", width: page.width, height: page.height })),
+            }
+          : { pagesPending: true }
+        : {}),
     })),
     markupReviews,
     savedMarkupReviews,

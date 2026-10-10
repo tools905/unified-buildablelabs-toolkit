@@ -71,6 +71,10 @@ export type PanelAttachment = {
   uploaderName: string;
   // The app it came through (a connected AI app), or null when it was added on the board.
   uploadedVia: string | null;
+  // A PDF's pages as pictures, much lighter to show than the PDF itself. Missing until they've been
+  // drawn; `pagesPending` then asks the board to have them drawn.
+  pages?: { url: string; width: number; height: number }[];
+  pagesPending?: boolean;
 };
 
 export type PanelReviewPoint = {

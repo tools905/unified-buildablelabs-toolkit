@@ -26,6 +26,7 @@ import {
 import type { ContentIdeaStatus } from "@/lib/db/types";
 import { loadPanel, peekFreshPanel, peekPanel, storePanel } from "@/components/content-board/panel-cache";
 import { removeAttachmentAction } from "@/app/tools/content-board/actions";
+import { requestPageImages } from "@/components/content-board/request-page-images";
 
 // Signed links last an hour; reuse them for 45 minutes so refreshing the panel
 // (after adding a point, say) doesn't make images reload or the PDF restart.
@@ -146,6 +147,12 @@ export function IdeaPanel({
   }, [serverStatus, idea.status, router]);
 
   const attachments = data?.attachments ?? [];
+  // PDFs without page pictures yet (new uploads, or ones added through a connected app) get them drawn,
+  // so the next time anyone opens the idea the pages show straight away.
+  const pendingPages = attachments.filter((item) => item.pagesPending).map((item) => item.id).join(",");
+  useEffect(() => {
+    pendingPages.split(",").filter(Boolean).forEach(requestPageImages);
+  }, [pendingPages]);
   const drafts = groupUploads(attachments);
   const latestDraft = drafts[drafts.length - 1] ?? null;
   const index = Math.min(chosenIndex ?? latestDraft?.items[0]?.index ?? 0, Math.max(0, attachments.length - 1));

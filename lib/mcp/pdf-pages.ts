@@ -98,6 +98,40 @@ export async function renderPdfThumbnail(pdf: Uint8Array): Promise<Uint8Array | 
   }
 }
 
+export type PageImage = { bytes: Uint8Array; width: number; height: number };
+
+// Opens a PDF to draw its pages one at a time as WebP pictures (the board's page pictures, see
+// content-page-images-service.ts). Throws when the PDF can't be opened. Call close() when done.
+export async function openPdfForPictures(pdf: Uint8Array) {
+  await loadDrawingSurface();
+  const pdfjs = await loadPdfjs();
+  const task = pdfjs.getDocument(openOptions(pdf));
+  try {
+    const doc = (await task.promise) as unknown as OpenedPdf & { numPages: number };
+    return {
+      pageCount: doc.numPages,
+      async drawPage(number: number, longestSide: number, quality = 82): Promise<PageImage> {
+        const page = await doc.getPage(number);
+        try {
+          const base = page.getViewport({ scale: 1 });
+          const viewport = page.getViewport({ scale: longestSide / Math.max(base.width, base.height) });
+          const width = Math.max(1, Math.round(viewport.width));
+          const height = Math.max(1, Math.round(viewport.height));
+          const { canvas, context } = (doc.canvasFactory as DrawingSurface).create(width, height);
+          await page.render({ canvasContext: context, canvas, viewport }).promise;
+          return { bytes: canvas.toBuffer("image/webp", quality), width, height };
+        } finally {
+          page.cleanup();
+        }
+      },
+      close: () => task.destroy(),
+    };
+  } catch (error) {
+    await task.destroy();
+    throw error;
+  }
+}
+
 export type RenderedPages = { pageCount: number; firstPage: number; lastPage: number; images: McpImage[] };
 
 export async function renderPdfPages(pdf: Uint8Array, firstPage: number, lastPage: number | undefined): Promise<RenderedPages> {

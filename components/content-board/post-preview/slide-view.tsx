@@ -55,7 +55,15 @@ export function SlideView({ slide, near }: { slide: LoadedSlide; near: boolean }
     <div ref={boxRef} className="relative h-full w-full overflow-hidden bg-neutral-200">
       {slide.url ? (
         // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URLs, not a fixed host
-        <img src={slide.url} alt={slide.label} draggable={false} className="h-full w-full select-none object-cover" />
+        <img
+          src={slide.url}
+          alt={slide.label}
+          draggable={false}
+          // Pages far from the one on screen load when they come close.
+          loading={near ? "eager" : "lazy"}
+          decoding="async"
+          className="h-full w-full select-none object-cover"
+        />
       ) : null}
       {pdf ? (
         <canvas

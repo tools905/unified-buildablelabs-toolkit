@@ -9,6 +9,8 @@ import type { PreviewSlide } from "@/lib/utils/social-preview";
 export type LoadedSlide = PreviewSlide & {
   url?: string;
   pdf?: { doc: PDFDocumentProxy; pageNumber: number };
+  // The uploaded file and page this slide shows (a PDF page may be shown as its picture).
+  place: { attachmentId: string; pageNumber: number };
 };
 
 // Pages beyond this are left out of the preview (the viewer still shows the whole PDF).
@@ -29,7 +31,8 @@ function loadImage(url: string): Promise<{ width: number; height: number }> {
 // a PDF is one slide per page. Design links are counted but can't be shown.
 export function usePostSlides(attachments: PanelAttachment[]) {
   const usable = attachments.filter((item) => item.kind !== "link" && item.url);
-  const key = usable.map((item) => `${item.id}:${item.fileName ?? ""}`).join("|");
+  // Page pictures arriving later (once drawn) change how a PDF is shown, so they're part of the key.
+  const key = usable.map((item) => `${item.id}:${item.fileName ?? ""}:${item.pages?.length ?? 0}`).join("|");
   const [result, setResult] = useState<Result | null>(null);
   // The signed addresses change every time the panel reloads, so the latest ones are read from here
   // when a load starts, while the load itself only restarts when the set of files changes.
@@ -53,7 +56,28 @@ export function usePostSlides(attachments: PanelAttachment[]) {
         try {
           if (file.kind === "image" && file.url) {
             const { width, height } = await loadImage(file.url);
-            slides.push({ id: file.id, source: "image", width, height, label: file.fileName ?? "Image", url: file.url });
+            slides.push({
+              id: file.id,
+              source: "image",
+              width,
+              height,
+              label: file.fileName ?? "Image",
+              url: file.url,
+              place: { attachmentId: file.id, pageNumber: 1 },
+            });
+          } else if (file.kind === "pdf" && file.pages?.length) {
+            // The pages as pictures: nothing to download up front but what's on screen, nothing to draw.
+            file.pages.slice(0, MAX_PREVIEW_PAGES).forEach((page, index) => {
+              slides.push({
+                id: `${file.id}:p${index + 1}`,
+                source: "pdf",
+                width: page.width,
+                height: page.height,
+                label: `${file.fileName ?? "PDF"} · page ${index + 1}`,
+                url: page.url,
+                place: { attachmentId: file.id, pageNumber: index + 1 },
+              });
+            });
           } else if (file.kind === "pdf" && file.url) {
             const pdfjs = await import("pdfjs-dist");
             pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -72,6 +96,7 @@ export function usePostSlides(attachments: PanelAttachment[]) {
                 height: Math.round(view.height),
                 label: `${file.fileName ?? "PDF"} · page ${number}`,
                 pdf: { doc, pageNumber: number },
+                place: { attachmentId: file.id, pageNumber: number },
               });
             }
           }
