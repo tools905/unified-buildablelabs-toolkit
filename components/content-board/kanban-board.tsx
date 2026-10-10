@@ -81,10 +81,10 @@ export function KanbanBoard({
   );
 
   // A column takes the card being dragged only if this person may make that move (see canMoveIdea):
-  // admins anywhere, everyone else between Shortlisted, In Progress and Posted.
+  // admins anywhere, everyone else between Feedback, Shortlisted, In Progress and Posted.
   const draggingIdea = draggingId ? (ideas.find((idea) => idea.id === draggingId) ?? null) : null;
   const canDropOn = (status: ContentIdeaStatus) =>
-    draggingIdea !== null && (draggingIdea.status === status || canMoveIdea({ from: draggingIdea.status, to: status, isAdmin }));
+    draggingIdea !== null && (draggingIdea.status === status || canMoveIdea({ from: draggingIdea.status, to: status, isAdmin, openReviewCount: draggingIdea.open_review_count }));
 
   function handleDrop(status: ContentIdeaStatus) {
     if (!draggingId || !canDropOn(status)) {

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { canMoveIdea, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
+import { canMoveIdea, openPointsText, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
 import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
@@ -317,9 +317,24 @@ export async function moveContentIdea(
     }
     return idea;
   }
-  if (!canMoveIdea({ from: idea.status, to, isAdmin })) {
+  // A team member shortlists only once every review point is fixed.
+  let openReviewCount = 0;
+  if (!isAdmin && idea.status === "feedback" && to === "approved") {
+    const { count, error: countError } = await supabase
+      .from("content_idea_review_points")
+      .select("id", { count: "exact", head: true })
+      .eq("idea_id", ideaId)
+      .eq("is_resolved", false);
+    if (countError) throw countError;
+    openReviewCount = count ?? 0;
+  }
+  if (!canMoveIdea({ from: idea.status, to, isAdmin, openReviewCount })) {
     throw new Error(
-      isAdmin ? "That move isn't allowed from here." : "Only admins can move an idea into or out of that column.",
+      isAdmin
+        ? "That move isn't allowed from here."
+        : openReviewCount > 0
+          ? `${openPointsText(openReviewCount)}. Mark ${openReviewCount === 1 ? "it" : "them"} as fixed, then shortlist.`
+          : "Only admins can move an idea into or out of that column.",
     );
   }
   const moved = await updateContentIdea(supabase, workspaceId, ideaId, actorId, {

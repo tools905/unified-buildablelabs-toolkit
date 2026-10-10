@@ -16,8 +16,9 @@ export type MoveIdea = (
 ) => Promise<string | null>;
 
 // Where the idea is in Ideas → Feedback → Shortlisted → In Progress → Posted, and the one step this
-// person can take next. Admins shortlist (optionally choosing the posting day, which puts it on the
-// calendar); the assigned people start it and mark it posted.
+// person can take next. Anyone can shortlist from Feedback (team members once every review point is
+// fixed), optionally choosing the posting day, which puts it on the calendar; then start it and mark it
+// posted.
 export function StageActions({
   idea,
   isAdmin,

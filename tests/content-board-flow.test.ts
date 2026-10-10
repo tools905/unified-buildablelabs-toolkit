@@ -10,8 +10,11 @@ describe("who can move an idea between columns", () => {
     expect(canMoveIdea({ from: "posted", to: "feedback", isAdmin: true })).toBe(true);
   });
 
-  it("lets anyone on the team take a shortlisted idea through to posted, and one step back", () => {
+  it("lets anyone on the team take an idea from Feedback through to Posted, and one step back", () => {
     const member = { isAdmin: false };
+    expect(canMoveIdea({ from: "feedback", to: "approved", ...member })).toBe(true);
+    expect(canMoveIdea({ from: "approved", to: "feedback", ...member })).toBe(true);
+    expect(canTeamMoveFrom("feedback")).toBe(true);
     expect(canMoveIdea({ from: "approved", to: "in_progress", ...member })).toBe(true);
     expect(canMoveIdea({ from: "in_progress", to: "posted", ...member })).toBe(true);
     expect(canMoveIdea({ from: "in_progress", to: "approved", ...member })).toBe(true);
@@ -20,14 +23,18 @@ describe("who can move an idea between columns", () => {
     expect(canTeamMoveFrom("posted")).toBe(true);
   });
 
-  it("keeps shortlisting and every other move with admins", () => {
+  it("lets a team member shortlist only once every review point is fixed (admins anyway)", () => {
+    expect(canMoveIdea({ from: "feedback", to: "approved", isAdmin: false, openReviewCount: 1 })).toBe(false);
+    expect(canMoveIdea({ from: "feedback", to: "approved", isAdmin: true, openReviewCount: 3 })).toBe(true);
+  });
+
+  it("keeps every other move with admins", () => {
     const member = { isAdmin: false };
-    expect(canMoveIdea({ from: "feedback", to: "approved", ...member })).toBe(false);
     expect(canMoveIdea({ from: "idea", to: "feedback", ...member })).toBe(false);
+    expect(canMoveIdea({ from: "idea", to: "approved", ...member })).toBe(false);
+    expect(canMoveIdea({ from: "feedback", to: "in_progress", ...member })).toBe(false);
     expect(canMoveIdea({ from: "approved", to: "posted", ...member })).toBe(false);
-    expect(canMoveIdea({ from: "approved", to: "feedback", ...member })).toBe(false);
     expect(canTeamMoveFrom("idea")).toBe(false);
-    expect(canTeamMoveFrom("feedback")).toBe(false);
   });
 
   it("treats a move to the same column as no move", () => {
@@ -45,7 +52,14 @@ describe("the next step shown on an idea", () => {
       note: expect.stringContaining("2 review points are still open"),
     });
     expect(nextStep({ ...base, status: "feedback", isAdmin: true })).toEqual({ kind: "move", to: "approved", label: "Shortlist" });
-    expect(nextStep({ ...base, status: "feedback" })).toMatchObject({ kind: "wait" });
+  });
+
+  it("lets a team member shortlist from Feedback once the review points are fixed", () => {
+    expect(nextStep({ ...base, status: "feedback" })).toEqual({ kind: "move", to: "approved", label: "Shortlist" });
+    expect(nextStep({ ...base, status: "feedback", openReviewCount: 1 })).toEqual({
+      kind: "wait",
+      reason: "1 review point is still open. Mark it as fixed to shortlist it.",
+    });
   });
 
   it("lets anyone start a shortlisted idea and then mark it posted", () => {

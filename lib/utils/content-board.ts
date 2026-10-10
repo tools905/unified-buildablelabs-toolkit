@@ -72,22 +72,27 @@ export function checkAttachmentFile(file: { type: string; size: number }): strin
 
 // Who may move an idea from one column to another.
 //  - Ideas → Feedback happens by itself when the first review point is added.
-//  - Ideas or Feedback → Shortlisted is an admin's call ("satisfied with the changes"). Open review
-//    points are pointed out but don't stop an admin who is satisfied anyway.
-//  - Shortlisted → In Progress → Posted can be done by anyone on the team, and anyone can take one
-//    step back (In Progress → Shortlisted, Posted → In Progress) to undo a click made by mistake.
+//  - Feedback → Shortlisted → In Progress → Posted can be done by anyone on the team, and anyone can
+//    take one step back (Shortlisted → Feedback, In Progress → Shortlisted, Posted → In Progress) to
+//    undo a click made by mistake.
+//  - A team member shortlists only once every review point is marked fixed. An admin can shortlist
+//    anyway (open points are pointed out), and can shortlist straight from Ideas.
 //  - Admins can move any card anywhere.
 const TEAM_MOVES: Partial<Record<ContentIdeaStatus, ContentIdeaStatus[]>> = {
-  approved: ["in_progress"],
+  feedback: ["approved"],
+  approved: ["in_progress", "feedback"],
   in_progress: ["posted", "approved"],
   posted: ["in_progress"],
 };
 
-export function canMoveIdea(input: { from: ContentIdeaStatus; to: ContentIdeaStatus; isAdmin: boolean }) {
+export function canMoveIdea(input: { from: ContentIdeaStatus; to: ContentIdeaStatus; isAdmin: boolean; openReviewCount?: number }) {
   if (input.from === input.to) return false;
   if (input.isAdmin) return true;
+  if (input.from === "feedback" && input.to === "approved" && (input.openReviewCount ?? 0) > 0) return false;
   return TEAM_MOVES[input.from]?.includes(input.to) ?? false;
 }
+
+export const openPointsText = (count: number) => `${count} review ${count === 1 ? "point is" : "points are"} still open`;
 
 // Whether a team member can pick a card up at all (to drag it between columns).
 export function canTeamMoveFrom(status: ContentIdeaStatus) {
@@ -109,15 +114,10 @@ export function nextStep(input: { status: ContentIdeaStatus; isAdmin: boolean; o
         ? { kind: "move", to: "approved", label: "Shortlist" }
         : { kind: "wait", reason: "Add a review point to send it to Feedback." };
     case "feedback":
-      if (!isAdmin) return { kind: "wait", reason: "An admin shortlists it once the review points are fixed." };
-      return openReviewCount > 0
-        ? {
-            kind: "move",
-            to: "approved",
-            label: "Shortlist",
-            note: `${openReviewCount} review ${openReviewCount === 1 ? "point is" : "points are"} still open. You can shortlist anyway.`,
-          }
-        : { kind: "move", to: "approved", label: "Shortlist" };
+      if (openReviewCount === 0) return { kind: "move", to: "approved", label: "Shortlist" };
+      return isAdmin
+        ? { kind: "move", to: "approved", label: "Shortlist", note: `${openPointsText(openReviewCount)}. You can shortlist anyway.` }
+        : { kind: "wait", reason: `${openPointsText(openReviewCount)}. Mark ${openReviewCount === 1 ? "it" : "them"} as fixed to shortlist it.` };
     case "approved":
       return { kind: "move", to: "in_progress", label: "Start working" };
     case "in_progress":

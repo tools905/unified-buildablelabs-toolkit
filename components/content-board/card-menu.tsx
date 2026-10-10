@@ -32,7 +32,7 @@ export function CardMenu({
   onMove: (status: ContentIdeaStatus) => void;
 }) {
   const moves = CONTENT_COLUMNS.filter((column) =>
-    canMoveIdea({ from: idea.status, to: column.status, isAdmin }),
+    canMoveIdea({ from: idea.status, to: column.status, isAdmin, openReviewCount: idea.open_review_count }),
   );
 
   return (
