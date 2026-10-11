@@ -249,6 +249,23 @@ export function IdeaCard({
           </span>
         </p>
       ) : null}
+      {(idea.status === "idea" || idea.status === "feedback") && idea.after_changes ? (
+        // What the admin asked for once the changes are made, so the team knows the next step at a glance.
+        <p
+          className={cn(
+            "mt-1.5 inline-flex w-fit items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-medium",
+            idea.after_changes === "review" && idea.changes_done_at
+              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+              : "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+          )}
+        >
+          {idea.after_changes === "shortlist"
+            ? "After changes: move to Shortlisted"
+            : idea.changes_done_at
+              ? "Changes done: ready for review"
+              : "After changes: back for review"}
+        </p>
+      ) : null}
       {assignees.length > 0 ? (
         <p
           className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"

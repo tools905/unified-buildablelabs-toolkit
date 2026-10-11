@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { canMoveIdea, openPointsText, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
+import { canMoveIdea, openPointsText, type AfterChanges, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
 import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
@@ -16,7 +16,7 @@ import {
 } from "@/lib/validation/content-idea-schema";
 
 export const CONTENT_IDEA_SELECT =
-  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), reviewer:profiles!content_ideas_reviewed_by_fkey(full_name, email), mover:profiles!content_ideas_status_changed_by_fkey(full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at, uploader:profiles!content_idea_attachments_created_by_fkey(full_name, email)), review_points:content_idea_review_points(id, is_resolved, created_at, resolved_at, author:profiles!content_idea_review_points_created_by_fkey(full_name, email)), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
+  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), reviewer:profiles!content_ideas_reviewed_by_fkey(full_name, email), mover:profiles!content_ideas_status_changed_by_fkey(full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at, uploader:profiles!content_idea_attachments_created_by_fkey(full_name, email)), review_points:content_idea_review_points(id, is_resolved, created_at, resolved_at, author:profiles!content_idea_review_points_created_by_fkey(full_name, email)), markup_reviews:content_idea_reviews(created_at, author:profiles!content_idea_reviews_created_by_fkey(full_name, email)), changes_doer:profiles!content_ideas_changes_done_by_fkey(full_name, email), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
 
 export async function createContentIdea(
   supabase: SupabaseClient<any>,
@@ -231,6 +231,9 @@ type IdeaWithEmbeds = {
   review_points?:
     | { id: string; is_resolved: boolean; created_at?: string; resolved_at?: string | null; author?: EmbeddedPerson }[]
     | null;
+  markup_reviews?: { created_at: string; author?: EmbeddedPerson }[] | null;
+  changes_done_at?: string | null;
+  changes_doer?: EmbeddedPerson;
 };
 
 export type CardThumbnail = { kind: "image" | "pdf" | "link"; url: string | null };
@@ -283,6 +286,9 @@ export async function attachCardPreviews<T extends IdeaWithEmbeds>(supabase: Sup
         uploads: attachments
           .filter((item) => item.created_at)
           .map((item) => ({ createdAt: item.created_at as string, uploaderName: personName(item.uploader) })),
+        markups: (idea.markup_reviews ?? []).map((review) => ({ createdAt: review.created_at, authorName: personName(review.author) })),
+        changesDoneAt: idea.changes_done_at ?? null,
+        changesDoneByName: personName(idea.changes_doer),
       }),
       thumbnail,
     };
@@ -302,7 +308,7 @@ export async function moveContentIdea(
   const [{ data: idea, error }, isAdmin] = await Promise.all([
     supabase
       .from("content_ideas")
-      .select("id, status, assignees:content_idea_assignees(user_id)")
+      .select("id, status, after_changes, assignees:content_idea_assignees(user_id)")
       .eq("id", ideaId)
       .maybeSingle(),
     isWorkspaceAdmin(workspaceId, actorId, supabase),
@@ -319,7 +325,7 @@ export async function moveContentIdea(
   }
   // A team member shortlists only once every review point is fixed.
   let openReviewCount = 0;
-  if (!isAdmin && idea.status === "feedback" && to === "approved") {
+  if (!isAdmin && idea.status === "feedback" && to === "approved" && idea.after_changes !== "shortlist") {
     const { count, error: countError } = await supabase
       .from("content_idea_review_points")
       .select("id", { count: "exact", head: true })
@@ -328,11 +334,14 @@ export async function moveContentIdea(
     if (countError) throw countError;
     openReviewCount = count ?? 0;
   }
-  if (!canMoveIdea({ from: idea.status, to, isAdmin, openReviewCount })) {
+  const afterChanges = (idea.after_changes ?? null) as AfterChanges | null;
+  if (!canMoveIdea({ from: idea.status, to, isAdmin, openReviewCount, afterChanges })) {
     throw new Error(
       isAdmin
         ? "That move isn't allowed from here."
-        : openReviewCount > 0
+        : idea.status === "feedback" && to === "approved" && afterChanges === "review"
+          ? "An admin asked to review this again first. Use \u201cChanges done, send for review\u201d."
+          : openReviewCount > 0
           ? `${openPointsText(openReviewCount)}. Mark ${openReviewCount === 1 ? "it" : "them"} as fixed, then shortlist.`
           : "Only admins can move an idea into or out of that column.",
     );
@@ -341,6 +350,11 @@ export async function moveContentIdea(
     status: to,
     ...(options.scheduledFor ? { scheduledFor: options.scheduledFor } : {}),
   });
+  // Shortlisted and beyond, the review round is over: what the admin asked for after the changes no
+  // longer applies (if the idea comes back to Feedback, the admin decides afresh).
+  if (["approved", "in_progress", "posted"].includes(to) && (idea.after_changes || to === "approved")) {
+    await supabase.from("content_ideas").update({ after_changes: null, changes_done_at: null, changes_done_by: null }).eq("id", ideaId);
+  }
   // Starting work on an idea nobody is assigned to makes whoever started it the assignee, so the card
   // shows who is posting it. Best effort: the move itself has already been saved.
   if (to === "in_progress" && (idea.assignees ?? []).length === 0) {
@@ -449,4 +463,75 @@ export async function deleteContentIdea(
     entityType: "content_idea",
     entityId: ideaId,
   });
+}
+
+// What happens once the team has made the changes an admin asked for (admins only): the team moves it
+// on to Shortlisted themselves, or it comes back for another review. Null clears the choice. Choosing
+// again starts a new round, so an earlier "changes done" is cleared.
+export async function setAfterChanges(
+  supabase: SupabaseClient<any>,
+  workspaceId: string,
+  ideaId: string,
+  actorId: string,
+  value: AfterChanges | null,
+) {
+  if (!(await isWorkspaceAdmin(workspaceId, actorId, supabase))) throw new Error("Only admins can choose this.");
+  const { data, error } = await supabase
+    .from("content_ideas")
+    .update({ after_changes: value, changes_done_at: null, changes_done_by: null })
+    .eq("id", ideaId)
+    .eq("workspace_id", workspaceId)
+    .select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("This idea no longer exists.");
+}
+
+// A team member has made the changes an admin asked to review again: noted on the idea, and the
+// admins get a bell notification.
+export async function markChangesDone(supabase: SupabaseClient<any>, workspaceId: string, ideaId: string, actorId: string) {
+  const { data: idea, error } = await supabase
+    .from("content_ideas")
+    .select("id, title, status, after_changes")
+    .eq("id", ideaId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!idea) throw new Error("This idea no longer exists.");
+  if (idea.status !== "feedback" || idea.after_changes !== "review") {
+    throw new Error("This idea isn't waiting for changes to review any more. Refresh the board.");
+  }
+  const { error: updateError } = await supabase
+    .from("content_ideas")
+    .update({ changes_done_at: new Date().toISOString(), changes_done_by: actorId })
+    .eq("id", ideaId);
+  if (updateError) throw updateError;
+
+  const [{ data: admins }, { data: actor }] = await Promise.all([
+    supabase.from("workspace_members").select("user_id").eq("workspace_id", workspaceId).eq("role", "admin").eq("status", "active"),
+    supabase.from("profiles").select("full_name, email").eq("id", actorId).maybeSingle(),
+  ]);
+  const name = actor?.full_name || actor?.email || "Someone";
+  // Telling admins is best effort: the change is saved either way.
+  await Promise.allSettled(
+    (admins ?? [])
+      .map((row: { user_id: string }) => row.user_id)
+      .filter((userId: string) => userId !== actorId)
+      .map((userId: string) =>
+        createNotification({
+          userId,
+          type: "content_idea_changes_done",
+          title: "Changes ready for review",
+          message: `${name} made the changes on \u201c${idea.title}\u201d. It's ready for your review.`,
+        }),
+      ),
+  );
+}
+
+// New feedback after the team said the changes were done starts the next review round.
+export async function startNewReviewRound(supabase: SupabaseClient<any>, ideaId: string) {
+  await supabase
+    .from("content_ideas")
+    .update({ changes_done_at: null, changes_done_by: null })
+    .eq("id", ideaId)
+    .not("changes_done_at", "is", null);
 }

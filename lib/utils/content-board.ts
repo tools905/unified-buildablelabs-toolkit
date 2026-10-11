@@ -75,8 +75,11 @@ export function checkAttachmentFile(file: { type: string; size: number }): strin
 //  - Feedback → Shortlisted → In Progress → Posted can be done by anyone on the team, and anyone can
 //    take one step back (Shortlisted → Feedback, In Progress → Shortlisted, Posted → In Progress) to
 //    undo a click made by mistake.
-//  - A team member shortlists only once every review point is marked fixed. An admin can shortlist
-//    anyway (open points are pointed out), and can shortlist straight from Ideas.
+//  - When reviewing, an admin can say what happens once the team has made the changes
+//    (`afterChanges`): "shortlist" lets a team member move it to Shortlisted with their own click;
+//    "review" keeps it in Feedback until the admin has looked again (the member marks the changes
+//    done instead). With neither, a team member shortlists once every review point is marked fixed.
+//  - An admin can shortlist anyway (open points are pointed out), and can shortlist straight from Ideas.
 //  - Admins can move any card anywhere.
 const TEAM_MOVES: Partial<Record<ContentIdeaStatus, ContentIdeaStatus[]>> = {
   feedback: ["approved"],
@@ -85,10 +88,21 @@ const TEAM_MOVES: Partial<Record<ContentIdeaStatus, ContentIdeaStatus[]>> = {
   posted: ["in_progress"],
 };
 
-export function canMoveIdea(input: { from: ContentIdeaStatus; to: ContentIdeaStatus; isAdmin: boolean; openReviewCount?: number }) {
+export type AfterChanges = "shortlist" | "review";
+
+export function canMoveIdea(input: {
+  from: ContentIdeaStatus;
+  to: ContentIdeaStatus;
+  isAdmin: boolean;
+  openReviewCount?: number;
+  afterChanges?: AfterChanges | null;
+}) {
   if (input.from === input.to) return false;
   if (input.isAdmin) return true;
-  if (input.from === "feedback" && input.to === "approved" && (input.openReviewCount ?? 0) > 0) return false;
+  if (input.from === "feedback" && input.to === "approved") {
+    if (input.afterChanges === "review") return false;
+    if (input.afterChanges !== "shortlist" && (input.openReviewCount ?? 0) > 0) return false;
+  }
   return TEAM_MOVES[input.from]?.includes(input.to) ?? false;
 }
 
@@ -104,10 +118,26 @@ export type NextStep =
   // `note` is a reminder shown next to the button; it never stops the move.
   | { kind: "move"; to: ContentIdeaStatus; label: string; note?: string }
   | { kind: "wait"; reason: string }
+  // The admin asked to see it again once the changes are made: the team member says they're done.
+  | { kind: "changes_done"; label: string; note: string }
   | null;
 
-export function nextStep(input: { status: ContentIdeaStatus; isAdmin: boolean; openReviewCount: number }): NextStep {
-  const { status, isAdmin, openReviewCount } = input;
+export function nextStep(input: {
+  status: ContentIdeaStatus;
+  isAdmin: boolean;
+  openReviewCount: number;
+  afterChanges?: AfterChanges | null;
+  changesDoneByName?: string | null;
+}): NextStep {
+  const { status, isAdmin, openReviewCount, afterChanges } = input;
+  if (status === "feedback" && !isAdmin && afterChanges === "review") {
+    return input.changesDoneByName
+      ? { kind: "wait", reason: `Changes marked done by ${input.changesDoneByName}. Waiting for an admin to review them again.` }
+      : { kind: "changes_done", label: "Changes done, send for review", note: "An admin asked to see this again once the changes are made." };
+  }
+  if (status === "feedback" && !isAdmin && afterChanges === "shortlist") {
+    return { kind: "move", to: "approved", label: "Shortlist", note: "An admin said to move it on to Shortlisted once the changes are made." };
+  }
   switch (status) {
     case "idea":
       return isAdmin
@@ -175,7 +205,7 @@ export function columnOrderNote(status: ContentIdeaStatus) {
 }
 
 export type LatestActivity = {
-  kind: "reviewed" | "comment" | "resolved" | "upload" | "moved";
+  kind: "reviewed" | "comment" | "resolved" | "upload" | "moved" | "markup" | "changes_done";
   at: string;
   // Who did it, when that is recorded (ticking a comment done is not).
   by: string | null;
@@ -193,6 +223,9 @@ export function latestActivity(input: {
   reviewerName?: string | null;
   points?: { createdAt: string; resolvedAt?: string | null; authorName?: string | null }[];
   uploads?: { createdAt: string; uploaderName?: string | null }[];
+  markups?: { createdAt: string; authorName?: string | null }[];
+  changesDoneAt?: string | null;
+  changesDoneByName?: string | null;
 }): LatestActivity | null {
   const events: LatestActivity[] = [];
   if (input.movedAt && input.movedTo) {
@@ -204,10 +237,27 @@ export function latestActivity(input: {
     if (point.resolvedAt) events.push({ kind: "resolved", at: point.resolvedAt, by: null });
   }
   for (const upload of input.uploads ?? []) events.push({ kind: "upload", at: upload.createdAt, by: upload.uploaderName ?? null });
+  for (const markup of input.markups ?? []) events.push({ kind: "markup", at: markup.createdAt, by: markup.authorName ?? null });
+  if (input.changesDoneAt) events.push({ kind: "changes_done", at: input.changesDoneAt, by: input.changesDoneByName ?? null });
   const valid = events.filter((event) => !Number.isNaN(new Date(event.at).getTime()));
   if (valid.length === 0) return null;
-  return valid.reduce((latest, event) => (new Date(event.at).getTime() > new Date(latest.at).getTime() ? event : latest));
+  const latest = valid.reduce((newest, event) => (new Date(event.at).getTime() > new Date(newest.at).getTime() ? event : newest));
+  // Submitting a Pencil review also adds its comment and marks the idea reviewed a moment later; the
+  // review is what happened, so it's what the card shows.
+  if (latest.kind === "comment" || latest.kind === "reviewed") {
+    const review = valid.find(
+      (event) =>
+        event.kind === "markup" &&
+        event.by === latest.by &&
+        new Date(latest.at).getTime() - new Date(event.at).getTime() <= PENCIL_REVIEW_FOLLOW_UP_MS,
+    );
+    if (review) return review;
+  }
+  return latest;
 }
+
+// How soon after a Pencil review its own comment and "reviewed" mark follow it.
+export const PENCIL_REVIEW_FOLLOW_UP_MS = 2 * 60 * 1000;
 
 // "Reviewed by Aditi", "Comment by Mridul", "Comment marked done", "New upload by Ankitha",
 // "Moved to Shortlisted by Akhil".
@@ -222,6 +272,10 @@ export function describeActivity(activity: LatestActivity) {
       return `Comment${by}`;
     case "resolved":
       return "Comment marked done";
+    case "markup":
+      return `Pencil review${by}`;
+    case "changes_done":
+      return `Changes done${by}, ready for review`;
     default:
       return `New upload${by}`;
   }

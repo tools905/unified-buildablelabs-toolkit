@@ -25,6 +25,8 @@ export function PencilReviews({
   saved = [],
   currentUserId,
   isAdmin,
+  afterChanges = null,
+  canChooseAfterChanges = false,
   onChanged,
 }: {
   ideaId: string;
@@ -36,6 +38,9 @@ export function PencilReviews({
   saved?: { fileIds: string[]; pageCount: number; updatedAt: string }[];
   currentUserId: string;
   isAdmin: boolean;
+  // For an admin reviewing an idea in Ideas or Feedback: the "once the team has made the changes" choice.
+  afterChanges?: "shortlist" | "review" | null;
+  canChooseAfterChanges?: boolean;
   onChanged: () => void;
 }) {
   const { values, push, pop } = useUrlState(URL_KEYS);
@@ -170,6 +175,7 @@ export function PencilReviews({
           ideaId={ideaId}
           draftLabel={drafts.length > 1 ? `Draft ${drawDraft.number}` : "Draft"}
           attachments={draftFiles}
+          afterChanges={isAdmin && canChooseAfterChanges ? { current: afterChanges } : undefined}
           onClose={(saving) => {
             pop({ markup: null });
             // The panel's "Continue your Pencil review" shows once the last save is in.

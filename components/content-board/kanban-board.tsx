@@ -84,7 +84,13 @@ export function KanbanBoard({
   // admins anywhere, everyone else between Feedback, Shortlisted, In Progress and Posted.
   const draggingIdea = draggingId ? (ideas.find((idea) => idea.id === draggingId) ?? null) : null;
   const canDropOn = (status: ContentIdeaStatus) =>
-    draggingIdea !== null && (draggingIdea.status === status || canMoveIdea({ from: draggingIdea.status, to: status, isAdmin, openReviewCount: draggingIdea.open_review_count }));
+    draggingIdea !== null && (draggingIdea.status === status || canMoveIdea({
+        from: draggingIdea.status,
+        to: status,
+        isAdmin,
+        openReviewCount: draggingIdea.open_review_count,
+        afterChanges: draggingIdea.after_changes,
+      }));
 
   function handleDrop(status: ContentIdeaStatus) {
     if (!draggingId || !canDropOn(status)) {

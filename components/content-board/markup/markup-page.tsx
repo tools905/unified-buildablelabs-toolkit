@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { RenderTask } from "pdfjs-dist";
 import type { LoadedSlide } from "@/components/content-board/post-preview/use-post-slides";
-import { HIGHLIGHTER_OPACITY, strokePath, strokeWidth, type MarkupStroke, type MarkupTool } from "@/lib/utils/markup";
+import { HIGHLIGHTER_OPACITY, strokePath, type MarkupStroke, type MarkupTool } from "@/lib/utils/markup";
 
 export type MarkupInput = MarkupTool | "eraser";
 
@@ -24,13 +24,14 @@ export function MarkupPage({
   color,
   fingerDraws,
   zoom,
+  lineWidth,
   onStroke,
   onErase,
   onDrawingChange,
   onPenSeen,
 }: {
   slide: LoadedSlide;
-  // The size the page is shown at, in CSS pixels.
+  // The size the page fits the screen at, in CSS pixels (before zooming).
   width: number;
   height: number;
   strokes: MarkupStroke[];
@@ -39,8 +40,11 @@ export function MarkupPage({
   tool: MarkupInput;
   color: string;
   fingerDraws: boolean;
-  // How far the page is zoomed in, so a pen line keeps its thickness on screen.
+  // How far the page is zoomed in. The page is laid out at its zoomed size (not blown up from a small
+  // picture), so lines stay crisp however far in you zoom.
   zoom: number;
+  // Thickness of the line being drawn, as a share of the page's width: the same while drawing as after.
+  lineWidth: number;
   onStroke: (stroke: MarkupStroke) => void;
   // Called for every point the eraser passes over (x and y between 0 and 1).
   onErase: (x: number, y: number) => void;
@@ -51,7 +55,7 @@ export function MarkupPage({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const livePathRef = useRef<SVGPathElement>(null);
-  const live = useRef<{ pointerId: number; points: number[]; pressures: number[] } | null>(null);
+  const live = useRef<{ pointerId: number; points: number[] } | null>(null);
   const viewHeight = (VIEW_WIDTH * slide.height) / Math.max(1, slide.width);
   const pdf = slide.pdf;
 
@@ -120,8 +124,6 @@ export function MarkupPage({
     // The same spot again (the Pencil reports some twice) adds nothing but a kink.
     if (count >= 2 && current.points[count - 2] === point.x && current.points[count - 1] === point.y) return;
     current.points.push(point.x, point.y);
-    // The first report of a touch-down can say 0 pressure; that's not how hard the line is pressed.
-    if (event.pointerType === "pen" && event.pressure > 0) current.pressures.push(event.pressure);
     livePathRef.current?.setAttribute("d", strokePath(current.points, VIEW_WIDTH, viewHeight));
   }
 
@@ -131,19 +133,16 @@ export function MarkupPage({
     onDrawingChange(false);
     livePathRef.current?.setAttribute("d", "");
     if (!current || tool === "eraser" || current.points.length < 2) return;
-    const pressure = current.pressures.length
-      ? current.pressures.reduce((total, value) => total + value, 0) / current.pressures.length
-      : 0.5;
-    onStroke({ tool, color, width: strokeWidth(tool, pressure, zoom), points: current.points });
+    onStroke({ tool, color, width: lineWidth, points: current.points });
   }
 
-  const liveWidth = strokeWidth(tool === "eraser" ? "pen" : tool, 0.5, zoom) * VIEW_WIDTH;
+  const liveWidth = lineWidth * VIEW_WIDTH;
 
   return (
     <div
       ref={surfaceRef}
       className="relative overflow-hidden bg-white shadow-2xl [-webkit-touch-callout:none]"
-      style={{ width, height, touchAction: editable ? "none" : undefined, cursor: editable ? (tool === "eraser" ? "cell" : "crosshair") : undefined }}
+      style={{ width: width * zoom, height: height * zoom, touchAction: editable ? "none" : undefined, cursor: editable ? (tool === "eraser" ? "cell" : "crosshair") : undefined }}
       onPointerDown={(event) => {
         if (!editable) return;
         if (event.pointerType === "touch" && !fingerDraws) return;
@@ -160,7 +159,7 @@ export function MarkupPage({
         } catch {
           // Some browsers refuse capture for a pointer they've already released; drawing still works.
         }
-        live.current = { pointerId: event.pointerId, points: [], pressures: [] };
+        live.current = { pointerId: event.pointerId, points: [] };
         onDrawingChange(true);
         addPoint(event.nativeEvent);
       }}

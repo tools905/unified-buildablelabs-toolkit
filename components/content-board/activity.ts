@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import type { IdeaPanelData, PanelAttachment } from "@/components/content-board/types";
 import type { ContentIdeaStatus } from "@/lib/db/types";
-import { groupIntoDrafts } from "@/lib/utils/content-board";
+import { groupIntoDrafts, PENCIL_REVIEW_FOLLOW_UP_MS } from "@/lib/utils/content-board";
 
 // "30 Sep 2026, 5:12 pm" in the viewer's own time zone.
 export function formatWhen(value: string | Date) {
@@ -26,6 +26,14 @@ function clip(text: string, max = 80) {
 
 // Everything that happened to an idea, newest first, built from data the panel already has.
 export function buildActivity(data: IdeaPanelData): ActivityEvent[] {
+  // A Pencil review adds its own comment ("Marked up pages 2 and 5 …") and marks the idea reviewed a
+  // moment later. Those are shown as the one Pencil review rather than three separate updates.
+  const reviews = data.markupReviews ?? [];
+  const partOfReview = (at: string, by: string | null | undefined, body?: string) =>
+    reviews.some((review) => {
+      const gap = new Date(at).getTime() - new Date(review.createdAt).getTime();
+      return review.authorName === by && gap >= 0 && gap <= PENCIL_REVIEW_FOLLOW_UP_MS && (body === undefined || body.startsWith("Marked up "));
+    });
   const events: ActivityEvent[] = [
     { id: "created", at: data.history.createdAt, label: `Idea created by ${data.history.creatorName}` },
   ];
@@ -40,7 +48,7 @@ export function buildActivity(data: IdeaPanelData): ActivityEvent[] {
     });
   }
 
-  if (data.history.reviewedAt) {
+  if (data.history.reviewedAt && !partOfReview(data.history.reviewedAt, data.history.reviewerName)) {
     events.push({
       id: "reviewed",
       at: data.history.reviewedAt,
@@ -48,7 +56,24 @@ export function buildActivity(data: IdeaPanelData): ActivityEvent[] {
     });
   }
 
+  for (const review of reviews) {
+    events.push({
+      id: `pencil-${review.id}`,
+      at: review.createdAt,
+      label: `Pencil review by ${review.authorName}`,
+      detail: [`${review.pages.length} ${review.pages.length === 1 ? "page" : "pages"} marked`, review.note ?? ""].filter(Boolean).join(" · "),
+    });
+  }
+  if (data.history.changesDoneAt) {
+    events.push({
+      id: "changes-done",
+      at: data.history.changesDoneAt,
+      label: `Changes done by ${data.history.changesDoneByName ?? "Unknown"}, ready for review`,
+    });
+  }
+
   for (const point of data.points) {
+    if (partOfReview(point.createdAt, point.authorName, point.body)) continue;
     events.push({
       id: `comment-${point.id}`,
       at: point.createdAt,

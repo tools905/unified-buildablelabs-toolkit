@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { addReviewPoint } from "@/lib/services/content-review-service";
+import { setAfterChanges, startNewReviewRound } from "@/lib/services/content-idea-service";
 import { describePages, type MarkupStroke } from "@/lib/utils/markup";
 import { MAX_REVIEW_POINT_LENGTH } from "@/lib/utils/content-board";
 import {
@@ -69,9 +70,16 @@ export async function submitMarkupReview(
     throw pagesError;
   }
 
+  // An admin can say, with the review, what happens once the team has made the changes.
+  if (submission.afterChanges !== undefined) {
+    await setAfterChanges(supabase, input.workspaceId, idea.id, input.userId, submission.afterChanges);
+  }
+
   const where = describePages(submission.pages.map((page) => page.position));
   const body = `Marked up ${where} with Pencil.${submission.note ? ` ${submission.note}` : ""}`.slice(0, MAX_REVIEW_POINT_LENGTH);
   await addReviewPoint(supabase, { workspaceId: input.workspaceId, ideaId: idea.id, userId: input.userId, body });
+  // Unless the admin just chose afresh (which starts a new round itself).
+  if (submission.afterChanges === undefined) await startNewReviewRound(supabase, idea.id);
 
   await writeAuditLog(supabase, {
     workspaceId: input.workspaceId,

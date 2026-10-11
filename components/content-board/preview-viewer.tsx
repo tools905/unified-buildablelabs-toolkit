@@ -1,12 +1,21 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Link2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Link2, PenLine } from "lucide-react";
 import { InlineConfirmButton } from "@/components/content-board/inline-confirm-button";
 import { describeUploads, draftOf, formatWhen, groupUploads, type UploadGroup } from "@/components/content-board/activity";
 import { ideaPdfUrl } from "@/components/content-board/idea-pdf";
 import { PdfViewer } from "@/components/content-board/pdf-viewer";
 import { cn } from "@/lib/utils/cn";
 import type { PanelAttachment } from "@/components/content-board/types";
+import type { MarkupReviewSummary } from "@/lib/utils/markup";
+
+// The Pencil reviews of a draft (marks drawn on its files), newest first.
+function reviewsOfDraft(draft: UploadGroup, reviews: MarkupReviewSummary[]) {
+  const ids = new Set(draft.items.map((item) => item.attachment.id));
+  return reviews
+    .filter((review) => review.fileIds.some((id) => ids.has(id)))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
 
 export function PreviewViewer({
   ideaId,
@@ -15,6 +24,7 @@ export function PreviewViewer({
   onIndexChange,
   onRemove,
   busy,
+  reviews = [],
 }: {
   ideaId: string;
   attachments: PanelAttachment[];
@@ -22,6 +32,7 @@ export function PreviewViewer({
   onIndexChange: (index: number) => void;
   onRemove: (attachment: PanelAttachment) => void;
   busy: boolean;
+  reviews?: MarkupReviewSummary[];
 }) {
   const current = attachments[index];
   const drafts = groupUploads(attachments);
@@ -94,6 +105,13 @@ export function PreviewViewer({
           uploaded by <span className="font-medium text-foreground">{current.uploaderName}</span>
           {current.uploadedVia ? <> through <span className="font-medium text-foreground">{current.uploadedVia}</span></> : null} ·{" "}
           {formatWhen(current.createdAt)}
+          {currentDraft && reviewsOfDraft(currentDraft, reviews)[0] ? (
+            <>
+              {" "}
+              · <span className="font-medium text-foreground">Pencil review by {reviewsOfDraft(currentDraft, reviews)[0].authorName}</span>,{" "}
+              {formatWhen(reviewsOfDraft(currentDraft, reviews)[0].createdAt)}
+            </>
+          ) : null}
         </p>
         <div className="flex shrink-0 items-center gap-1">
           {current.kind === "link" && current.url ? (
@@ -117,7 +135,7 @@ export function PreviewViewer({
         </div>
       </div>
 
-      <DraftList ideaId={ideaId} drafts={drafts} index={index} onIndexChange={onIndexChange} />
+      <DraftList ideaId={ideaId} drafts={drafts} index={index} onIndexChange={onIndexChange} reviews={reviews} />
     </div>
   );
 }
@@ -130,13 +148,18 @@ function DraftList({
   drafts,
   index,
   onIndexChange,
+  reviews,
 }: {
   ideaId: string;
   drafts: UploadGroup[];
   index: number;
   onIndexChange: (index: number) => void;
+  reviews: MarkupReviewSummary[];
 }) {
   const latest = drafts[drafts.length - 1];
+  // The newest update of all, an upload or a Pencil review, gets the "Latest update" mark.
+  const newestReview = [...reviews].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  const reviewIsLatest = Boolean(latest && newestReview && new Date(newestReview.createdAt).getTime() > new Date(latest.at).getTime());
   const newestFirst = [...drafts].reverse();
 
   return (
@@ -152,6 +175,8 @@ function DraftList({
           const selected = draft.items.some((item) => item.index === index);
           const fileIds = draft.items.filter((item) => item.attachment.kind !== "link").map((item) => item.attachment.id);
           const isLatest = draft === latest;
+          const draftReviews = reviewsOfDraft(draft, reviews);
+          const latestReview = draftReviews[0];
           return (
             <li
               key={draft.key}
@@ -171,7 +196,7 @@ function DraftList({
                       Draft {draft.number}
                       {isLatest ? (
                         <span className="rounded-sm bg-primary px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
-                          Latest
+                          {drafts.length > 1 ? "Latest draft" : "Draft"}
                         </span>
                       ) : null}
                       {selected ? <span className="text-[11px] font-medium text-primary">Viewing</span> : null}
@@ -181,6 +206,18 @@ function DraftList({
                       {draft.uploadedVia ? ` through ${draft.uploadedVia}` : ""} · {formatWhen(draft.at)}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">{describeUploads(draft.items)}</span>
+                    {latestReview ? (
+                      <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-foreground">
+                        <PenLine className="h-3 w-3 text-primary" aria-hidden="true" />
+                        Pencil review by <span className="font-medium">{latestReview.authorName}</span> · {formatWhen(latestReview.createdAt)}
+                        {draftReviews.length > 1 ? <span className="text-muted-foreground"> (+{draftReviews.length - 1} more)</span> : null}
+                        {reviewIsLatest && latestReview.id === newestReview?.id ? (
+                          <span className="rounded-sm bg-primary px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                            Latest update
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
                   </span>
                 </button>
                 {fileIds.length > 0 ? (

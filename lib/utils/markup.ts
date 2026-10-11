@@ -28,27 +28,34 @@ export type MarkupReviewSummary = {
 
 export type MarkupReviewPage = { attachmentId: string; pageNumber: number; strokes: MarkupStroke[] };
 
+// The pen's colours; any other shade can be picked too.
 export const MARKUP_PENS = [
   { label: "Red", color: "#E5372B" },
-  { label: "Blue", color: "#2563EB" },
+  { label: "Orange", color: "#F97316" },
+  { label: "Yellow", color: "#FACC15" },
   { label: "Green", color: "#16A34A" },
+  { label: "Teal", color: "#0D9488" },
+  { label: "Blue", color: "#2563EB" },
+  { label: "Purple", color: "#7C3AED" },
+  { label: "Pink", color: "#EC4899" },
+  { label: "Brown", color: "#92400E" },
+  { label: "Grey", color: "#6B7280" },
   { label: "Black", color: "#111111" },
+  { label: "White", color: "#FFFFFF" },
 ] as const;
 export const HIGHLIGHTER_COLOR = "#FACC15";
-export const MARKUP_COLORS = [...MARKUP_PENS.map((pen) => pen.color), HIGHLIGHTER_COLOR] as string[];
 
-export const PEN_WIDTH = 0.0045;
-export const HIGHLIGHTER_WIDTH = 0.028;
 export const HIGHLIGHTER_OPACITY = 0.45;
 
-// Width for a stroke from how hard the Pencil was pressed (0 to 1; a mouse reports 0.5). A pen line keeps
-// the same thickness on screen at any zoom, like Apple's own Markup: zoom in to write small and neatly. The
-// highlighter stays the width of a line of text on the page.
-export function strokeWidth(tool: MarkupTool, averagePressure: number, zoom = 1) {
-  if (tool === "highlighter") return HIGHLIGHTER_WIDTH;
-  const pressure = Number.isFinite(averagePressure) && averagePressure > 0 ? Math.min(1, averagePressure) : 0.5;
-  const scale = Number.isFinite(zoom) && zoom > 1 ? zoom : 1;
-  return Number(Math.max(0.0008, (PEN_WIDTH * (0.55 + pressure * 0.9)) / scale).toFixed(5));
+// Line sizes are chosen on a slider, in screen pixels at the zoom the line is drawn at, so a line looks
+// exactly as thick while it's drawn as after the Pencil lifts, and writing zoomed in comes out finer on
+// the page, like Apple's own Markup.
+export const SIZE_RANGE = { pen: { min: 1, max: 24, initial: 3 }, highlighter: { min: 6, max: 48, initial: 18 } } as const;
+
+// A line's thickness as a share of the page's width, from its size on screen.
+export function strokeWidth(sizePx: number, pageWidthPx: number, zoom = 1) {
+  const shown = Math.max(1, pageWidthPx) * (Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
+  return Number(Math.min(0.1, Math.max(0.0002, sizePx / shown)).toFixed(5));
 }
 
 const round = (value: number) => Math.round(value * 10000) / 10000;

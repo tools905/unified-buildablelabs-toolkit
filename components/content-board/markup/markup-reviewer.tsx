@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -31,6 +32,8 @@ import {
   eraseAt,
   HIGHLIGHTER_COLOR,
   MARKUP_PENS,
+  SIZE_RANGE,
+  strokeWidth,
   markupPageKey,
   simplifyPoints,
   type MarkupReviewPage,
@@ -54,6 +57,23 @@ const storageKey = (ideaId: string, fileIds: string[]) => `tc-markup:${ideaId}:$
 // The review in progress, as kept on this device: a copy of everything, and whether it has changes the
 // server hasn't saved yet (`dirty`), so a crash or a dropped connection loses nothing.
 type LocalCopy = { pages: Pages; note: string; dirty: boolean };
+
+// Small per-device choices (pen colour, sizes). Storage can be unavailable; the defaults are used then.
+function readPreference(key: string, fallback: string, valid: (value: string) => boolean) {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value !== null && valid(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writePreference(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Not kept; nothing else depends on it.
+  }
+}
 
 function readLocal(key: string): LocalCopy | null {
   try {
@@ -120,6 +140,9 @@ export function MarkupReviewer(
         ideaId: string;
         draftLabel: string;
         attachments: PanelAttachment[];
+        // Shown to an admin reviewing an idea in Ideas or Feedback: what happens once the team has
+        // made the changes, chosen along with the review.
+        afterChanges?: { current: "shortlist" | "review" | null };
         // Called with the last save, when one is still on its way.
         onClose: (saving?: Promise<void>) => void;
         onSubmitted: () => void;
@@ -397,7 +420,25 @@ export function MarkupReviewer(
 
   // ---- tools -----------------------------------------------------------------------------------
   const [tool, setTool] = useState<MarkupInput>("pen");
-  const [color, setColor] = useState<string>(MARKUP_PENS[0].color);
+  // The pen's colour and each tool's size are remembered on this device for the next review.
+  const [penColor, setPenColorState] = useState<string>(() => readPreference("tc-markup-color", MARKUP_PENS[0].color, (value) => /^#[0-9a-f]{6}$/i.test(value)));
+  const [sizes, setSizesState] = useState<{ pen: number; highlighter: number }>(() => ({
+    pen: Number(readPreference("tc-markup-size-pen", String(SIZE_RANGE.pen.initial), (value) => Number(value) >= SIZE_RANGE.pen.min && Number(value) <= SIZE_RANGE.pen.max)),
+    highlighter: Number(
+      readPreference("tc-markup-size-highlighter", String(SIZE_RANGE.highlighter.initial), (value) => Number(value) >= SIZE_RANGE.highlighter.min && Number(value) <= SIZE_RANGE.highlighter.max),
+    ),
+  }));
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const setPenColor = (value: string) => {
+    setPenColorState(value);
+    writePreference("tc-markup-color", value);
+  };
+  const setSize = (which: "pen" | "highlighter", value: number) => {
+    setSizesState((current) => ({ ...current, [which]: value }));
+    writePreference(`tc-markup-size-${which}`, String(value));
+  };
+  const color = tool === "highlighter" ? HIGHLIGHTER_COLOR : penColor;
+  const sizeTool: "pen" | "highlighter" = tool === "highlighter" ? "highlighter" : "pen";
   const [fingerDraws, setFingerDraws] = useState(false);
   const [penSeen, setPenSeen] = useState(false);
   const [showMarks, setShowMarks] = useState(true);
@@ -484,6 +525,9 @@ export function MarkupReviewer(
 
   // ---- submitting --------------------------------------------------------------------------------
   const [confirming, setConfirming] = useState(false);
+  const [afterChangesChoice, setAfterChangesChoice] = useState<"shortlist" | "review" | null>(
+    props.mode === "draw" ? (props.afterChanges?.current ?? null) : null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -501,7 +545,12 @@ export function MarkupReviewer(
       const response = await fetch(`${BASE_PATH}/api/content-board/ideas/${encodeURIComponent(ideaId)}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileIds, note: noteRef.current.trim() || undefined, pages: marked }),
+        body: JSON.stringify({
+          fileIds,
+          note: noteRef.current.trim() || undefined,
+          pages: marked,
+          ...(props.afterChanges ? { afterChanges: afterChangesChoice } : {}),
+        }),
       });
       const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Couldn't submit the review. Please try again.");
@@ -601,31 +650,29 @@ export function MarkupReviewer(
       {/* Tools */}
       {drawing ? (
         <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-white/10 px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="toolbar" aria-label="Drawing tools">
-          {MARKUP_PENS.map((pen) => {
-            const on = tool === "pen" && color === pen.color;
-            return (
-              <button
-                key={pen.color}
-                type="button"
-                aria-label={`${pen.label} pen`}
-                aria-pressed={on}
-                onClick={() => {
-                  setTool("pen");
-                  setColor(pen.color);
-                }}
-                className={cn(toolButton, on ? "bg-white/15 ring-2 ring-white" : "hover:bg-white/10")}
-              >
-                <span className="h-5 w-5 rounded-full border border-white/40" style={{ backgroundColor: pen.color }} />
-              </button>
-            );
-          })}
+          <button
+            type="button"
+            aria-label="Pen and colours"
+            aria-pressed={tool === "pen"}
+            aria-expanded={paletteOpen}
+            title="Pen: tap again for colours"
+            onClick={() => {
+              // The first tap picks the pen; tapping it again opens the colours.
+              if (tool === "pen") setPaletteOpen((open) => !open);
+              else setTool("pen");
+            }}
+            className={cn("flex h-10 shrink-0 items-center gap-1 rounded-md px-2 transition-colors", tool === "pen" ? "bg-white/15 ring-2 ring-white" : "hover:bg-white/10")}
+          >
+            <span className="h-5 w-5 rounded-full border border-white/40" style={{ backgroundColor: penColor }} />
+            <ChevronDown className={cn("h-3.5 w-3.5 text-white/70 transition-transform", paletteOpen ? "rotate-180" : "")} />
+          </button>
           <button
             type="button"
             aria-label="Highlighter"
             aria-pressed={tool === "highlighter"}
             onClick={() => {
               setTool("highlighter");
-              setColor(HIGHLIGHTER_COLOR);
+              setPaletteOpen(false);
             }}
             className={cn(toolButton, tool === "highlighter" ? "bg-white/15 ring-2 ring-white" : "hover:bg-white/10")}
           >
@@ -635,11 +682,41 @@ export function MarkupReviewer(
             type="button"
             aria-label="Eraser"
             aria-pressed={tool === "eraser"}
-            onClick={() => setTool("eraser")}
+            onClick={() => {
+              setTool("eraser");
+              setPaletteOpen(false);
+            }}
             className={cn(toolButton, tool === "eraser" ? "bg-white/15 ring-2 ring-white" : "hover:bg-white/10")}
           >
             <Eraser className="h-5 w-5" />
           </button>
+          <label
+            className={cn("flex h-10 shrink-0 items-center gap-2 rounded-md px-2", tool === "eraser" ? "opacity-40" : "")}
+            title={`${sizeTool === "pen" ? "Pen" : "Highlighter"} size`}
+          >
+            <span className="grid h-6 w-6 place-items-center" aria-hidden="true">
+              <span
+                className="rounded-full"
+                style={{
+                  width: Math.min(24, Math.max(2, sizes[sizeTool] * (sizeTool === "highlighter" ? 0.5 : 1))),
+                  height: Math.min(24, Math.max(2, sizes[sizeTool] * (sizeTool === "highlighter" ? 0.5 : 1))),
+                  backgroundColor: color,
+                  opacity: sizeTool === "highlighter" ? 0.7 : 1,
+                }}
+              />
+            </span>
+            <input
+              type="range"
+              aria-label={`${sizeTool === "pen" ? "Pen" : "Highlighter"} size`}
+              min={SIZE_RANGE[sizeTool].min}
+              max={SIZE_RANGE[sizeTool].max}
+              step={1}
+              value={sizes[sizeTool]}
+              disabled={tool === "eraser"}
+              onChange={(event) => setSize(sizeTool, Number(event.target.value))}
+              className="w-24 accent-white sm:w-32"
+            />
+          </label>
           <span className="mx-1 h-6 w-px shrink-0 bg-white/15" />
           <button type="button" aria-label="Undo" onClick={undo} disabled={!history.length} className={cn(toolButton, "hover:bg-white/10 disabled:opacity-30")}>
             <Undo2 className="h-5 w-5" />
@@ -680,6 +757,56 @@ export function MarkupReviewer(
               <Plus className="h-4 w-4" />
             </button>
           </span>
+        </div>
+      ) : null}
+
+      {/* The pen's colours: 12 to pick from, or any other shade. */}
+      {drawing && paletteOpen ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-white/10 bg-neutral-800 px-3 py-2" role="group" aria-label="Pen colours">
+          {MARKUP_PENS.map((pen) => {
+            const on = penColor.toLowerCase() === pen.color.toLowerCase();
+            return (
+              <button
+                key={pen.color}
+                type="button"
+                aria-label={pen.label}
+                aria-pressed={on}
+                title={pen.label}
+                onClick={() => {
+                  setPenColor(pen.color);
+                  setTool("pen");
+                  setPaletteOpen(false);
+                }}
+                className={cn("grid h-9 w-9 place-items-center rounded-full transition-transform", on ? "ring-2 ring-white" : "hover:scale-110")}
+              >
+                <span className="h-6 w-6 rounded-full border border-white/40" style={{ backgroundColor: pen.color }} />
+              </button>
+            );
+          })}
+          <label
+            className="relative flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-white/20 pl-1 pr-3 text-xs hover:bg-white/10"
+            title="Any other colour"
+          >
+            <span
+              className="h-6 w-6 rounded-full border border-white/40"
+              style={{
+                background: MARKUP_PENS.some((pen) => pen.color.toLowerCase() === penColor.toLowerCase())
+                  ? "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)"
+                  : penColor,
+              }}
+            />
+            Custom
+            <input
+              type="color"
+              value={penColor}
+              onChange={(event) => {
+                setPenColor(event.target.value);
+                setTool("pen");
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              aria-label="Pick any colour"
+            />
+          </label>
         </div>
       ) : null}
 
@@ -775,7 +902,8 @@ export function MarkupReviewer(
           </p>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: "center center" }}>
+            {/* Moved, not scaled: the page itself is laid out at the zoomed size, so it stays sharp. */}
+            <div style={{ transform: `translate(${view.x}px, ${view.y}px)` }}>
               <MarkupPage
                 key={currentKey}
                 slide={current}
@@ -788,6 +916,7 @@ export function MarkupReviewer(
                 color={color}
                 fingerDraws={fingerDraws}
                 zoom={view.zoom}
+                lineWidth={strokeWidth(sizes[sizeTool], fit.width, view.zoom)}
                 onPenSeen={() => setPenSeen(true)}
                 onDrawingChange={(active) => {
                   drawingNow.current = active;
@@ -807,7 +936,8 @@ export function MarkupReviewer(
                 }
                 onErase={(x, y) => {
                   const existing = pagesRef.current[currentKey] ?? [];
-                  const next = eraseAt(existing, x, y, 0.015, current.height / Math.max(1, current.width));
+                  // About 14 screen pixels around the eraser, at any zoom.
+                  const next = eraseAt(existing, x, y, 14 / Math.max(1, fit.width * view.zoom), current.height / Math.max(1, current.width));
                   if (next.length === existing.length) return;
                   if (erasing.current) erasing.current.removed = true;
                   setPages({ ...pagesRef.current, [currentKey]: next });
@@ -893,6 +1023,37 @@ export function MarkupReviewer(
                 className="mt-1 w-full rounded-md border border-white/15 bg-neutral-900 px-3 py-2 text-base text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary sm:text-sm"
               />
             </label>
+            {props.mode === "draw" && props.afterChanges ? (
+              <fieldset className="mt-3">
+                <legend className="text-xs text-white/70">Once the team has made the changes</legend>
+                <div className="mt-1 grid gap-1.5 sm:grid-cols-2">
+                  {(
+                    [
+                      { value: "shortlist", label: "They move it to Shortlisted", hint: "Small fixes: no need to check again." },
+                      { value: "review", label: "Send it back to me", hint: "It stays in Feedback for your review." },
+                    ] as const
+                  ).map((option) => {
+                    const on = afterChangesChoice === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => setAfterChangesChoice(on ? null : option.value)}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                          on ? "border-primary bg-primary/20 text-white" : "border-white/15 text-white/80 hover:bg-white/10",
+                        )}
+                      >
+                        <span className="block font-medium">{option.label}</span>
+                        <span className="block text-[11px] text-white/60">{option.hint}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ) : null}
             {submitError ? (
               <p role="alert" className="mt-2 text-sm text-red-300">
                 {submitError}

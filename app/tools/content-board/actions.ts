@@ -171,6 +171,21 @@ export async function removeAttachmentAction(attachmentId: string) {
   return toResult(() => attachmentService.removeAttachment(supabase, attachmentId), { revalidate: false });
 }
 
+export async function setAfterChangesAction(ideaId: string, value: "shortlist" | "review" | null) {
+  const { supabase, user, workspace } = await requireContentBoardContext();
+  return toResult(async () => {
+    if (value !== null && value !== "shortlist" && value !== "review") throw new Error("Unknown choice.");
+    await contentIdeaService.setAfterChanges(supabase, workspace.id, ideaId, user.id, value);
+  });
+}
+
+export async function markChangesDoneAction(ideaId: string) {
+  const { supabase, user, workspace } = await requireContentBoardContext();
+  return toResult(async () => {
+    await contentIdeaService.markChangesDone(supabase, workspace.id, ideaId, user.id);
+  });
+}
+
 export async function setIdeaReviewedAction(ideaId: string, reviewed: boolean) {
   const { supabase, user, workspace } = await requireContentBoardContext();
   return toResult(async () => {
@@ -183,6 +198,7 @@ export async function addReviewPointAction(input: { ideaId: string; body: string
   return toResult(async () => {
     const parsed = addReviewPointSchema.parse(input);
     await reviewService.addReviewPoint(supabase, { workspaceId: workspace.id, userId: user.id, ...parsed });
+    await contentIdeaService.startNewReviewRound(supabase, parsed.ideaId);
   }, { revalidate: false });
 }
 

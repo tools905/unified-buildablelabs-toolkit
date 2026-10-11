@@ -28,9 +28,9 @@ describe("drawing marks", () => {
     expect(simplified.slice(-2)).toEqual([0.01, 0.5]);
   });
 
-  it("presses harder for a thicker Pencil line", () => {
-    expect(strokeWidth("pen", 1)).toBeGreaterThan(strokeWidth("pen", 0.2));
-    expect(strokeWidth("highlighter", 1)).toBe(strokeWidth("highlighter", 0.1));
+  it("keeps a line the size chosen on the slider, measured on screen", () => {
+    expect(strokeWidth(6, 600)).toBe(0.01);
+    expect(strokeWidth(12, 600)).toBe(0.02);
   });
 
   it("turns a stroke into a path on a page of any size", () => {
@@ -42,9 +42,8 @@ describe("drawing marks", () => {
     expect(strokePath([0, 0, 0.1, 0.2, 0.2, 0], 100, 100)).toBe("M0.00 0.00 Q10.00 20.00 15.00 10.00 L20.00 0.00");
   });
 
-  it("keeps a pen line the same thickness on screen when zoomed in", () => {
-    expect(strokeWidth("pen", 0.5, 2)).toBeCloseTo(strokeWidth("pen", 0.5) / 2, 4);
-    expect(strokeWidth("highlighter", 0.5, 3)).toBe(strokeWidth("highlighter", 0.5));
+  it("writes finer on the page when zoomed in, at the same thickness on screen", () => {
+    expect(strokeWidth(6, 600, 2)).toBe(0.005);
   });
 
   it("erases only the strokes the eraser passes over", () => {
@@ -82,6 +81,8 @@ describe("a submitted review", () => {
       const builder: Record<string, unknown> = {
         select: () => builder,
         eq: () => builder,
+        not: () => builder,
+        update: () => builder,
         delete: () => {
           deleted.push(table);
           return builder;

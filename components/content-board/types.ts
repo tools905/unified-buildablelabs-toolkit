@@ -40,6 +40,10 @@ export type ContentIdeaWithRelations = {
   scheduled_for: string | null;
   reference_links: string[];
   reviewed_at: string | null;
+  // What an admin chose for once the team has made the changes, and when a team member said they were
+  // done (see canMoveIdea).
+  after_changes?: AfterChanges | null;
+  changes_done_at?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -87,12 +91,20 @@ export type PanelReviewPoint = {
   authorName: string;
 };
 
+import type { AfterChanges } from "@/lib/utils/content-board";
+export type { AfterChanges };
+
 export type IdeaPanelHistory = {
   createdAt: string;
   creatorName: string;
   postedAt: string | null;
   reviewedAt: string | null;
   reviewerName: string | null;
+  // What the admin chose for once the team has made the changes (see 062), and when a team member
+  // said the changes were done.
+  afterChanges?: AfterChanges | null;
+  changesDoneAt?: string | null;
+  changesDoneByName?: string | null;
 };
 
 export type IdeaPanelData = {

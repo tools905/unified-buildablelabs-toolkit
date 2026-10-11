@@ -147,6 +147,8 @@ export const markupSubmissionSchema = z
     fileIds: z.array(z.string().uuid()).min(1).max(12),
     note: z.string().trim().max(3000).optional(),
     pages: z.array(markupPageSchema).min(1, "Draw on at least one page first.").max(60),
+    // An admin's choice for once the team has made the changes (see canMoveIdea).
+    afterChanges: z.enum(["shortlist", "review"]).nullable().optional(),
   })
   .refine(pagesOnDraft, "Those pages aren't part of this draft.")
   .refine(smallEnough, "This review is too large to save. Split it into two reviews.");

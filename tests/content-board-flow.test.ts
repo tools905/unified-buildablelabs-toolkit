@@ -28,6 +28,21 @@ describe("who can move an idea between columns", () => {
     expect(canMoveIdea({ from: "feedback", to: "approved", isAdmin: true, openReviewCount: 3 })).toBe(true);
   });
 
+  it("follows what the admin chose for once the changes are made", () => {
+    const member = { from: "feedback" as const, to: "approved" as const, isAdmin: false };
+    // "They move it to Shortlisted": their own click, open points or not.
+    expect(canMoveIdea({ ...member, openReviewCount: 3, afterChanges: "shortlist" })).toBe(true);
+    // "Send it back to me": never by a team member.
+    expect(canMoveIdea({ ...member, openReviewCount: 0, afterChanges: "review" })).toBe(false);
+    expect(canMoveIdea({ ...member, isAdmin: true, afterChanges: "review" })).toBe(true);
+    expect(nextStep({ status: "feedback", isAdmin: false, openReviewCount: 2, afterChanges: "review" })).toMatchObject({ kind: "changes_done" });
+    expect(nextStep({ status: "feedback", isAdmin: false, openReviewCount: 2, afterChanges: "review", changesDoneByName: "Mridul" })).toMatchObject({
+      kind: "wait",
+      reason: expect.stringContaining("Mridul"),
+    });
+    expect(nextStep({ status: "feedback", isAdmin: false, openReviewCount: 2, afterChanges: "shortlist" })).toMatchObject({ kind: "move", to: "approved" });
+  });
+
   it("keeps every other move with admins", () => {
     const member = { isAdmin: false };
     expect(canMoveIdea({ from: "idea", to: "feedback", ...member })).toBe(false);
@@ -177,5 +192,28 @@ describe("a new idea needs only one thing filled in", () => {
     expect(matchesPlatform({ platform: "any", platforms: ["any"] }, "instagram")).toBe(true);
     expect(matchesPlatform({ platform: "linkedin", platforms: ["linkedin"] }, "instagram")).toBe(false);
     expect(matchesPlatform({ platform: "linkedin", platforms: ["linkedin"] }, "")).toBe(true);
+  });
+});
+
+describe("the latest update on a card", () => {
+  it("is the Pencil review, not the comment and reviewed mark that come with it", () => {
+    const at = (minutes: number) => new Date(Date.UTC(2026, 9, 10, 17, minutes)).toISOString();
+    const latest = latestActivity({
+      uploads: [{ createdAt: at(0), uploaderName: "Mridul" }],
+      markups: [{ createdAt: at(30), authorName: "Aditi" }],
+      points: [{ createdAt: at(30), authorName: "Aditi" }],
+      reviewedAt: at(31),
+      reviewerName: "Aditi",
+    });
+    expect(latest).toMatchObject({ kind: "markup", by: "Aditi" });
+    expect(describeActivity(latest!)).toBe("Pencil review by Aditi");
+  });
+
+  it("is a newer upload once the team has made changes after the review", () => {
+    const latest = latestActivity({
+      markups: [{ createdAt: "2026-10-10T17:30:00Z", authorName: "Aditi" }],
+      uploads: [{ createdAt: "2026-10-10T19:00:00Z", uploaderName: "Mridul" }],
+    });
+    expect(latest).toMatchObject({ kind: "upload", by: "Mridul" });
   });
 });

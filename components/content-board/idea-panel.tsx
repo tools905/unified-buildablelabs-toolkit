@@ -316,7 +316,10 @@ export function IdeaPanel({
               isAdmin={data.isAdmin}
               currentUserId={data.currentUserId}
               openReviewCount={data.points.filter((point) => !point.isResolved).length}
+              afterChanges={data.history.afterChanges ?? null}
+              changesDoneByName={data.history.changesDoneAt ? (data.history.changesDoneByName ?? "Someone") : null}
               onMove={onMove}
+              onChanged={() => afterChange()}
             />
 
             <section aria-label="Preview" className="space-y-3">
@@ -353,6 +356,7 @@ export function IdeaPanel({
                   onIndexChange={setChosenIndex}
                   onRemove={removeAttachment}
                   busy={false}
+                  reviews={data?.markupReviews ?? []}
                 />
               ) : (
                 <PostPreview
@@ -383,6 +387,8 @@ export function IdeaPanel({
                 saved={data.savedMarkupReviews ?? []}
                 currentUserId={data.currentUserId}
                 isAdmin={data.isAdmin}
+                afterChanges={data.history.afterChanges ?? null}
+                canChooseAfterChanges={idea.status === "idea" || idea.status === "feedback"}
                 onChanged={() => afterChange()}
               />
               <AttachmentAdder
