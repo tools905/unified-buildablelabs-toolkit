@@ -16,7 +16,7 @@ export const MCP_TOOL_TEXT: Record<McpToolName, McpToolText> = {
       "Lists ideas on the team's Content Board. Use it first to find an idea's id.",
       "Each idea comes with its id, title, platforms, column, scheduled day, number of open review points and number of files.",
       "Filter by platform, column, month (YYYY-MM) or mine_only; leave the filters out to see everything, up to limit (25 by default).",
-      "Columns are idea (shown as Ideas), feedback (Feedback), approved (Shortlisted), in_progress (In Progress) and posted (Posted).",
+      "Columns are idea (shown as Ideas), feedback (Feedback), approved (Shortlisted), in_progress (In Progress) and posted (Posted), plus discarded (Discarded: ideas the team set aside; they are out of the flow).",
       "If truncated is true there are more ideas than were returned, so narrow the filters.",
       'Example: "what is waiting for feedback this month?" means column feedback and month 2026-10. Then call get_idea on the one you need.',
     ].join(" "),

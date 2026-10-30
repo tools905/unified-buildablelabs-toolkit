@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CONTENT_COLUMNS, assigneeLabel, type ContentIdeaWithRelations } from "@/components/content-board/types";
 import { nextStep, type AfterChanges } from "@/lib/utils/content-board";
-import { markChangesDoneAction, setAfterChangesAction } from "@/app/tools/content-board/actions";
+import { markChangesDoneAction, restoreIdeaAction, setAfterChangesAction } from "@/app/tools/content-board/actions";
+import { formatWhen } from "@/components/content-board/activity";
 import { cn } from "@/lib/utils/cn";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 
@@ -27,6 +28,7 @@ export function StageActions({
   openReviewCount,
   afterChanges,
   changesDoneByName,
+  discarded = null,
   onMove,
   onChanged,
 }: {
@@ -36,6 +38,7 @@ export function StageActions({
   openReviewCount: number;
   afterChanges: AfterChanges | null;
   changesDoneByName: string | null;
+  discarded?: { at: string; byName: string | null; reason: string | null; from: "idea" | "feedback" } | null;
   onMove: MoveIdea;
   onChanged: () => void;
 }) {
@@ -95,7 +98,18 @@ export function StageActions({
         ))}
       </ol>
 
-      {step?.kind === "move" ? (
+      {idea.status === "discarded" ? (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Discarded{discarded?.byName ? ` by ${discarded.byName}` : ""}
+            {discarded ? ` on ${formatWhen(discarded.at)}` : ""}.
+            {discarded?.reason ? <span className="mt-1 block text-foreground">&ldquo;{discarded.reason}&rdquo;</span> : null}
+          </p>
+          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => run(() => restoreIdeaAction(idea.id))}>
+            {pending ? "Restoring…" : `Restore to ${discarded?.from === "feedback" ? "Feedback" : "Ideas"}`}
+          </Button>
+        </div>
+      ) : step?.kind === "move" ? (
         <div className="flex flex-wrap items-end gap-2">
           {step.note ? <p className="w-full text-xs text-amber-500">{step.note}</p> : null}
           {startNote ? <p className="w-full text-xs text-muted-foreground">{startNote}</p> : null}

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
 import { createNotification } from "@/lib/services/notification-service";
 import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
-import { canMoveIdea, openPointsText, type AfterChanges, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
+import { canDiscard, canMoveIdea, openPointsText, type AfterChanges, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
 import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
@@ -16,7 +16,7 @@ import {
 } from "@/lib/validation/content-idea-schema";
 
 export const CONTENT_IDEA_SELECT =
-  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), reviewer:profiles!content_ideas_reviewed_by_fkey(full_name, email), mover:profiles!content_ideas_status_changed_by_fkey(full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at, uploader:profiles!content_idea_attachments_created_by_fkey(full_name, email)), review_points:content_idea_review_points(id, is_resolved, created_at, resolved_at, author:profiles!content_idea_review_points_created_by_fkey(full_name, email)), markup_reviews:content_idea_reviews(created_at, author:profiles!content_idea_reviews_created_by_fkey(full_name, email)), changes_doer:profiles!content_ideas_changes_done_by_fkey(full_name, email), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
+  "*, creator:profiles!content_ideas_created_by_fkey(id, full_name, email), reviewer:profiles!content_ideas_reviewed_by_fkey(full_name, email), mover:profiles!content_ideas_status_changed_by_fkey(full_name, email), attachments:content_idea_attachments(id, kind, thumb_path, sort_order, created_by, created_at, uploader:profiles!content_idea_attachments_created_by_fkey(full_name, email)), review_points:content_idea_review_points(id, is_resolved, created_at, resolved_at, author:profiles!content_idea_review_points_created_by_fkey(full_name, email)), markup_reviews:content_idea_reviews(created_at, author:profiles!content_idea_reviews_created_by_fkey(full_name, email)), changes_doer:profiles!content_ideas_changes_done_by_fkey(full_name, email), discarder:profiles!content_ideas_discarded_by_fkey(full_name, email), assignees:content_idea_assignees(user_id, profile:profiles!content_idea_assignees_user_id_fkey(id, full_name, email))";
 
 export async function createContentIdea(
   supabase: SupabaseClient<any>,
@@ -350,6 +350,13 @@ export async function moveContentIdea(
     status: to,
     ...(options.scheduledFor ? { scheduledFor: options.scheduledFor } : {}),
   });
+  // Taken out of Discarded (an admin dragging it, or the card menu): it's an active idea again.
+  if (idea.status === "discarded") {
+    await supabase
+      .from("content_ideas")
+      .update({ discarded_at: null, discarded_by: null, discard_reason: null, discarded_from: null })
+      .eq("id", ideaId);
+  }
   // Shortlisted and beyond, the review round is over: what the admin asked for after the changes no
   // longer applies (if the idea comes back to Feedback, the admin decides afresh).
   if (["approved", "in_progress", "posted"].includes(to) && (idea.after_changes || to === "approved")) {
@@ -534,4 +541,92 @@ export async function startNewReviewRound(supabase: SupabaseClient<any>, ideaId:
     .update({ changes_done_at: null, changes_done_by: null })
     .eq("id", ideaId)
     .not("changes_done_at", "is", null);
+}
+
+// Anyone on the team can discard an idea in Ideas or Feedback, with an optional reason. It moves to the
+// Discarded column, remembering where it was so Restore can put it back.
+export async function discardIdea(
+  supabase: SupabaseClient<any>,
+  workspaceId: string,
+  ideaId: string,
+  actorId: string,
+  reason: string | null,
+) {
+  const { data: idea, error } = await supabase
+    .from("content_ideas")
+    .select("id, status")
+    .eq("id", ideaId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!idea) throw new Error("This idea no longer exists.");
+  if (idea.status === "discarded") return;
+  if (!canDiscard(idea.status)) throw new Error("Only ideas in Ideas or Feedback can be discarded.");
+  const trimmed = reason?.trim().slice(0, 500) || null;
+  // Only while it's still where it was read from, so two people acting at once can't clash.
+  const { data: updated, error: updateError } = await supabase
+    .from("content_ideas")
+    .update({
+      status: "discarded",
+      discarded_at: new Date().toISOString(),
+      discarded_by: actorId,
+      discard_reason: trimmed,
+      discarded_from: idea.status,
+    })
+    .eq("id", ideaId)
+    .eq("status", idea.status)
+    .select("id");
+  if (updateError) throw updateError;
+  if (!updated?.length) throw new Error("Someone moved this idea just now. Refresh the board and try again.");
+  await writeAuditLog(supabase, {
+    workspaceId,
+    actorId,
+    action: "content_idea.discarded",
+    entityType: "content_idea",
+    entityId: ideaId,
+    metadata: { from: idea.status, reason: trimmed },
+  });
+}
+
+// Puts a discarded idea back in the column it was discarded from (Ideas if that isn't known).
+export async function restoreIdea(supabase: SupabaseClient<any>, workspaceId: string, ideaId: string, actorId: string) {
+  const { data: idea, error } = await supabase
+    .from("content_ideas")
+    .select("id, status, discarded_from")
+    .eq("id", ideaId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!idea) throw new Error("This idea no longer exists.");
+  if (idea.status !== "discarded") return;
+  const to: ContentIdeaStatus = idea.discarded_from === "feedback" ? "feedback" : "idea";
+  const { error: updateError } = await supabase
+    .from("content_ideas")
+    .update({ status: to, discarded_at: null, discarded_by: null, discard_reason: null, discarded_from: null })
+    .eq("id", ideaId)
+    .eq("status", "discarded");
+  if (updateError) throw updateError;
+  await writeAuditLog(supabase, {
+    workspaceId,
+    actorId,
+    action: "content_idea.restored",
+    entityType: "content_idea",
+    entityId: ideaId,
+    metadata: { to },
+  });
+}
+
+// Admins only: removes a discarded idea and its files for good.
+export async function deleteDiscardedIdea(supabase: SupabaseClient<any>, workspaceId: string, ideaId: string, actorId: string) {
+  if (!(await isWorkspaceAdmin(workspaceId, actorId, supabase))) throw new Error("Only admins can delete ideas for good.");
+  const { data: idea, error } = await supabase
+    .from("content_ideas")
+    .select("id, status")
+    .eq("id", ideaId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!idea) return;
+  if (idea.status !== "discarded") throw new Error("Discard the idea first; only discarded ideas are deleted from here.");
+  await deleteContentIdea(supabase, workspaceId, ideaId, actorId);
 }

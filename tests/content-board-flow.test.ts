@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canMoveIdea, canTeamMoveFrom, columnOrderNote, deriveIdeaTitle, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
+import { canDiscard, canMoveIdea, canTeamMoveFrom, columnOrderNote, deriveIdeaTitle, describeActivity, latestActivity, nextStep, sortColumnIdeas } from "@/lib/utils/content-board";
 import { platformsSchema } from "@/lib/validation/content-idea-schema";
 import { matchesPlatform } from "@/components/content-board/types";
 import { activityTone, describeUploads, groupUploads } from "@/components/content-board/activity";
@@ -215,5 +215,39 @@ describe("the latest update on a card", () => {
       uploads: [{ createdAt: "2026-10-10T19:00:00Z", uploaderName: "Mridul" }],
     });
     expect(latest).toMatchObject({ kind: "upload", by: "Mridul" });
+  });
+});
+
+describe("discarding an idea", () => {
+  it("is its own step from Ideas or Feedback, never a plain move or drag", () => {
+    expect(canDiscard("idea")).toBe(true);
+    expect(canDiscard("feedback")).toBe(true);
+    expect(canDiscard("approved")).toBe(false);
+    expect(canMoveIdea({ from: "idea", to: "discarded", isAdmin: true })).toBe(false);
+    expect(canMoveIdea({ from: "feedback", to: "discarded", isAdmin: false })).toBe(false);
+  });
+
+  it("can be undone by an admin dragging it out; the team uses Restore", () => {
+    expect(canMoveIdea({ from: "discarded", to: "idea", isAdmin: true })).toBe(true);
+    expect(canMoveIdea({ from: "discarded", to: "feedback", isAdmin: false })).toBe(false);
+    expect(canTeamMoveFrom("discarded")).toBe(false);
+  });
+
+  it("lists the most recently discarded first, and says so", () => {
+    const card = (id: string, discardedAt: string) => ({
+      id,
+      status: "discarded" as const,
+      created_at: "2026-10-01T00:00:00Z",
+      latest_activity: null,
+      first_feedback_at: null,
+      discarded_at: discardedAt,
+    });
+    const sorted = sortColumnIdeas("discarded", [card("old", "2026-10-02T00:00:00Z"), card("new", "2026-10-20T00:00:00Z")]);
+    expect(sorted.map((idea) => idea.id)).toEqual(["new", "old"]);
+    expect(columnOrderNote("discarded")).toBe("Most recently discarded first");
+  });
+
+  it("shows on the card as discarded, by whom", () => {
+    expect(describeActivity({ kind: "moved", at: "2026-10-20T00:00:00Z", by: "Aditi", to: "discarded" })).toBe("Discarded by Aditi");
   });
 });

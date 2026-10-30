@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArchiveX, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AssignDialog } from "@/components/content-board/assign-dialog";
 import { CreateIdeaDialog } from "@/components/content-board/create-idea-dialog";
+import { DiscardDialog } from "@/components/content-board/discard-dialog";
+import { restoreIdeaAction } from "@/app/tools/content-board/actions";
 import { IdeaCard } from "@/components/content-board/idea-card";
 import { IdeaDetail } from "@/components/content-board/idea-detail";
 import { IdeaPanel } from "@/components/content-board/idea-panel";
@@ -17,11 +20,20 @@ import {
   type ContentIdeaWithRelations,
   type ContentMemberOption,
 } from "@/components/content-board/types";
-import { canMoveIdea, canTeamMoveFrom, columnOrderNote, sortColumnIdeas } from "@/lib/utils/content-board";
+import { canMoveIdea, canTeamMoveFrom, columnOrderNote, COLUMN_LABELS, sortColumnIdeas } from "@/lib/utils/content-board";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 import { cn } from "@/lib/utils/cn";
 
 const URL_KEYS = ["idea", "view"] as const;
+
+// Discarded ideas sit in their own column between Ideas and Feedback, folded away to a thin strip
+// until someone opens it. Whether it's open is remembered on this device.
+const DISCARDED_OPEN_KEY = "tc-discarded-open";
+const BOARD_COLUMNS: { status: ContentIdeaStatus; label: string }[] = [
+  CONTENT_COLUMNS[0],
+  { status: "discarded", label: COLUMN_LABELS.discarded },
+  ...CONTENT_COLUMNS.slice(1),
+];
 
 export function KanbanBoard({
   initialIdeas,
@@ -34,7 +46,25 @@ export function KanbanBoard({
   currentUserId: string;
   isAdmin: boolean;
 }) {
-  const { ideas, moveIdea, setOptimisticStatus, moveError, clearMoveError } = useIdeaMoves(initialIdeas);
+  const { ideas, moveIdea, runMove, setOptimisticStatus, moveError, clearMoveError } = useIdeaMoves(initialIdeas);
+  const [discardedOpen, setDiscardedOpenState] = useState(false);
+  useEffect(() => {
+    try {
+      // Read after the first render, so the server and the browser draw the same board first.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem(DISCARDED_OPEN_KEY) === "1") setDiscardedOpenState(true);
+    } catch {
+      // Storage unavailable: it starts folded.
+    }
+  }, []);
+  const setDiscardedOpen = (open: boolean) => {
+    setDiscardedOpenState(open);
+    try {
+      window.localStorage.setItem(DISCARDED_OPEN_KEY, open ? "1" : "0");
+    } catch {
+      // Not remembered; nothing else depends on it.
+    }
+  };
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("");
   const [proposerFilter, setProposerFilter] = useState("");
@@ -70,7 +100,7 @@ export function KanbanBoard({
 
   const columns = useMemo(
     () =>
-      CONTENT_COLUMNS.map((column) => ({
+      BOARD_COLUMNS.map((column) => ({
         ...column,
         ideas: sortColumnIdeas(
           column.status,
@@ -105,16 +135,26 @@ export function KanbanBoard({
 
   // Phones show one column at a time; the tabs jump to a column and follow the swipe.
   function showColumn(index: number) {
-    const target = columnsRef.current?.children[index] as HTMLElement | undefined;
-    target?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+    // Opening Discarded from its tab unfolds it first.
+    if (columns[index]?.status === "discarded" && !discardedOpen) setDiscardedOpen(true);
+    requestAnimationFrame(() => {
+      const target = columnsRef.current?.children[index] as HTMLElement | undefined;
+      target?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+    });
   }
 
+  // The column whose left edge is nearest the scroll position (columns differ in width: the folded
+  // Discarded strip is narrow).
   function trackVisibleColumn() {
     const container = columnsRef.current;
-    const first = container?.children[0] as HTMLElement | undefined;
-    if (!container || !first) return;
-    const step = first.offsetWidth + 12;
-    setVisibleColumn(Math.min(CONTENT_COLUMNS.length - 1, Math.max(0, Math.round(container.scrollLeft / step))));
+    if (!container) return;
+    const children = Array.from(container.children) as HTMLElement[];
+    const left = container.scrollLeft + container.offsetLeft;
+    let nearest = 0;
+    children.forEach((child, index) => {
+      if (Math.abs(child.offsetLeft - left) < Math.abs(children[nearest].offsetLeft - left)) nearest = index;
+    });
+    setVisibleColumn(nearest);
   }
 
   const selectClass = "h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm";
@@ -214,10 +254,32 @@ export function KanbanBoard({
       <div
         ref={columnsRef}
         onScroll={trackVisibleColumn}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 lg:mx-0 lg:grid lg:snap-none lg:auto-cols-[minmax(13rem,1fr)] lg:grid-flow-col lg:gap-4 lg:px-0"
+        // On desktop the folded Discarded strip takes only a thin slot between Ideas and Feedback.
+        style={{
+          gridTemplateColumns: columns
+            .map((column) => (column.status === "discarded" && !discardedOpen ? "2.75rem" : "minmax(13rem, 1fr)"))
+            .join(" "),
+        }}
+        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 lg:mx-0 lg:grid lg:snap-none lg:gap-4 lg:px-0"
       >
         {columns.map((column) => {
           const isDragOver = dragOverStatus === column.status;
+          if (column.status === "discarded" && !discardedOpen) {
+            return (
+              <button
+                key={column.status}
+                type="button"
+                onClick={() => setDiscardedOpen(true)}
+                aria-label={`Show discarded ideas (${column.ideas.length})`}
+                title="Show discarded ideas"
+                className="flex h-[calc(100dvh-17rem)] min-h-[22rem] w-11 shrink-0 snap-start flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 py-3 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 hover:text-foreground lg:h-[calc(100vh-260px)] lg:w-auto"
+              >
+                <ArchiveX className="h-4 w-4 shrink-0" />
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">{column.ideas.length}</span>
+                <span className="text-xs font-medium [writing-mode:vertical-rl]">Discarded</span>
+              </button>
+            );
+          }
           return (
             <div
               key={column.status}
@@ -232,15 +294,33 @@ export function KanbanBoard({
               className={cn(
                 "flex h-[calc(100dvh-17rem)] min-h-[22rem] w-[86vw] max-w-[24rem] shrink-0 snap-start flex-col rounded-lg border bg-muted/40 p-3 transition-colors sm:w-[22rem] lg:h-[calc(100vh-260px)] lg:w-auto lg:max-w-none",
                 isDragOver ? "border-primary/60 bg-primary/5" : "border-border",
+                // Discarded cards are shown faded: they're out of the flow.
+                column.status === "discarded" && "border-dashed bg-muted/20 [&_[role=button]]:opacity-75",
               )}
             >
               <div className="mb-3 flex shrink-0 items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold">{column.label}</h2>
+                  <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                    {column.status === "discarded" ? <ArchiveX className="h-3.5 w-3.5 text-muted-foreground" /> : null}
+                    {column.label}
+                  </h2>
                   {/* Ideas and the other columns are ordered differently, so each says how. */}
                   <p className="text-[11px] text-muted-foreground">{columnOrderNote(column.status)}</p>
                 </div>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{column.ideas.length}</span>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{column.ideas.length}</span>
+                  {column.status === "discarded" ? (
+                    <button
+                      type="button"
+                      onClick={() => setDiscardedOpen(false)}
+                      aria-label="Hide discarded ideas"
+                      title="Hide"
+                      className="grid h-7 w-7 place-items-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
               {/* A little room on every side so a card can grow on hover without being cut off. */}
               <div className="-mx-1.5 min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-1.5 py-1.5">
@@ -257,6 +337,11 @@ export function KanbanBoard({
                     onEdit={() => push({ idea: idea.id, view: "edit" })}
                     onAssign={() => push({ idea: idea.id, view: "assign" })}
                     onMove={(status) => void moveIdea(idea.id, status)}
+                    onDiscard={() => push({ idea: idea.id, view: "discard" })}
+                    onRestore={() =>
+                      void runMove(idea.id, idea.discarded_from === "feedback" ? "feedback" : "idea", () => restoreIdeaAction(idea.id))
+                    }
+                    onDeleteForGood={() => push({ idea: idea.id, view: "delete" })}
                     onDragStart={(event) => {
                       setDraggingId(idea.id);
                       event.dataTransfer.effectAllowed = "move";
@@ -269,7 +354,7 @@ export function KanbanBoard({
                 ))}
                 {column.ideas.length === 0 ? (
                   <p className="rounded-md border border-dashed border-border py-4 text-center text-xs text-muted-foreground">
-                    No ideas
+                    {column.status === "discarded" ? "Nothing discarded. Discard an idea from its ⋮ menu." : "No ideas"}
                   </p>
                 ) : null}
               </div>
@@ -296,6 +381,17 @@ export function KanbanBoard({
           isAdmin={isAdmin}
           currentUserId={currentUserId}
           onClose={() => pop({ view: null })}
+        />
+      ) : null}
+      {panelIdea && (view === "discard" || view === "delete") ? (
+        <DiscardDialog
+          idea={panelIdea}
+          mode={view}
+          onDone={() => {
+            if (view === "discard") setOptimisticStatus(panelIdea.id, "discarded");
+          }}
+          // A deleted idea is gone, so its panel closes too.
+          onClose={() => (view === "delete" ? pop({ idea: null, view: null }) : pop({ view: null }))}
         />
       ) : null}
       {panelIdea && view === "assign" && isAdmin ? (

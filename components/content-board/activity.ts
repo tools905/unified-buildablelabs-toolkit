@@ -64,6 +64,14 @@ export function buildActivity(data: IdeaPanelData): ActivityEvent[] {
       detail: [`${review.pages.length} ${review.pages.length === 1 ? "page" : "pages"} marked`, review.note ?? ""].filter(Boolean).join(" · "),
     });
   }
+  if (data.history.discarded) {
+    events.push({
+      id: "discarded",
+      at: data.history.discarded.at,
+      label: `Discarded by ${data.history.discarded.byName ?? "Unknown"}`,
+      detail: data.history.discarded.reason ?? undefined,
+    });
+  }
   if (data.history.changesDoneAt) {
     events.push({
       id: "changes-done",

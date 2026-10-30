@@ -171,6 +171,27 @@ export async function removeAttachmentAction(attachmentId: string) {
   return toResult(() => attachmentService.removeAttachment(supabase, attachmentId), { revalidate: false });
 }
 
+export async function discardIdeaAction(ideaId: string, reason: string | null) {
+  const { supabase, user, workspace } = await requireContentBoardContext();
+  return toResult(async () => {
+    await contentIdeaService.discardIdea(supabase, workspace.id, ideaId, user.id, reason);
+  });
+}
+
+export async function restoreIdeaAction(ideaId: string) {
+  const { supabase, user, workspace } = await requireContentBoardContext();
+  return toResult(async () => {
+    await contentIdeaService.restoreIdea(supabase, workspace.id, ideaId, user.id);
+  });
+}
+
+export async function deleteDiscardedIdeaAction(ideaId: string) {
+  const { supabase, user, workspace } = await requireContentBoardContext();
+  return toResult(async () => {
+    await contentIdeaService.deleteDiscardedIdea(supabase, workspace.id, ideaId, user.id);
+  });
+}
+
 export async function setAfterChangesAction(ideaId: string, value: "shortlist" | "review" | null) {
   const { supabase, user, workspace } = await requireContentBoardContext();
   return toResult(async () => {

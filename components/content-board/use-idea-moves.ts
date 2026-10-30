@@ -37,13 +37,15 @@ export function useIdeaMoves(initialIdeas: ContentIdeaWithRelations[]) {
     [initialIdeas],
   );
 
-  const moveIdea = useCallback(
-    async (ideaId: string, status: ContentIdeaStatus, options: { scheduledFor?: string | null } = {}) => {
+  // Shows the card in `status` at once and runs `action`; if it fails, the card goes back and the
+  // reason is shown.
+  const runMove = useCallback(
+    async (ideaId: string, status: ContentIdeaStatus, action: () => Promise<{ ok: true } | { ok: false; error: string }>) => {
       setMoveError(null);
       setOptimisticStatus(ideaId, status);
       let problem: string | null = null;
       try {
-        const result = await moveIdeaAction(ideaId, status, options);
+        const result = await action();
         if (!result.ok) problem = result.error;
       } catch {
         problem = "Couldn't reach the server, so the card wasn't moved. Please try again.";
@@ -57,5 +59,11 @@ export function useIdeaMoves(initialIdeas: ContentIdeaWithRelations[]) {
     [setOptimisticStatus],
   );
 
-  return { ideas, moveIdea, setOptimisticStatus, moveError, clearMoveError: () => setMoveError(null) };
+  const moveIdea = useCallback(
+    (ideaId: string, status: ContentIdeaStatus, options: { scheduledFor?: string | null } = {}) =>
+      runMove(ideaId, status, () => moveIdeaAction(ideaId, status, options)),
+    [runMove],
+  );
+
+  return { ideas, moveIdea, runMove, setOptimisticStatus, moveError, clearMoveError: () => setMoveError(null) };
 }

@@ -131,6 +131,9 @@ export function IdeaCard({
   onEdit,
   onAssign,
   onMove,
+  onDiscard,
+  onRestore,
+  onDeleteForGood,
   onDragStart,
   onDragEnd,
   isDragging,
@@ -150,6 +153,9 @@ export function IdeaCard({
   onEdit: () => void;
   onAssign: () => void;
   onMove: (status: ContentIdeaStatus) => void;
+  onDiscard: () => void;
+  onRestore: () => void;
+  onDeleteForGood: () => void;
   onDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?: () => void;
   isDragging: boolean;
@@ -247,6 +253,14 @@ export function IdeaCard({
             {describeActivity(idea.latest_activity)} ·{" "}
             <span suppressHydrationWarning>{formatDistanceToNowStrict(new Date(idea.latest_activity.at), { addSuffix: true })}</span>
           </span>
+        </p>
+      ) : null}
+      {idea.status === "discarded" ? (
+        // Who discarded it and why, so the team can tell whether to bring it back.
+        <p className="mt-1.5 break-words text-[11px] leading-snug text-muted-foreground">
+          Discarded{idea.discarder ? ` by ${idea.discarder.full_name || idea.discarder.email}` : ""}
+          {idea.discarded_at ? ` · ${formatWhen(idea.discarded_at)}` : ""}
+          {idea.discard_reason ? <span className="block text-foreground/80">&ldquo;{idea.discard_reason}&rdquo;</span> : null}
         </p>
       ) : null}
       {(idea.status === "idea" || idea.status === "feedback") && idea.after_changes ? (
@@ -371,6 +385,9 @@ export function IdeaCard({
           onEdit={onEdit}
           onAssign={onAssign}
           onMove={onMove}
+          onDiscard={onDiscard}
+          onRestore={onRestore}
+          onDeleteForGood={onDeleteForGood}
         />
       </div>
     </div>

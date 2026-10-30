@@ -17,7 +17,7 @@ export const platformsSchema = z
     return unique.length ? unique : ["any"];
   });
 
-export const contentIdeaStatusSchema = z.enum(["idea", "feedback", "approved", "in_progress", "posted"]);
+export const contentIdeaStatusSchema = z.enum(["idea", "feedback", "approved", "in_progress", "posted", "discarded"]);
 
 // A calendar day like "2026-10-12"; an empty field means "not scheduled".
 export const scheduledForSchema = z.preprocess(

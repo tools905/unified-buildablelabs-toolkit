@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Download, Eye, MoreVertical, Pencil, UserPlus } from "lucide-react";
+import { ArchiveX, ArrowRight, Download, Eye, MoreVertical, Pencil, RotateCcw, Trash2, UserPlus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,12 +10,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CONTENT_COLUMNS, type ContentIdeaWithRelations } from "@/components/content-board/types";
-import { canMoveIdea } from "@/lib/utils/content-board";
+import { canDiscard, canMoveIdea, COLUMN_LABELS } from "@/lib/utils/content-board";
 import { ideaPdfUrl } from "@/components/content-board/idea-pdf";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 
 // The ⋮ menu on a board card: open, edit, assign (admins), move to another column (whoever may make
-// that move) and download the post as a PDF.
+// that move), download the post as a PDF, and discard (Ideas and Feedback) / restore / delete for good.
 export function CardMenu({
   idea,
   isAdmin,
@@ -23,6 +23,9 @@ export function CardMenu({
   onEdit,
   onAssign,
   onMove,
+  onDiscard,
+  onRestore,
+  onDeleteForGood,
 }: {
   idea: ContentIdeaWithRelations;
   isAdmin: boolean;
@@ -30,7 +33,11 @@ export function CardMenu({
   onEdit: () => void;
   onAssign: () => void;
   onMove: (status: ContentIdeaStatus) => void;
+  onDiscard: () => void;
+  onRestore: () => void;
+  onDeleteForGood: () => void;
 }) {
+  const discarded = idea.status === "discarded";
   const moves = CONTENT_COLUMNS.filter((column) =>
     canMoveIdea({ from: idea.status, to: column.status, isAdmin, openReviewCount: idea.open_review_count, afterChanges: idea.after_changes }),
   );
@@ -73,7 +80,31 @@ export function CardMenu({
             </a>
           </DropdownMenuItem>
         ) : null}
-        {moves.length > 0 ? (
+        {discarded ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onRestore}>
+              <RotateCcw />
+              Restore to {COLUMN_LABELS[idea.discarded_from === "feedback" ? "feedback" : "idea"]}
+            </DropdownMenuItem>
+            {isAdmin ? (
+              <DropdownMenuItem onSelect={onDeleteForGood} className="text-destructive focus:text-destructive">
+                <Trash2 />
+                Delete for good…
+              </DropdownMenuItem>
+            ) : null}
+          </>
+        ) : null}
+        {canDiscard(idea.status) ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onDiscard} className="text-destructive focus:text-destructive">
+              <ArchiveX />
+              Discard…
+            </DropdownMenuItem>
+          </>
+        ) : null}
+        {moves.length > 0 && !discarded ? (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Move to</DropdownMenuLabel>

@@ -22,7 +22,7 @@ export async function getIdeaPanelData(
     isWorkspaceAdmin(workspace.id, user.id, supabase),
     supabase
       .from("content_ideas")
-      .select("status, created_at, created_by, posted_at, reviewed_at, reviewed_by, after_changes, changes_done_at, changes_done_by")
+      .select("status, created_at, created_by, posted_at, reviewed_at, reviewed_by, after_changes, changes_done_at, changes_done_by, discarded_at, discarded_by, discard_reason, discarded_from")
       .eq("id", ideaId)
       .single(),
     listMarkupReviews(supabase, ideaId),
@@ -33,7 +33,7 @@ export async function getIdeaPanelData(
   const idea = ideaResult.data;
 
   const personIds = [
-    ...new Set([user.id, idea.created_by, idea.reviewed_by, idea.changes_done_by, ...attachments.map((item) => item.created_by)].filter(Boolean)),
+    ...new Set([user.id, idea.created_by, idea.reviewed_by, idea.changes_done_by, idea.discarded_by, ...attachments.map((item) => item.created_by)].filter(Boolean)),
   ] as string[];
   // Names and signed file links don't depend on each other, so fetch them together.
   const [{ data: people }, signed] = await Promise.all([
@@ -70,6 +70,14 @@ export async function getIdeaPanelData(
       afterChanges: idea.after_changes ?? null,
       changesDoneAt: idea.changes_done_at ?? null,
       changesDoneByName: idea.changes_done_by ? nameOf(idea.changes_done_by) : null,
+      discarded: idea.discarded_at
+        ? {
+            at: idea.discarded_at,
+            byName: idea.discarded_by ? nameOf(idea.discarded_by) : null,
+            reason: idea.discard_reason ?? null,
+            from: idea.discarded_from === "feedback" ? "feedback" : "idea",
+          }
+        : null,
     },
     attachments: attachments.map((item) => ({
       id: item.id,

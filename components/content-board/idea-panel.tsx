@@ -318,6 +318,7 @@ export function IdeaPanel({
               openReviewCount={data.points.filter((point) => !point.isResolved).length}
               afterChanges={data.history.afterChanges ?? null}
               changesDoneByName={data.history.changesDoneAt ? (data.history.changesDoneByName ?? "Someone") : null}
+              discarded={data.history.discarded ?? null}
               onMove={onMove}
               onChanged={() => afterChange()}
             />

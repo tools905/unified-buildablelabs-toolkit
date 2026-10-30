@@ -98,6 +98,8 @@ export function canMoveIdea(input: {
   afterChanges?: AfterChanges | null;
 }) {
   if (input.from === input.to) return false;
+  // Discarding has its own step (with an optional reason), never a plain move or a drag.
+  if (input.to === "discarded") return false;
   if (input.isAdmin) return true;
   if (input.from === "feedback" && input.to === "approved") {
     if (input.afterChanges === "review") return false;
@@ -197,10 +199,16 @@ export const COLUMN_LABELS: Record<ContentIdeaStatus, string> = {
   approved: "Shortlisted",
   in_progress: "In Progress",
   posted: "Posted",
+  discarded: "Discarded",
 };
+
+// Ideas in these columns can be discarded (by anyone on the team), and are restored back to them.
+export const DISCARDABLE: ContentIdeaStatus[] = ["idea", "feedback"];
+export const canDiscard = (status: ContentIdeaStatus) => DISCARDABLE.includes(status);
 
 // How each column is ordered, shown in small under its title.
 export function columnOrderNote(status: ContentIdeaStatus) {
+  if (status === "discarded") return "Most recently discarded first";
   return status === "idea" ? "Oldest idea first" : "Most recent activity first";
 }
 
@@ -265,6 +273,7 @@ export function describeActivity(activity: LatestActivity) {
   const by = activity.by ? ` by ${activity.by}` : "";
   switch (activity.kind) {
     case "moved":
+      if (activity.to === "discarded") return `Discarded${by}`;
       return `Moved to ${activity.to ? COLUMN_LABELS[activity.to] : "this column"}${by}`;
     case "reviewed":
       return `Reviewed${by}`;
@@ -294,6 +303,10 @@ const time = (value: string | null | undefined) => (value ? new Date(value).getT
 // column: the idea with the most recent activity on top (moved into the column, reviewed, commented,
 // a comment ticked done, a new upload).
 export function sortColumnIdeas<T extends SortableIdea>(status: ContentIdeaStatus, ideas: T[]): T[] {
+  if (status === "discarded") {
+    const discardedAt = (idea: T) => time((idea as T & { discarded_at?: string | null }).discarded_at ?? idea.created_at);
+    return [...ideas].sort((a, b) => discardedAt(b) - discardedAt(a));
+  }
   if (status === "idea") {
     return [...ideas].sort((a, b) => time(a.created_at) - time(b.created_at));
   }

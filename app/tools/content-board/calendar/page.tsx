@@ -61,7 +61,8 @@ export default async function ContentCalendarPage({ searchParams }: { searchPara
   }
 
   const [rawIdeas, members, admin] = await Promise.all([
-    listContentIdeas(supabase, workspace.id),
+    // Discarded ideas don't belong on the calendar.
+    listContentIdeas(supabase, workspace.id).then((ideas) => ideas.filter((idea) => idea.status !== "discarded")),
     getWorkspaceMembers(supabase, workspace.id),
     isWorkspaceAdmin(workspace.id, user.id, supabase),
   ]);

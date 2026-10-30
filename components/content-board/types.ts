@@ -44,6 +44,11 @@ export type ContentIdeaWithRelations = {
   // done (see canMoveIdea).
   after_changes?: AfterChanges | null;
   changes_done_at?: string | null;
+  // Set while the idea is in Discarded: when, by whom, why, and the column it came from.
+  discarded_at?: string | null;
+  discard_reason?: string | null;
+  discarded_from?: "idea" | "feedback" | null;
+  discarder?: ContentIdeaProfile | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -105,6 +110,8 @@ export type IdeaPanelHistory = {
   afterChanges?: AfterChanges | null;
   changesDoneAt?: string | null;
   changesDoneByName?: string | null;
+  // While the idea is in Discarded.
+  discarded?: { at: string; byName: string | null; reason: string | null; from: "idea" | "feedback" } | null;
 };
 
 export type IdeaPanelData = {
