@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, ListFilter, Trash2 } from "lucide-react";
+import { Check, ListFilter, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { describeRange, type DateRange, type RangeKey } from "@/lib/utils/date-range";
@@ -15,8 +15,9 @@ const OPTIONS: { key: RangeKey; label: string }[] = [
   { key: "custom", label: "Custom dates" },
 ];
 
-// Above a list of notifications or logs: "Select all shown", the dustbin (deletes what's ticked, after a
-// confirm) and, right next to it, the filter (all time, this month, last 3 months or custom dates).
+// Above a list of notifications or logs: the dustbin and, right next to it, the filter (all time, this
+// month, last 3 months or custom dates). The tick boxes stay hidden until the dustbin is pressed; then
+// "Select all", the count, "Delete N" (after a confirm) and Cancel show, and the list shows its boxes.
 export function ListToolbar({
   range,
   shownCount,
@@ -25,6 +26,9 @@ export function ListToolbar({
   onToggleAll,
   onDelete,
   deleting,
+  selecting,
+  onSelectingChange,
+  leading,
 }: {
   range: DateRange;
   shownCount: number;
@@ -33,6 +37,10 @@ export function ListToolbar({
   onToggleAll: () => void;
   onDelete: () => void;
   deleting: boolean;
+  selecting: boolean;
+  onSelectingChange: (selecting: boolean) => void;
+  // Shown on the left when not choosing what to delete, such as "Mark all read".
+  leading?: ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,36 +78,60 @@ export function ListToolbar({
   }
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <label className={cn("flex items-center gap-2 text-sm", shownCount === 0 && "pointer-events-none opacity-50")}>
-        <input type="checkbox" checked={allSelected && shownCount > 0} onChange={onToggleAll} className="h-4 w-4 accent-primary" />
-        Select all shown
-        {selectedCount > 0 ? <span className="text-xs text-muted-foreground">({selectedCount} selected)</span> : null}
-      </label>
-      <div className="flex items-center gap-1.5">
+    <div className="mb-4 flex min-h-9 flex-wrap items-center justify-between gap-2">
+      {selecting ? (
+        <label className={cn("flex items-center gap-2 text-sm", shownCount === 0 && "pointer-events-none opacity-50")}>
+          <input type="checkbox" checked={allSelected && shownCount > 0} onChange={onToggleAll} className="h-4 w-4 accent-primary" />
+          Select all
+          <span className="text-xs text-muted-foreground">({selectedCount} selected)</span>
+        </label>
+      ) : (
+        <div>{leading}</div>
+      )}
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         {range.key !== "all" ? <span className="hidden text-xs text-muted-foreground sm:inline">{describeRange(range)}</span> : null}
-        {confirming ? (
-          <span className="flex items-center gap-1.5">
-            <span className="text-xs">Delete {selectedCount}?</span>
-            <Button type="button" size="sm" variant="destructive" disabled={deleting} onClick={() => { onDelete(); setConfirming(false); }}>
-              {deleting ? "Deleting…" : "Delete"}
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-          </span>
-        ) : (
+        {!selecting ? (
           <Button
             type="button"
             size="icon"
             variant="outline"
-            aria-label={selectedCount ? `Delete ${selectedCount} selected` : "Delete (tick items first)"}
-            title={selectedCount ? `Delete ${selectedCount} selected` : "Tick items to delete them"}
-            disabled={selectedCount === 0 || deleting}
-            onClick={() => setConfirming(true)}
+            aria-label="Delete items"
+            title={shownCount ? "Choose items to delete" : "Nothing to delete"}
+            disabled={shownCount === 0}
+            onClick={() => onSelectingChange(true)}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
+        ) : confirming ? (
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs">Delete {selectedCount}? This can&apos;t be undone.</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => {
+                onDelete();
+                setConfirming(false);
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+              Back
+            </Button>
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5">
+            <Button type="button" size="sm" variant="destructive" className="gap-1.5" disabled={selectedCount === 0 || deleting} onClick={() => setConfirming(true)}>
+              <Trash2 className="h-3.5 w-3.5" />
+              {deleting ? "Deleting…" : selectedCount ? `Delete ${selectedCount}` : "Tick items to delete"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" className="gap-1" onClick={() => onSelectingChange(false)}>
+              <X className="h-3.5 w-3.5" />
+              Cancel
+            </Button>
+          </span>
         )}
         <div ref={boxRef} className="relative">
           <Button

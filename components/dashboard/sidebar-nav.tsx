@@ -11,7 +11,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   FileBarChart,
-  History,
   KanbanSquare,
   LayoutDashboard,
   MessageCircle,
@@ -41,7 +40,6 @@ const baseLinks: NavItem[] = [
 const adminLinks: NavItem[] = [
   { href: "/team", label: "Team", icon: Users, exact: true },
   { href: "/team/logs", label: "Workspace Logs", icon: Activity },
-  { href: "/admin/audit-logs", label: "Audit Logs", icon: History },
 ];
 
 const toolNav: Array<{

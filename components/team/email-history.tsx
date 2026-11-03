@@ -20,6 +20,8 @@ type EmailLog = {
 export function EmailHistory({ logs, range }: { logs: EmailLog[]; range: DateRange }) {
   const [items, setItems] = useState(logs);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  // Tick boxes show only after the dustbin is pressed.
+  const [selecting, setSelecting] = useState(false);
   const [deleting, startDelete] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const allSelected = items.length > 0 && items.every((item) => selected.has(item.id));
@@ -44,6 +46,7 @@ export function EmailHistory({ logs, range }: { logs: EmailLog[]; range: DateRan
       }
       setItems((current) => current.filter((item) => !ids.includes(item.id)));
       setSelected(new Set());
+      setSelecting(false);
     });
   }
 
@@ -57,6 +60,11 @@ export function EmailHistory({ logs, range }: { logs: EmailLog[]; range: DateRan
         onToggleAll={() => setSelected(allSelected ? new Set() : new Set(items.map((item) => item.id)))}
         onDelete={remove}
         deleting={deleting}
+        selecting={selecting}
+        onSelectingChange={(next) => {
+          setSelecting(next);
+          if (!next) setSelected(new Set());
+        }}
       />
       {error ? (
         <p role="alert" className="mb-3 text-sm text-destructive">
@@ -71,9 +79,11 @@ export function EmailHistory({ logs, range }: { logs: EmailLog[]; range: DateRan
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-8">
-                <span className="sr-only">Select</span>
-              </TableHead>
+              {selecting ? (
+                <TableHead className="w-8">
+                  <span className="sr-only">Select</span>
+                </TableHead>
+              ) : null}
               <TableHead>Recipient</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Status</TableHead>
@@ -83,16 +93,24 @@ export function EmailHistory({ logs, range }: { logs: EmailLog[]; range: DateRan
           </TableHeader>
           <TableBody>
             {items.map((log) => (
-              <TableRow key={log.id} data-state={selected.has(log.id) ? "selected" : undefined}>
-                <TableCell>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(log.id)}
-                    onChange={() => toggle(log.id)}
-                    aria-label={`Select the email to ${log.recipient_email}`}
-                    className="h-4 w-4 accent-primary"
-                  />
-                </TableCell>
+              <TableRow
+                key={log.id}
+                data-state={selected.has(log.id) ? "selected" : undefined}
+                onClick={selecting ? () => toggle(log.id) : undefined}
+                className={selecting ? "cursor-pointer" : undefined}
+              >
+                {selecting ? (
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(log.id)}
+                      onChange={() => toggle(log.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      aria-label={`Select the email to ${log.recipient_email}`}
+                      className="h-4 w-4 accent-primary"
+                    />
+                  </TableCell>
+                ) : null}
                 <TableCell className="font-medium">{log.recipient_email}</TableCell>
                 <TableCell className="capitalize">{log.type.replace(/_/g, " ")}</TableCell>
                 <TableCell>

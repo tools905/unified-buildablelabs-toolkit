@@ -80,7 +80,7 @@ function ToolGrid({ tools }: { tools: ToolkitTool[] }) {
 
 // The workspace-wide numbers admins used to find under Admin Reports.
 async function loadAdminStats(supabase: SupabaseClient<any>, workspaceId: string) {
-  const [members, projects, pendingReviews, auditLogs] = await Promise.all([
+  const [members, projects, pendingReviews] = await Promise.all([
     supabase
       .from("workspace_members")
       .select("*", { count: "exact", head: true })
@@ -92,13 +92,11 @@ async function loadAdminStats(supabase: SupabaseClient<any>, workspaceId: string
       .select("*, review_rounds!inner(projects!inner(workspace_id))", { count: "exact", head: true })
       .eq("status", "pending")
       .eq("review_rounds.projects.workspace_id", workspaceId),
-    supabase.from("audit_logs").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
   ]);
   return {
     members: members.count ?? 0,
     projects: projects.count ?? 0,
     pendingReviews: pendingReviews.count ?? 0,
-    auditLogs: auditLogs.count ?? 0,
   };
 }
 
@@ -129,9 +127,8 @@ export default async function DashboardPage() {
             <StatCard title="Pending reviews" value={stats.pendingReviews} />
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
-            {stats.auditLogs} logged workspace actions.{" "}
             <Link href="/team/logs" className="font-medium text-primary hover:underline">
-              View workspace logs
+              View workspace logs (emails sent)
             </Link>
           </p>
         </CollapsibleSection>

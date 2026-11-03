@@ -23,6 +23,8 @@ type Notification = {
 export function NotificationList({ notifications, range }: { notifications: Notification[]; range: DateRange }) {
   const [items, setItems] = useState(notifications);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  // Tick boxes show only after the dustbin is pressed.
+  const [selecting, setSelecting] = useState(false);
   const [, startTransition] = useTransition();
   const [deleting, startDelete] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export function NotificationList({ notifications, range }: { notifications: Noti
       }
       setItems((current) => current.filter((item) => !ids.includes(item.id)));
       setSelected(new Set());
+      setSelecting(false);
     });
   }
 
@@ -63,22 +66,27 @@ export function NotificationList({ notifications, range }: { notifications: Noti
         onToggleAll={() => setSelected(allSelected ? new Set() : new Set(items.map((item) => item.id)))}
         onDelete={remove}
         deleting={deleting}
+        selecting={selecting}
+        onSelectingChange={(next) => {
+          setSelecting(next);
+          if (!next) setSelected(new Set());
+        }}
+        leading={
+          unreadCount > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setItems((prev) => prev.map((item) => ({ ...item, read_at: item.read_at ?? new Date(0).toISOString() })));
+                startTransition(() => markAllNotificationsReadAction());
+              }}
+            >
+              Mark all read
+            </Button>
+          ) : null
+        }
       />
-      {unreadCount > 0 ? (
-        <div className="-mt-2 mb-3 flex justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setItems((prev) => prev.map((item) => ({ ...item, read_at: item.read_at ?? new Date(0).toISOString() })));
-              startTransition(() => markAllNotificationsReadAction());
-            }}
-          >
-            Mark all read
-          </Button>
-        </div>
-      ) : null}
       {error ? (
         <p role="alert" className="mb-3 text-sm text-destructive">
           {error}
@@ -98,16 +106,20 @@ export function NotificationList({ notifications, range }: { notifications: Noti
                 selected.has(item.id) && "border-primary/50 bg-primary/5",
               )}
             >
-              <input
-                type="checkbox"
-                checked={selected.has(item.id)}
-                onChange={() => toggle(item.id)}
-                aria-label={`Select “${item.title}”`}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-              />
+              {selecting ? (
+                <input
+                  type="checkbox"
+                  checked={selected.has(item.id)}
+                  onChange={() => toggle(item.id)}
+                  aria-label={`Select “${item.title}”`}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                />
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
+                  // While choosing what to delete, a tap anywhere on the row ticks it.
+                  if (selecting) return toggle(item.id);
                   if (item.read_at) return;
                   setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, read_at: new Date(0).toISOString() } : n)));
                   startTransition(() => markNotificationReadAction(item.id));
