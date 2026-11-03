@@ -8,7 +8,8 @@ import { LogoutButton } from "@/components/dashboard/logout-button";
 import { getUserSession } from "@/lib/auth/require-user";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { getUnreadNotificationCount } from "@/lib/services/notification-service";
-import { dailyGreeting, firstName } from "@/lib/utils/greeting";
+import { dailyGreetingParts, firstName, todayLabel } from "@/lib/utils/greeting";
+import { TodayBar } from "@/components/dashboard/today-bar";
 
 async function getShellContext() {
   try {
@@ -20,7 +21,7 @@ async function getShellContext() {
       getCurrentWorkspace(supabase, user.id),
       supabase.from("profiles").select("full_name, email").eq("id", user.id).maybeSingle(),
     ]);
-    const greeting = dailyGreeting(user.id, firstName(profile?.full_name, profile?.email ?? user.email));
+    const greeting = dailyGreetingParts(user.id, firstName(profile?.full_name, profile?.email ?? user.email));
     if (!workspace) return { admin: false, unreadCount: 0, greeting };
 
     const [admin, unreadCount] = await Promise.all([
@@ -60,12 +61,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <DesktopSidebar admin={admin} unreadCount={unreadCount} initialCollapsed={sidebarCollapsed} />
         <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
           <div className="mx-auto w-full max-w-7xl">
-            {/* Today's greeting, in the same spot on every page (see lib/utils/greeting.ts). */}
-            {greeting ? (
-              <p className="mb-3 text-sm font-medium text-primary sm:-mb-2 sm:text-right lg:-mt-2" aria-live="off">
-                {greeting}
-              </p>
-            ) : null}
+            {/* Today's greeting, in the same spot on every page. */}
+            {greeting ? <TodayBar greeting={greeting} date={todayLabel()} unreadCount={unreadCount} /> : null}
             {children}
           </div>
         </main>

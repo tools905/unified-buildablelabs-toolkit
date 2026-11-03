@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dailyGreeting, firstName, GREETING_LINES } from "@/lib/utils/greeting";
+import { dailyGreeting, dailyGreetingParts, firstName, GREETING_LINES, todayLabel } from "@/lib/utils/greeting";
 
 describe("the daily greeting", () => {
   it("uses the person's first name", () => {
@@ -19,5 +19,15 @@ describe("the daily greeting", () => {
   it("has about thirty lines, each naming the person", () => {
     expect(GREETING_LINES.length).toBe(30);
     expect(GREETING_LINES.every((line) => line.includes("{name}"))).toBe(true);
+  });
+});
+
+describe("the greeting's parts and date", () => {
+  it("splits the line around the name and dates it in India time", () => {
+    const parts = dailyGreetingParts("u1", "Aditi", new Date("2026-11-04T03:00:00Z"));
+    expect(parts.name).toBe("Aditi");
+    expect(`${parts.before}${parts.name}${parts.after}`).toBe(dailyGreeting("u1", "Aditi", new Date("2026-11-04T03:00:00Z")));
+    // 20:00 UTC on the 3rd is already the 4th in India.
+    expect(todayLabel(new Date("2026-11-03T20:00:00Z"))).toBe("Wednesday · 4 November");
   });
 });

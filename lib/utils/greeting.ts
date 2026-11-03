@@ -45,10 +45,22 @@ export function firstName(fullName: string | null | undefined, email: string | n
   return local ? local[0].toUpperCase() + local.slice(1) : "there";
 }
 
-// Today's line for this person.
-export function dailyGreeting(userId: string, name: string, now = new Date()) {
+// Today's line for this person, split around the name so the page can set the name apart.
+export function dailyGreetingParts(userId: string, name: string, now = new Date()) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
   let hash = 0;
   for (const char of `${userId}:${day}`) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return LINES[hash % LINES.length].replace("{name}", name);
+  const [before, after] = LINES[hash % LINES.length].split("{name}");
+  return { before, name, after };
+}
+
+export function dailyGreeting(userId: string, name: string, now = new Date()) {
+  const { before, after } = dailyGreetingParts(userId, name, now);
+  return `${before}${name}${after}`;
+}
+
+// "Tuesday · 4 November", India time.
+export function todayLabel(now = new Date()) {
+  const part = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", ...options }).format(now);
+  return `${part({ weekday: "long" })} · ${part({ day: "numeric", month: "long" })}`;
 }
