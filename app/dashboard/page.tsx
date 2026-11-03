@@ -111,16 +111,12 @@ export default async function DashboardPage() {
   // Newsletter now lives inside Content Board (its sidebar, below Calendar), so it has no card of its own.
   const contentTools = tools.filter((tool) => tool.group === "content" && tool.slug !== "newsletter");
 
-  const displayName =
-    (user.user_metadata?.full_name as string | undefined)?.split(" ")[0] ||
-    user.email?.split("@")[0] ||
-    "there";
-
   return (
     <>
       <PageHeader
         eyebrow={workspace.name}
-        title={`Welcome back, ${displayName}`}
+        // The daily greeting above every page already welcomes the person by name.
+        title="Dashboard"
         description="Every tool your team uses, in one place."
       />
 

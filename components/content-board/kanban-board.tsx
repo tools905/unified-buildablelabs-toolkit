@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArchiveX, ChevronLeft } from "lucide-react";
+import { ArchiveX, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AssignDialog } from "@/components/content-board/assign-dialog";
 import { CreateIdeaDialog } from "@/components/content-board/create-idea-dialog";
 import { DiscardDialog } from "@/components/content-board/discard-dialog";
+import { BoardFilters, NO_FILTERS, type BoardFilterValues } from "@/components/content-board/board-filters";
+import { ExportDialog } from "@/components/content-board/export-dialog";
 import { restoreIdeaAction } from "@/app/tools/content-board/actions";
 import { IdeaCard } from "@/components/content-board/idea-card";
 import { IdeaDetail } from "@/components/content-board/idea-detail";
@@ -14,8 +16,6 @@ import { useIdeaMoves } from "@/components/content-board/use-idea-moves";
 import { useUrlState } from "@/components/dashboard/use-url-state";
 import {
   CONTENT_COLUMNS,
-  PLATFORM_META,
-  PLATFORM_OPTIONS,
   matchesPlatform,
   type ContentIdeaWithRelations,
   type ContentMemberOption,
@@ -26,9 +26,9 @@ import { cn } from "@/lib/utils/cn";
 
 const URL_KEYS = ["idea", "view"] as const;
 
-// Discarded ideas sit in their own column between Ideas and Feedback, folded away to a thin strip
-// until someone opens it. Whether it's open is remembered on this device.
-const DISCARDED_OPEN_KEY = "tc-discarded-open";
+// Discarded ideas sit in their own column between Ideas and Feedback, shown only when "Show discarded
+// ideas" is switched on in the Filter. The filters are remembered on this device.
+const FILTERS_KEY = "tc-board-filters";
 const BOARD_COLUMNS: { status: ContentIdeaStatus; label: string }[] = [
   CONTENT_COLUMNS[0],
   { status: "discarded", label: COLUMN_LABELS.discarded },
@@ -47,28 +47,27 @@ export function KanbanBoard({
   isAdmin: boolean;
 }) {
   const { ideas, moveIdea, runMove, setOptimisticStatus, moveError, clearMoveError } = useIdeaMoves(initialIdeas);
-  const [discardedOpen, setDiscardedOpenState] = useState(false);
+  const [filters, setFiltersState] = useState<BoardFilterValues>(NO_FILTERS);
   useEffect(() => {
     try {
       // Read after the first render, so the server and the browser draw the same board first.
+      const saved = JSON.parse(window.localStorage.getItem(FILTERS_KEY) ?? "null") as Partial<BoardFilterValues> | null;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (window.localStorage.getItem(DISCARDED_OPEN_KEY) === "1") setDiscardedOpenState(true);
+      if (saved) setFiltersState({ ...NO_FILTERS, ...saved });
     } catch {
-      // Storage unavailable: it starts folded.
+      // Storage unavailable: no filters.
     }
   }, []);
-  const setDiscardedOpen = (open: boolean) => {
-    setDiscardedOpenState(open);
+  // The filters are remembered on this device.
+  const setFilters = (next: BoardFilterValues) => {
+    setFiltersState(next);
     try {
-      window.localStorage.setItem(DISCARDED_OPEN_KEY, open ? "1" : "0");
+      window.localStorage.setItem(FILTERS_KEY, JSON.stringify(next));
     } catch {
       // Not remembered; nothing else depends on it.
     }
   };
   const [search, setSearch] = useState("");
-  const [platformFilter, setPlatformFilter] = useState("");
-  const [proposerFilter, setProposerFilter] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<ContentIdeaStatus | null>(null);
   const [visibleColumn, setVisibleColumn] = useState(0);
@@ -81,13 +80,11 @@ export function KanbanBoard({
 
   const filtered = useMemo(() => {
     return ideas.filter((idea) => {
-      if (!matchesPlatform(idea, platformFilter)) return false;
-      if (proposerFilter === "me" && idea.created_by !== currentUserId) return false;
-      if (proposerFilter && proposerFilter !== "me" && idea.created_by !== proposerFilter) return false;
-      const assignedIds = (idea.assignees ?? []).map((assignee) => assignee.user_id);
-      if (assigneeFilter === "me" && !assignedIds.includes(currentUserId)) return false;
-      if (assigneeFilter === "none" && assignedIds.length > 0) return false;
-      if (assigneeFilter && assigneeFilter !== "me" && assigneeFilter !== "none" && !assignedIds.includes(assigneeFilter)) return false;
+      if (!matchesPlatform(idea, filters.platform)) return false;
+      // A person: ideas they added or are assigned to.
+      if (filters.person && idea.created_by !== filters.person && !(idea.assignees ?? []).some((assignee) => assignee.user_id === filters.person)) {
+        return false;
+      }
       if (search) {
         const query = search.toLowerCase();
         const matches =
@@ -96,18 +93,19 @@ export function KanbanBoard({
       }
       return true;
     });
-  }, [ideas, search, platformFilter, proposerFilter, assigneeFilter, currentUserId]);
+  }, [ideas, search, filters.platform, filters.person]);
 
   const columns = useMemo(
     () =>
-      BOARD_COLUMNS.map((column) => ({
+      // The Discarded column only when "Show discarded ideas" is on in the filter.
+      BOARD_COLUMNS.filter((column) => column.status !== "discarded" || filters.showDiscarded).map((column) => ({
         ...column,
         ideas: sortColumnIdeas(
           column.status,
           filtered.filter((idea) => idea.status === column.status),
         ),
       })),
-    [filtered],
+    [filtered, filters.showDiscarded],
   );
 
   // A column takes the card being dragged only if this person may make that move (see canMoveIdea):
@@ -135,12 +133,8 @@ export function KanbanBoard({
 
   // Phones show one column at a time; the tabs jump to a column and follow the swipe.
   function showColumn(index: number) {
-    // Opening Discarded from its tab unfolds it first.
-    if (columns[index]?.status === "discarded" && !discardedOpen) setDiscardedOpen(true);
-    requestAnimationFrame(() => {
-      const target = columnsRef.current?.children[index] as HTMLElement | undefined;
-      target?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
-    });
+    const target = columnsRef.current?.children[index] as HTMLElement | undefined;
+    target?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
   }
 
   // The column whose left edge is nearest the scroll position (columns differ in width: the folded
@@ -157,63 +151,21 @@ export function KanbanBoard({
     setVisibleColumn(nearest);
   }
 
-  const selectClass = "h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm";
-
   return (
     <div>
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="grid flex-1 grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <Input
-            placeholder="Search ideas…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            aria-label="Search ideas"
-            className="col-span-2 sm:max-w-xs"
-          />
-          <select
-            value={platformFilter}
-            onChange={(event) => setPlatformFilter(event.target.value)}
-            aria-label="Filter by platform"
-            className={selectClass}
-          >
-            <option value="">Every platform</option>
-            {PLATFORM_OPTIONS.map((platform) => (
-              <option key={platform} value={platform}>
-                {PLATFORM_META[platform].label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={proposerFilter}
-            onChange={(event) => setProposerFilter(event.target.value)}
-            aria-label="Filter by who proposed it"
-            className={selectClass}
-          >
-            <option value="">Everyone</option>
-            <option value="me">Posted by me</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={assigneeFilter}
-            onChange={(event) => setAssigneeFilter(event.target.value)}
-            aria-label="Filter by who it is assigned to"
-            className={cn(selectClass, "col-span-2 sm:col-span-1")}
-          >
-            <option value="">Anyone assigned</option>
-            <option value="me">Assigned to me</option>
-            <option value="none">Unassigned</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                Assigned to {member.label}
-              </option>
-            ))}
-          </select>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Search ideas…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          aria-label="Search ideas"
+          className="min-w-0 flex-1 basis-full sm:max-w-xs sm:basis-auto"
+        />
+        <div className="ml-auto flex items-center gap-2">
+          <BoardFilters values={filters} members={members} onChange={setFilters} />
+          <ExportDialog ideas={ideas} />
+          <CreateIdeaDialog members={members} isAdmin={isAdmin} currentUserId={currentUserId} />
         </div>
-        <CreateIdeaDialog members={members} isAdmin={isAdmin} currentUserId={currentUserId} />
       </div>
 
       {moveError ? (
@@ -254,32 +206,10 @@ export function KanbanBoard({
       <div
         ref={columnsRef}
         onScroll={trackVisibleColumn}
-        // On desktop the folded Discarded strip takes only a thin slot between Ideas and Feedback.
-        style={{
-          gridTemplateColumns: columns
-            .map((column) => (column.status === "discarded" && !discardedOpen ? "2.75rem" : "minmax(13rem, 1fr)"))
-            .join(" "),
-        }}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 lg:mx-0 lg:grid lg:snap-none lg:gap-4 lg:px-0"
+        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 lg:mx-0 lg:grid lg:snap-none lg:auto-cols-[minmax(13rem,1fr)] lg:grid-flow-col lg:gap-4 lg:px-0"
       >
         {columns.map((column) => {
           const isDragOver = dragOverStatus === column.status;
-          if (column.status === "discarded" && !discardedOpen) {
-            return (
-              <button
-                key={column.status}
-                type="button"
-                onClick={() => setDiscardedOpen(true)}
-                aria-label={`Show discarded ideas (${column.ideas.length})`}
-                title="Show discarded ideas"
-                className="flex h-[calc(100dvh-17rem)] min-h-[22rem] w-11 shrink-0 snap-start flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 py-3 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 hover:text-foreground lg:h-[calc(100vh-260px)] lg:w-auto"
-              >
-                <ArchiveX className="h-4 w-4 shrink-0" />
-                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">{column.ideas.length}</span>
-                <span className="text-xs font-medium [writing-mode:vertical-rl]">Discarded</span>
-              </button>
-            );
-          }
           return (
             <div
               key={column.status}
@@ -312,12 +242,12 @@ export function KanbanBoard({
                   {column.status === "discarded" ? (
                     <button
                       type="button"
-                      onClick={() => setDiscardedOpen(false)}
+                      onClick={() => setFilters({ ...filters, showDiscarded: false })}
                       aria-label="Hide discarded ideas"
-                      title="Hide"
+                      title="Hide (or use Filter)"
                       className="grid h-7 w-7 place-items-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
-                      <ChevronLeft className="h-4 w-4" />
+                      <X className="h-4 w-4" />
                     </button>
                   ) : null}
                 </div>

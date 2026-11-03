@@ -8,29 +8,34 @@ import { LogoutButton } from "@/components/dashboard/logout-button";
 import { getUserSession } from "@/lib/auth/require-user";
 import { getCurrentWorkspace, isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { getUnreadNotificationCount } from "@/lib/services/notification-service";
+import { dailyGreeting, firstName } from "@/lib/utils/greeting";
 
 async function getShellContext() {
   try {
     const { supabase, user } = await getUserSession();
 
-    if (!user) return { admin: false, unreadCount: 0 };
+    if (!user) return { admin: false, unreadCount: 0, greeting: null };
 
-    const workspace = await getCurrentWorkspace(supabase, user.id);
-    if (!workspace) return { admin: false, unreadCount: 0 };
+    const [workspace, { data: profile }] = await Promise.all([
+      getCurrentWorkspace(supabase, user.id),
+      supabase.from("profiles").select("full_name, email").eq("id", user.id).maybeSingle(),
+    ]);
+    const greeting = dailyGreeting(user.id, firstName(profile?.full_name, profile?.email ?? user.email));
+    if (!workspace) return { admin: false, unreadCount: 0, greeting };
 
     const [admin, unreadCount] = await Promise.all([
       isWorkspaceAdmin(workspace.id, user.id, supabase),
       getUnreadNotificationCount(supabase, user.id),
     ]);
 
-    return { admin, unreadCount };
+    return { admin, unreadCount, greeting };
   } catch {
-    return { admin: false, unreadCount: 0 };
+    return { admin: false, unreadCount: 0, greeting: null };
   }
 }
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const [{ admin, unreadCount }, cookieStore] = await Promise.all([getShellContext(), cookies()]);
+  const [{ admin, unreadCount, greeting }, cookieStore] = await Promise.all([getShellContext(), cookies()]);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "collapsed";
 
   return (
@@ -54,7 +59,15 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen w-full">
         <DesktopSidebar admin={admin} unreadCount={unreadCount} initialCollapsed={sidebarCollapsed} />
         <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-          <div className="mx-auto w-full max-w-7xl">{children}</div>
+          <div className="mx-auto w-full max-w-7xl">
+            {/* Today's greeting, in the same spot on every page (see lib/utils/greeting.ts). */}
+            {greeting ? (
+              <p className="mb-3 text-sm font-medium text-primary sm:-mb-2 sm:text-right lg:-mt-2" aria-live="off">
+                {greeting}
+              </p>
+            ) : null}
+            {children}
+          </div>
         </main>
       </div>
     </div>

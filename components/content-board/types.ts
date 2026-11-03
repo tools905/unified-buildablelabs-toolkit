@@ -38,6 +38,8 @@ export type ContentIdeaWithRelations = {
   status: ContentIdeaStatus;
   post_url: string | null;
   scheduled_for: string | null;
+  // When it was marked posted (set while in Posted).
+  posted_at?: string | null;
   reference_links: string[];
   reviewed_at: string | null;
   // What an admin chose for once the team has made the changes, and when a team member said they were

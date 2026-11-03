@@ -23,15 +23,24 @@ export async function createNotification(input: {
   if (error) throw error;
 }
 
-export async function listNotifications(supabase: SupabaseClient<any>, userId: string) {
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(30);
+export async function listNotifications(
+  supabase: SupabaseClient<any>,
+  userId: string,
+  range: { since: string | null; until: string | null } = { since: null, until: null },
+) {
+  let query = supabase.from("notifications").select("*").eq("user_id", userId);
+  if (range.since) query = query.gte("created_at", range.since);
+  if (range.until) query = query.lte("created_at", range.until);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(200);
   if (error) throw error;
   return data ?? [];
+}
+
+// Deletes the person's own notifications (others' are never matched).
+export async function deleteNotifications(supabase: SupabaseClient<any>, userId: string, ids: string[]) {
+  if (!ids.length) return;
+  const { error } = await supabase.from("notifications").delete().eq("user_id", userId).in("id", ids.slice(0, 500));
+  if (error) throw error;
 }
 
 export async function getUnreadNotificationCount(supabase: SupabaseClient<any>, userId: string) {
