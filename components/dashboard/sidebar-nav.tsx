@@ -34,6 +34,8 @@ type NavItem = {
 const baseLinks: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/connected-apps", label: "Connected apps", icon: Plug, exact: true },
+  // Settings → Downloads (the only section so far).
+  { href: "/settings/downloads", label: "Settings", icon: Settings },
 ];
 
 // Only admins see these, and each page also turns non-admins away on the server.

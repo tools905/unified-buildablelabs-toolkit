@@ -7,7 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { bulkAssignAction, bulkDeleteAction, bulkUpdateStatusAction } from "@/app/tools/tickets/actions";
 import { TICKET_COLUMNS, type MemberOption, type TicketWithRelations } from "@/components/tickets/types";
 import type { TicketStatus } from "@/lib/db/types";
-import { formatISTDate, formatISTInputDate } from "@/lib/utils/dates";
+import { ticketsCsvNames } from "@/lib/utils/downloads";
+import { saveTicketsCsvAction } from "@/app/actions/downloads";
+import { formatISTDate } from "@/lib/utils/dates";
 
 function toCsv(tickets: TicketWithRelations[]) {
   const header = ["Title", "Status", "Assignee", "Progress %", "Due date", "Created at"];
@@ -23,14 +25,17 @@ function toCsv(tickets: TicketWithRelations[]) {
   return [header, ...rows].map((row) => row.map(escape).join(",")).join("\n");
 }
 
+// Downloads the list straight away, and keeps a copy under Settings → Downloads.
 function downloadCsv(tickets: TicketWithRelations[]) {
-  const blob = new Blob([toCsv(tickets)], { type: "text/csv;charset=utf-8;" });
+  const csv = toCsv(tickets);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `tickets-${formatISTInputDate(new Date())}.csv`;
+  link.download = ticketsCsvNames().fileName;
   link.click();
   URL.revokeObjectURL(url);
+  void saveTicketsCsvAction(csv, tickets.length);
 }
 
 export function TicketAdminTable({ tickets, members }: { tickets: TicketWithRelations[]; members: MemberOption[] }) {

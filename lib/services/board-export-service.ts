@@ -8,13 +8,14 @@ import { MAX_EXPORT_POSTS, pdfSafeText, selectForExport } from "@/lib/utils/boar
 import { pageSizeFor } from "@/lib/utils/content-export";
 import { pageImagesReady, type PageImageInfo } from "@/lib/utils/page-images";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
+import { boardExportNames, type ExportEvent } from "@/lib/utils/downloads";
+import { recordDownload } from "@/lib/services/download-service";
 
 const DOWNLOAD_LINK_TTL_SECONDS = 10 * 60;
 // Storage takes files up to 50 MB.
 const MAX_FILE_BYTES = 48 * 1024 * 1024;
 // Pages are pictures this size (longest side), which keeps a month of carousels to a sensible file.
 const PICTURE_SIDE = 1350;
-const KEEP_EXPORTS = 5;
 
 const COVER = { width: 1080, height: 1350, margin: 80 };
 const INK = rgb(0.07, 0.07, 0.09);
@@ -117,11 +118,20 @@ async function readFile(supabase: SupabaseClient<any>, path: string) {
 const toJpeg = (bytes: Uint8Array) =>
   sharp(bytes).resize({ width: PICTURE_SIDE, height: PICTURE_SIDE, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality: 80 }).toBuffer();
 
-// The latest draft's pages, as pictures where it can (small files), else the PDF's own pages.
-async function addDraftPages(supabase: SupabaseClient<any>, doc: PDFDocument, attachments: Attachment[]) {
+// The files of a post's latest draft (its images and PDFs).
+function latestDraftFiles(attachments: Attachment[]) {
   const sorted = [...attachments].sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
   const drafts = groupIntoDrafts(sorted, (item) => item.created_by, (item) => item.created_at);
-  const files = (drafts[drafts.length - 1] ?? []).filter((item) => item.kind !== "link" && item.storage_path);
+  return (drafts[drafts.length - 1] ?? []).filter((item) => item.kind !== "link" && item.storage_path);
+}
+
+// About how many pages a post adds (its cover and its draft), so progress moves by work done.
+const postWeight = (attachments: Attachment[]) =>
+  1 + latestDraftFiles(attachments).reduce((sum, file) => sum + (file.kind === "pdf" ? Math.max(1, file.page_count ?? file.page_images?.length ?? 1) : 1), 0);
+
+// The latest draft's pages, as pictures where it can (small files), else the PDF's own pages.
+async function addDraftPages(supabase: SupabaseClient<any>, doc: PDFDocument, attachments: Attachment[]) {
+  const files = latestDraftFiles(attachments);
   for (const file of files) {
     if (file.kind === "pdf" && !pageImagesReady(file.page_images, file.page_count)) {
       const source = await PDFDocument.load(await readFile(supabase, file.storage_path!), { ignoreEncryption: true });
@@ -146,8 +156,9 @@ type ExportInput = { workspaceId: string; from: string; to: string; columns: Con
 
 // One PDF of every post in `columns` with a posting day from `from` to `to`: a contents page, then for
 // each post a cover page (title, day, column, platforms, caption) followed by its latest draft. Uses
-// the caller's client, so row-level security decides what they can export.
-export async function buildBoardPdf(supabase: SupabaseClient<any>, input: ExportInput) {
+// the caller's client, so row-level security decides what they can export. `onProgress` hears about
+// each post as it goes in, for the progress bar.
+export async function buildBoardPdf(supabase: SupabaseClient<any>, input: ExportInput, onProgress: (event: ExportEvent) => void = () => {}) {
   const { data, error } = await supabase
     .from("content_ideas")
     .select(
@@ -161,6 +172,8 @@ export async function buildBoardPdf(supabase: SupabaseClient<any>, input: Export
   if (chosen.length > MAX_EXPORT_POSTS) {
     throw new ExportProblem(`That's ${chosen.length} posts; export up to ${MAX_EXPORT_POSTS} at a time (pick fewer dates).`);
   }
+
+  onProgress({ type: "start", posts: chosen.map(({ idea }) => ({ title: idea.title, weight: postWeight(idea.attachments ?? []) })) });
 
   const doc = await PDFDocument.create();
   const title = `BuildableLabs posts, ${longDay(input.from)} to ${longDay(input.to)}`;
@@ -192,7 +205,7 @@ export async function buildBoardPdf(supabase: SupabaseClient<any>, input: Export
   }
 
   // Each post.
-  for (const { idea, day } of chosen) {
+  for (const [index, { idea, day }] of chosen.entries()) {
     const cover = doc.addPage([COVER.width, COVER.height]);
     let top = COVER.height - COVER.margin - 20;
     cover.drawText(pdfSafeText(`${longDay(day)} · ${COLUMN_LABELS[idea.status]}`).toUpperCase(), { x: COVER.margin, y: top, size: 20, font: bold, color: ACCENT });
@@ -213,29 +226,47 @@ export async function buildBoardPdf(supabase: SupabaseClient<any>, input: Export
 
     const added = await addDraftPages(supabase, doc, idea.attachments ?? []);
     if (added === 0) cover.drawText("No images or PDFs uploaded yet.", { x: COVER.margin, y: COVER.margin, size: 20, font: regular, color: MUTED });
+    onProgress({ type: "post", index });
   }
 
+  onProgress({ type: "saving" });
   const bytes = await doc.save();
   if (bytes.length > MAX_FILE_BYTES) throw new ExportProblem("That export is too large to download in one file. Pick fewer dates or columns.");
-  return bytes;
+  return { bytes, pages: doc.getPageCount(), posts: chosen.length };
 }
 
-// The export, saved to storage, as a short-lived download link.
-export async function exportBoardPdf(supabase: SupabaseClient<any>, input: ExportInput) {
-  const bytes = await buildBoardPdf(supabase, input);
+// The export, saved to storage and listed under Settings → Downloads (kept 30 days), with a
+// short-lived link to download it now.
+export async function exportBoardPdf(
+  supabase: SupabaseClient<any>,
+  input: ExportInput & { userId: string },
+  onProgress: (event: ExportEvent) => void = () => {},
+) {
+  const { bytes, pages, posts } = await buildBoardPdf(supabase, input, onProgress);
 
+  onProgress({ type: "uploading" });
   const storage = supabase.storage.from(CONTENT_BUCKET);
-  const folder = `${input.workspaceId}/board-exports`;
-  const name = `${input.from}_${input.to}_${Date.now()}.pdf`;
-  const { error: uploadError } = await storage.upload(`${folder}/${name}`, bytes, { contentType: "application/pdf", upsert: false });
+  const path = `${input.workspaceId}/board-exports/${input.from}_${input.to}_${Date.now()}.pdf`;
+  const { error: uploadError } = await storage.upload(path, bytes, { contentType: "application/pdf", upsert: false });
   if (uploadError) throw uploadError;
-  // Only the last few exports are kept.
-  const { data: existing } = await storage.list(folder, { limit: 100, sortBy: { column: "created_at", order: "desc" } });
-  const older = (existing ?? []).filter((item) => item.name !== name).slice(KEEP_EXPORTS - 1).map((item) => `${folder}/${item.name}`);
-  if (older.length) await storage.remove(older);
 
-  const fileName = `BuildableLabs posts ${input.from} to ${input.to}.pdf`;
-  const { data: signed, error: signError } = await storage.createSignedUrl(`${folder}/${name}`, DOWNLOAD_LINK_TTL_SECONDS, { download: fileName });
+  const { name, fileName } = boardExportNames(input.from, input.to, input.columns);
+  // A failure to list it shouldn't cost them the file they waited for.
+  const id = await recordDownload(supabase, {
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    kind: "board_pdf",
+    name,
+    fileName,
+    storagePath: path,
+    sizeBytes: bytes.length,
+    details: { from: input.from, to: input.to, columns: input.columns, posts, pages },
+  }).catch((error) => {
+    console.error("could not list the board export under Downloads", error);
+    return null;
+  });
+
+  const { data: signed, error: signError } = await storage.createSignedUrl(path, DOWNLOAD_LINK_TTL_SECONDS, { download: fileName });
   if (signError || !signed?.signedUrl) throw signError ?? new Error("Could not prepare the download.");
-  return signed.signedUrl;
+  return { url: signed.signedUrl, id, name, fileName, sizeBytes: bytes.length, pages };
 }

@@ -11,6 +11,7 @@ const protectedPrefixes = [
   "/my-reviews",
   "/onboarding",
   "/notifications",
+  "/settings",
   // The consent screen for connectors: a signed-out visitor logs in first, then comes back to approve.
   "/oauth",
   // The list of apps a person has connected, with a way to disconnect them.
