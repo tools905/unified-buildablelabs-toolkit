@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/services/audit-service", () => ({ writeAuditLog: vi.fn(async () => undefined) }));
-vi.mock("@/lib/services/notification-service", () => ({ createNotification: vi.fn(async () => undefined) }));
+vi.mock("@/lib/services/content-comment-service", () => ({ notifyPostComment: vi.fn(async () => undefined) }));
 vi.mock("@/lib/services/content-review-service", () => ({ addReviewPoint: vi.fn(async () => ({ movedToFeedback: true })) }));
 
 import { decodePDFRawStream, PDFArray, PDFDocument, PDFRawStream } from "pdf-lib";
-import { createNotification } from "@/lib/services/notification-service";
+import { notifyPostComment } from "@/lib/services/content-comment-service";
 import { addReviewPoint } from "@/lib/services/content-review-service";
 import { saveMarkupReview, submitMarkupReview } from "@/lib/services/content-markup-service";
 import { getIdeaPdfDownloadUrl } from "@/lib/services/content-export-service";
@@ -108,7 +108,7 @@ describe("a submitted review", () => {
     return { client: { from } as never, inserted, deleted };
   }
 
-  it("is saved as a layer, adds a review comment and tells the assignees (not the reviewer)", async () => {
+  it("is saved as a layer, adds a review comment and tells the people on the post", async () => {
     const { client, inserted, deleted } = fakeSupabase();
     const result = await submitMarkupReview(client, {
       workspaceId: "w",
@@ -125,7 +125,7 @@ describe("a submitted review", () => {
       client,
       expect.objectContaining({ ideaId: IDEA, body: "Marked up pages 2 and 5 with Pencil. Tighten the headline" }),
     );
-    expect(vi.mocked(createNotification).mock.calls.map(([input]) => input.userId)).toEqual([MRIDUL]);
+    expect(notifyPostComment).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ ideaId: IDEA, actorId: ADITI, kind: "pencil" }));
     // The copy saved while drawing goes once the review is submitted.
     expect(deleted).toEqual(["content_idea_review_drafts"]);
   });

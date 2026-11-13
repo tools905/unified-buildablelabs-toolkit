@@ -22,7 +22,8 @@ export type NotificationType =
   | "linkedin_post_summary"
   | "content_idea_assigned"
   | "content_idea_markup"
-  | "content_idea_changes_done";
+  | "content_idea_changes_done"
+  | "content_idea_comment";
 export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";

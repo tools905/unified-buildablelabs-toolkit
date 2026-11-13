@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/services/audit-service";
-import { createNotification } from "@/lib/services/notification-service";
+import { notifyPostComment } from "@/lib/services/content-comment-service";
 import { addReviewPoint } from "@/lib/services/content-review-service";
 import { setAfterChanges, startNewReviewRound } from "@/lib/services/content-idea-service";
 import { describePages, type MarkupStroke } from "@/lib/utils/markup";
@@ -90,20 +90,8 @@ export async function submitMarkupReview(
     metadata: { review_id: review.id, pages: submission.pages.length },
   });
 
-  // Telling people is best effort: the review is saved either way.
-  const toNotify = (idea.assignees ?? [])
-    .map((row: { user_id: string }) => row.user_id)
-    .filter((userId: string) => userId !== input.userId);
-  await Promise.allSettled(
-    toNotify.map((userId: string) =>
-      createNotification({
-        userId,
-        type: "content_idea_markup",
-        title: "New Pencil review",
-        message: `${input.userName} marked up ${where} of “${idea.title}”. Open the idea to see the marks.`,
-      }),
-    ),
-  );
+  // The people on the post hear about it (best effort: the review is saved either way).
+  await notifyPostComment(supabase, { workspaceId: input.workspaceId, ideaId: idea.id, actorId: input.userId, kind: "pencil" });
 
   // The review is in; the copy saved while drawing it isn't needed any more.
   await supabase

@@ -1,5 +1,7 @@
 "use server";
 
+import { after } from "next/server";
+import { notifyPostComment } from "@/lib/services/content-comment-service";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/require-user";
 import { requireDefaultWorkspace } from "@/modules/core/workspace/default-workspace";
@@ -220,6 +222,8 @@ export async function addReviewPointAction(input: { ideaId: string; body: string
     const parsed = addReviewPointSchema.parse(input);
     await reviewService.addReviewPoint(supabase, { workspaceId: workspace.id, userId: user.id, ...parsed });
     await contentIdeaService.startNewReviewRound(supabase, parsed.ideaId);
+    // The people on the post are told after the answer goes back, so adding a point stays quick.
+    after(() => notifyPostComment(supabase, { workspaceId: workspace.id, ideaId: parsed.ideaId, actorId: user.id, kind: "point" }));
   }, { revalidate: false });
 }
 

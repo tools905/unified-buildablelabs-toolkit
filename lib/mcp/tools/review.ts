@@ -14,6 +14,7 @@ import {
   type ReviewPoint,
 } from "@/lib/mcp/contract";
 import { McpToolFailure, parseToolInput } from "@/lib/mcp/errors";
+import { notifyPostComment } from "@/lib/services/content-comment-service";
 import {
   addReviewPoint,
   getReviewPoint,
@@ -80,6 +81,9 @@ export async function addReviewPointTool(caller: McpCaller, rawInput: unknown): 
     body: input.text,
     id: pointId,
   });
+
+  // The people on the post hear about it, as when a point is added in the app.
+  await notifyPostComment(caller.supabase, { workspaceId: caller.workspaceId, ideaId: input.idea_id, actorId: caller.userId, kind: "point" });
 
   const row = (await getReviewPoint(caller.supabase, pointId, caller.workspaceId)) as PointRow | null;
   if (!row) throw new Error("The review point was saved but could not be read back.");

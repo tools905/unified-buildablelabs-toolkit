@@ -295,7 +295,7 @@ export function contentIdeaAssignedEmailHtml(input: {
   ideaTitle: string;
   url: string;
 }) {
-  return `<p>Hi ${escapeHtml(input.assigneeName)},</p><p>An idea to work on has been assigned to you by ${escapeHtml(input.assignerName)}:</p><p><strong>${escapeHtml(input.ideaTitle)}</strong></p>${button(input.url, "Open the idea")}<p style="color:#666;font-size:12px">Sent by ${PRODUCT_NAME} because you were assigned this idea on the Content Board.</p>`;
+  return `<p>Hi ${escapeHtml(input.assigneeName)},</p><p>${escapeHtml(input.assignerName)} assigned you a post: <strong>${escapeHtml(input.ideaTitle)}</strong>.</p><p>Open Team Connect to see what's needed.</p>${button(input.url, "Open the post")}<p style="color:#666;font-size:12px">Sent by ${PRODUCT_NAME} because you were assigned this post on the Content Board.</p>`;
 }
 
 export async function sendContentIdeaAssignedEmail(
@@ -311,9 +311,28 @@ export async function sendContentIdeaAssignedEmail(
 ) {
   return sendEmail(supabase, {
     to: input.to,
-    subject: `${input.assignerName} assigned you an idea: ${input.ideaTitle}`,
+    subject: `${input.assignerName} assigned you a post: ${input.ideaTitle}`,
     html: contentIdeaAssignedEmailHtml(input),
     type: "content_idea_assigned",
+    workspaceId: input.workspaceId,
+  });
+}
+
+// A comment on someone's post: who commented and on which post, never the comment itself, so they
+// open Team Connect to read it.
+export function contentCommentEmailHtml(input: { recipientName: string; line: string; url: string }) {
+  return `<p>Hi ${escapeHtml(input.recipientName)},</p><p>${escapeHtml(input.line)}</p><p>Open Team Connect to see it.</p>${button(input.url, "Open the post")}<p style="color:#666;font-size:12px">Sent by ${PRODUCT_NAME} because you added, uploaded or were assigned this post on the Content Board.</p>`;
+}
+
+export async function sendContentCommentEmail(
+  supabase: SupabaseClient<any>,
+  input: { to: string; recipientName: string; subject: string; line: string; url: string; workspaceId: string },
+) {
+  return sendEmail(supabase, {
+    to: input.to,
+    subject: input.subject,
+    html: contentCommentEmailHtml(input),
+    type: "content_idea_comment",
     workspaceId: input.workspaceId,
   });
 }

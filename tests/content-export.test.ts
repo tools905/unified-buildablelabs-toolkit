@@ -37,7 +37,7 @@ describe("emails", () => {
       ideaTitle: "Founder Bingo",
       url: "https://example.test/teams/tools/content-board?idea=1",
     });
-    expect(html).toContain("An idea to work on has been assigned to you by Akhil &lt;script&gt;");
+    expect(html).toContain("Akhil &lt;script&gt; assigned you a post");
     expect(html).toContain("Founder Bingo");
     expect(html).toContain("https://example.test/teams/tools/content-board?idea=1");
     expect(html).not.toContain("<script>");
