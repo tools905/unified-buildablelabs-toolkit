@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteIdeaAction, updateIdeaAction } from "@/app/tools/content-board/actions";
+import { SCHEDULE_CANCELLED, useSchedulePrompt } from "@/components/content-board/schedule-prompt";
 import {
   CONTENT_COLUMNS,
   ideaPlatforms,
@@ -35,10 +36,12 @@ export function IdeaDetail({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { withPrompt, dialog: scheduleDialog } = useSchedulePrompt();
   const statusLabel = CONTENT_COLUMNS.find((c) => c.status === idea.status)?.label ?? idea.status;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      {scheduleDialog}
       <div className="popover-shadow flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-lg border border-border bg-card sm:max-w-lg sm:rounded-lg">
         <div
           className="flex items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6"
@@ -62,9 +65,13 @@ export function IdeaDetail({
               formData.set("ideaId", idea.id);
               setError(null);
               startTransition(async () => {
-                const result = await updateIdeaAction(formData);
+                // A new day that's already full asks for a reason first.
+                const result = await withPrompt((answer) => {
+                  if (answer.overLimitReason) formData.set("overLimitReason", answer.overLimitReason);
+                  return updateIdeaAction(formData);
+                });
                 if (result.ok) onClose();
-                else setError(result.error);
+                else if (result.error !== SCHEDULE_CANCELLED) setError(result.error);
               });
             }}
             className="space-y-4"

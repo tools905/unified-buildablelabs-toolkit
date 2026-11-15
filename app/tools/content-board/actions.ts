@@ -1,6 +1,8 @@
 "use server";
 
 import { after } from "next/server";
+import { ScheduleNeedsInput } from "@/lib/services/posting-slots-service";
+import type { ScheduleNeed } from "@/lib/utils/posting-slots";
 import { notifyPostComment } from "@/lib/services/content-comment-service";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/require-user";
@@ -17,7 +19,9 @@ import {
 import { ZodError } from "zod";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 
-export type ActionResult<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
+// `need`: the change needs a posting day or a reason for going over a day's slots; the screen asks
+// for it and tries again.
+export type ActionResult<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string; need?: ScheduleNeed };
 
 function friendlyMessage(error: unknown) {
   if (error instanceof ZodError) return error.issues[0]?.message ?? "That doesn't look right.";
@@ -42,6 +46,7 @@ async function toResult<T extends object = object>(
     if (options.revalidate !== false) refreshContentBoard();
     return { ok: true, ...(data ?? {}) } as ActionResult<T>;
   } catch (error) {
+    if (error instanceof ScheduleNeedsInput) return { ok: false, error: error.message, need: error.need };
     return { ok: false, error: friendlyMessage(error) };
   }
 }
@@ -79,7 +84,11 @@ export async function createIdeaAction(formData: FormData) {
 
 // Moves a card to another column. Who may make which move is checked on the server (canMoveIdea):
 // admins anywhere, the assigned people from Shortlisted through to Posted.
-export async function moveIdeaAction(ideaId: string, status: ContentIdeaStatus, options: { scheduledFor?: string | null } = {}) {
+export async function moveIdeaAction(
+  ideaId: string,
+  status: ContentIdeaStatus,
+  options: { scheduledFor?: string | null; overLimitReason?: string | null } = {},
+) {
   const { supabase, user, workspace } = await requireContentBoardContext();
   return toResult(async () => {
     await contentIdeaService.moveContentIdea(supabase, workspace.id, ideaId, user.id, status, options);
@@ -94,10 +103,10 @@ export async function setIdeaAssigneesAction(ideaId: string, assigneeIds: string
 }
 
 // Puts an idea on the calendar (or takes it off with an empty date).
-export async function scheduleIdeaAction(ideaId: string, scheduledFor: string | null) {
+export async function scheduleIdeaAction(ideaId: string, scheduledFor: string | null, overLimitReason?: string | null) {
   const { supabase, user, workspace } = await requireContentBoardContext();
   return toResult(async () => {
-    await contentIdeaService.updateContentIdea(supabase, workspace.id, ideaId, user.id, { scheduledFor: scheduledFor || null });
+    await contentIdeaService.updateContentIdea(supabase, workspace.id, ideaId, user.id, { scheduledFor: scheduledFor || null }, { overLimitReason });
   });
 }
 
@@ -116,7 +125,7 @@ export async function updateIdeaAction(formData: FormData) {
       referenceLinks: formData.getAll("referenceLinks").map(String),
       // Only sent for posted ideas; leave the saved link alone when the field isn't on the form.
       postUrl: formData.has("postUrl") ? String(formData.get("postUrl")) : undefined,
-    });
+    }, { overLimitReason: (formData.get("overLimitReason") as string) || null });
     // The assignee picker marks itself with `assigneesField`, so an empty list means "take everyone
     // off" while a form without the picker (non-admins) leaves the assignees alone.
     if (formData.get("assigneesField") === "1") {

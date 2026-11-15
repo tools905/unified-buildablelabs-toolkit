@@ -5,6 +5,8 @@ import { isWorkspaceAdmin } from "@/lib/services/workspace-service";
 import { canDiscard, canMoveIdea, openPointsText, type AfterChanges, deriveIdeaTitle, diffAssignees, groupIntoDrafts, latestActivity } from "@/lib/utils/content-board";
 import { sendContentIdeaAssignedEmail } from "@/lib/services/email-service";
 import { getAppLink } from "@/lib/utils/app-url";
+import { COUNTED_STATUSES, slotsUsed, type SlottedPlatform } from "@/lib/utils/posting-slots";
+import { autoSchedule, checkPostingDay, notifyOverLimit, ScheduleNeedsInput } from "@/lib/services/posting-slots-service";
 import type { ContentIdeaStatus, ContentPlatform } from "@/lib/db/types";
 import { removeStoredFilesForIdea, signPaths } from "@/lib/services/content-attachment-service";
 import {
@@ -297,18 +299,20 @@ export async function attachCardPreviews<T extends IdeaWithEmbeds>(supabase: Sup
 
 // Moves an idea to another column, if this person is allowed to make that move (see canMoveIdea).
 // A date can come along when shortlisting, so the idea lands on the calendar at the same time.
+// Shortlisting puts an Instagram/LinkedIn idea without a day on the first day with room; other
+// platforms need a day picked, and going over a day's slots needs a reason (see posting-slots).
 export async function moveContentIdea(
   supabase: SupabaseClient<any>,
   workspaceId: string,
   ideaId: string,
   actorId: string,
   to: ContentIdeaStatus,
-  options: { scheduledFor?: string | null } = {},
+  options: { scheduledFor?: string | null; overLimitReason?: string | null } = {},
 ) {
   const [{ data: idea, error }, isAdmin] = await Promise.all([
     supabase
       .from("content_ideas")
-      .select("id, status, after_changes, assignees:content_idea_assignees(user_id)")
+      .select("id, title, status, scheduled_for, platforms, platform, after_changes, assignees:content_idea_assignees(user_id)")
       .eq("id", ideaId)
       .maybeSingle(),
     isWorkspaceAdmin(workspaceId, actorId, supabase),
@@ -319,7 +323,7 @@ export async function moveContentIdea(
   // posting day chosen at the same time is still saved.
   if (idea.status === to) {
     if (options.scheduledFor) {
-      return updateContentIdea(supabase, workspaceId, ideaId, actorId, { scheduledFor: options.scheduledFor });
+      return updateContentIdea(supabase, workspaceId, ideaId, actorId, { scheduledFor: options.scheduledFor }, { overLimitReason: options.overLimitReason });
     }
     return idea;
   }
@@ -346,10 +350,28 @@ export async function moveContentIdea(
           : "Only admins can move an idea into or out of that column.",
     );
   }
-  const moved = await updateContentIdea(supabase, workspaceId, ideaId, actorId, {
-    status: to,
-    ...(options.scheduledFor ? { scheduledFor: options.scheduledFor } : {}),
-  });
+  // Coming onto the calendar (into Shortlisted, In Progress or Posted from elsewhere).
+  const entering = COUNTED_STATUSES.includes(to) && !COUNTED_STATUSES.includes(idea.status);
+  const day: string | null = options.scheduledFor || idea.scheduled_for || null;
+  let over: SlottedPlatform[] = [];
+  if (entering && day) {
+    over = await checkPostingDay(supabase, { workspaceId, ideaId, ideaTitle: idea.title, day, platforms: idea.platforms, platform: idea.platform, overLimitReason: options.overLimitReason });
+  } else if (entering && to !== "posted" && slotsUsed(idea).length === 0) {
+    throw new ScheduleNeedsInput({ kind: "day", ideaTitle: idea.title });
+  }
+  const moved = await updateContentIdea(
+    supabase,
+    workspaceId,
+    ideaId,
+    actorId,
+    { status: to, ...(options.scheduledFor ? { scheduledFor: options.scheduledFor } : {}) },
+    { slotsChecked: true },
+  );
+  // Best effort: the move is saved; without a day it just waits in the calendar's unscheduled list.
+  if (entering && !day && to !== "posted") await autoSchedule(supabase, ideaId).catch((scheduleError) => console.error("auto-schedule failed", scheduleError));
+  if (over.length && day) {
+    await notifyOverLimit(supabase, { workspaceId, ideaId, ideaTitle: idea.title, actorId, day, platforms: over, reason: options.overLimitReason ?? "" });
+  }
   // Taken out of Discarded (an admin dragging it, or the card menu): it's an active idea again.
   if (idea.status === "discarded") {
     await supabase
@@ -387,14 +409,48 @@ async function assignSelf(supabase: SupabaseClient<any>, workspaceId: string, id
   });
 }
 
+// `overLimitReason` is needed when the change puts a 3rd Instagram or LinkedIn post on a day.
 export async function updateContentIdea(
   supabase: SupabaseClient<any>,
   workspaceId: string,
   ideaId: string,
   actorId: string,
   rawInput: UpdateContentIdeaInput,
+  options: { overLimitReason?: string | null; slotsChecked?: boolean } = {},
 ) {
   const input = updateContentIdeaSchema.parse(rawInput);
+
+  // A new day or new platforms on an idea that's on the calendar: is there room?
+  let over: SlottedPlatform[] = [];
+  let slotDay: string | null = null;
+  let slotTitle = "";
+  if (!options.slotsChecked && (input.scheduledFor !== undefined || input.platforms !== undefined)) {
+    const { data: current, error: currentError } = await supabase
+      .from("content_ideas")
+      .select("title, status, scheduled_for, platforms, platform")
+      .eq("id", ideaId)
+      .maybeSingle();
+    if (currentError) throw currentError;
+    if (current) {
+      const day = input.scheduledFor !== undefined ? input.scheduledFor : current.scheduled_for;
+      const platforms = input.platforms ?? current.platforms;
+      const status = input.status ?? current.status;
+      const changed = day !== current.scheduled_for || String(platforms ?? []) !== String(current.platforms ?? []);
+      if (day && changed && COUNTED_STATUSES.includes(status)) {
+        slotDay = day;
+        slotTitle = input.title ?? current.title;
+        over = await checkPostingDay(supabase, {
+          workspaceId,
+          ideaId,
+          ideaTitle: slotTitle,
+          day,
+          platforms,
+          platform: platforms?.[0] ?? current.platform,
+          overLimitReason: options.overLimitReason,
+        });
+      }
+    }
+  }
 
   const update: Record<string, unknown> = {};
   if (input.title !== undefined) update.title = input.title;
@@ -423,8 +479,11 @@ export async function updateContentIdea(
     action: "content_idea.updated",
     entityType: "content_idea",
     entityId: ideaId,
-    metadata: update,
+    metadata: options.overLimitReason && over.length ? { ...update, over_limit_reason: options.overLimitReason } : update,
   });
+  if (over.length && slotDay) {
+    await notifyOverLimit(supabase, { workspaceId, ideaId, ideaTitle: slotTitle, actorId, day: slotDay, platforms: over, reason: options.overLimitReason ?? "" });
+  }
 
   return idea;
 }

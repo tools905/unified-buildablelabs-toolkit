@@ -9,6 +9,7 @@ import { nextStep, type AfterChanges } from "@/lib/utils/content-board";
 import { markChangesDoneAction, restoreIdeaAction, setAfterChangesAction } from "@/app/tools/content-board/actions";
 import { formatWhen } from "@/components/content-board/activity";
 import { cn } from "@/lib/utils/cn";
+import { slotsUsed } from "@/lib/utils/posting-slots";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 
 export type MoveIdea = (
@@ -115,7 +116,9 @@ export function StageActions({
           {startNote ? <p className="w-full text-xs text-muted-foreground">{startNote}</p> : null}
           {shortlisting ? (
             <label className="min-w-[10rem] flex-1 text-xs text-muted-foreground">
-              Posting day (optional, puts it on the calendar)
+              {slotsUsed(idea).length
+                ? "Posting day (optional: left empty, it goes on the next day with room)"
+                : "Day it goes out (needed)"}
               <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 h-9" />
             </label>
           ) : null}

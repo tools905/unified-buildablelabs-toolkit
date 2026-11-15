@@ -21,6 +21,7 @@ import { IdeaDetail } from "@/components/content-board/idea-detail";
 import { IdeaPanel } from "@/components/content-board/idea-panel";
 import { AssignDialog } from "@/components/content-board/assign-dialog";
 import { useIdeaMoves } from "@/components/content-board/use-idea-moves";
+import { SCHEDULE_CANCELLED, useSchedulePrompt } from "@/components/content-board/schedule-prompt";
 import { useUrlState } from "@/components/dashboard/use-url-state";
 import { scheduleIdeaAction } from "@/app/tools/content-board/actions";
 import {
@@ -47,8 +48,10 @@ const PLANNED: ContentIdeaWithRelations["status"][] = ["approved", "in_progress"
 function ScheduleField({ ideaId }: { ideaId: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { withPrompt, dialog } = useSchedulePrompt();
   return (
     <span className="flex shrink-0 flex-col items-end">
+      {dialog}
       <input
         type="date"
         aria-label="Choose the posting day"
@@ -58,8 +61,9 @@ function ScheduleField({ ideaId }: { ideaId: string }) {
           if (!value) return;
           setError(null);
           startTransition(async () => {
-            const result = await scheduleIdeaAction(ideaId, value);
-            if (!result.ok) setError(result.error);
+            // A day that's already full asks for a reason first.
+            const result = await withPrompt((answer) => scheduleIdeaAction(ideaId, value, answer.overLimitReason));
+            if (!result.ok && result.error !== SCHEDULE_CANCELLED) setError(result.error);
           });
         }}
         className="h-9 rounded-sm border border-border bg-background px-2 text-xs"
@@ -87,7 +91,7 @@ export function ContentCalendar({
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [platformFilter, setPlatformFilter] = useState("");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
-  const { ideas: liveIdeas, moveIdea, setOptimisticStatus, moveError, clearMoveError } = useIdeaMoves(ideas);
+  const { ideas: liveIdeas, moveIdea, setOptimisticStatus, moveError, clearMoveError, scheduleDialog } = useIdeaMoves(ideas);
   // The open idea lives in the address, so the phone's Back button closes it (see useUrlState).
   const { values, push, pop } = useUrlState(URL_KEYS);
 
@@ -308,6 +312,7 @@ export function ContentCalendar({
         )}
       </section>
 
+      {scheduleDialog}
       {moveError ? (
         <div role="alert" className="mt-4 flex items-start justify-between gap-3 border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
           <span>{moveError}</span>

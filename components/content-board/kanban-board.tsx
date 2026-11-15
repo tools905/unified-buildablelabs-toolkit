@@ -46,7 +46,7 @@ export function KanbanBoard({
   currentUserId: string;
   isAdmin: boolean;
 }) {
-  const { ideas, moveIdea, runMove, setOptimisticStatus, moveError, clearMoveError } = useIdeaMoves(initialIdeas);
+  const { ideas, moveIdea, runMove, setOptimisticStatus, moveError, clearMoveError, scheduleDialog } = useIdeaMoves(initialIdeas);
   const [filters, setFiltersState] = useState<BoardFilterValues>(NO_FILTERS);
   useEffect(() => {
     try {
@@ -168,6 +168,7 @@ export function KanbanBoard({
         </div>
       </div>
 
+      {scheduleDialog}
       {moveError ? (
         <div role="alert" className="mb-3 flex items-start justify-between gap-3 border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
           <span>{moveError}</span>

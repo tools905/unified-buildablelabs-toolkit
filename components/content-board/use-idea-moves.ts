@@ -2,16 +2,19 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { moveIdeaAction } from "@/app/tools/content-board/actions";
+import { SCHEDULE_CANCELLED, useSchedulePrompt } from "@/components/content-board/schedule-prompt";
 import type { ContentIdeaWithRelations } from "@/components/content-board/types";
 import type { ContentIdeaStatus } from "@/lib/db/types";
 
 type Override = { to: ContentIdeaStatus; from: ContentIdeaStatus };
 
 // Moves cards between columns. A card shows in its new column at once; if the server refuses the
-// move (say, someone without permission), it goes back and the reason is shown.
+// move (say, someone without permission), it goes back and the reason is shown. A move that needs a
+// posting day or a reason for a full day asks for it first (render `scheduleDialog`).
 export function useIdeaMoves(initialIdeas: ContentIdeaWithRelations[]) {
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [moveError, setMoveError] = useState<string | null>(null);
+  const { withPrompt, dialog: scheduleDialog } = useSchedulePrompt();
 
   // An override only applies while the server still reports the column the card was moved from.
   // Once fresh data arrives (with the move, or with someone else's later change) the server wins.
@@ -50,6 +53,10 @@ export function useIdeaMoves(initialIdeas: ContentIdeaWithRelations[]) {
       } catch {
         problem = "Couldn't reach the server, so the card wasn't moved. Please try again.";
       }
+      if (problem === SCHEDULE_CANCELLED) {
+        setOptimisticStatus(ideaId, null);
+        return null;
+      }
       if (problem) {
         setOptimisticStatus(ideaId, null);
         setMoveError(problem);
@@ -61,9 +68,9 @@ export function useIdeaMoves(initialIdeas: ContentIdeaWithRelations[]) {
 
   const moveIdea = useCallback(
     (ideaId: string, status: ContentIdeaStatus, options: { scheduledFor?: string | null } = {}) =>
-      runMove(ideaId, status, () => moveIdeaAction(ideaId, status, options)),
-    [runMove],
+      runMove(ideaId, status, () => withPrompt((answer) => moveIdeaAction(ideaId, status, { ...options, ...answer }))),
+    [runMove, withPrompt],
   );
 
-  return { ideas, moveIdea, runMove, setOptimisticStatus, moveError, clearMoveError: () => setMoveError(null) };
+  return { ideas, moveIdea, runMove, setOptimisticStatus, moveError, clearMoveError: () => setMoveError(null), scheduleDialog };
 }

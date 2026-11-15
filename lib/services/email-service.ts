@@ -336,3 +336,21 @@ export async function sendContentCommentEmail(
     workspaceId: input.workspaceId,
   });
 }
+
+// A day's Instagram/LinkedIn slots were overfilled on purpose: the admins see who, which post, and why.
+export function overLimitEmailHtml(input: { recipientName: string; actorName: string; ideaTitle: string; day: string; platforms: string; reason: string; url: string }) {
+  return `<p>Hi ${escapeHtml(input.recipientName)},</p><p>${escapeHtml(input.actorName)} put <strong>${escapeHtml(input.ideaTitle)}</strong> on ${escapeHtml(input.day)}, which already had 2 ${escapeHtml(input.platforms)} posts.</p><p>Their reason:</p><blockquote style="margin:0 0 12px;padding:8px 12px;border-left:3px solid #1f6f5b;background:#f4f4f4">${escapeHtml(input.reason)}</blockquote>${button(input.url, "Open the calendar")}<p style="color:#666;font-size:12px">Sent by ${PRODUCT_NAME} to admins when a day goes over 2 Instagram or 2 LinkedIn posts.</p>`;
+}
+
+export async function sendOverLimitEmail(
+  supabase: SupabaseClient<any>,
+  input: { to: string; recipientName: string; actorName: string; ideaTitle: string; day: string; platforms: string; reason: string; url: string; workspaceId: string },
+) {
+  return sendEmail(supabase, {
+    to: input.to,
+    subject: `Extra ${input.platforms} post on ${input.day}: ${input.ideaTitle}`,
+    html: overLimitEmailHtml(input),
+    type: "content_idea_over_limit",
+    workspaceId: input.workspaceId,
+  });
+}
