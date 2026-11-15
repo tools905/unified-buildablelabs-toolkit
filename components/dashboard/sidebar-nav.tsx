@@ -43,6 +43,7 @@ const baseLinks: NavItem[] = [
 const adminLinks: NavItem[] = [
   { href: "/team", label: "Team", icon: Users, exact: true },
   { href: "/team/logs", label: "Workspace Logs", icon: Activity },
+  { href: "/tools/talent-bank", label: "Talent Bank", icon: UserSearch },
 ];
 
 const toolNav: Array<{

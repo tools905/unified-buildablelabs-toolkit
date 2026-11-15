@@ -102,35 +102,33 @@ export const toolkitTools: ToolkitTool[] = [
   },
 ];
 
-const loadToolkitTools = unstable_cache(async () => {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return toolkitTools;
-  }
+// Only the database's switches are cached (names, descriptions, on/off). The catalog itself comes from
+// the code above on every call, so a tool added in a new release shows at once instead of waiting for
+// a cache made by the previous release to expire.
+type ToolRow = { slug: string; name: string | null; description: string | null; enabled: boolean | null };
+const loadToolRows = unstable_cache(
+  async (): Promise<ToolRow[]> => {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
+    try {
+      const { data, error } = await createAdminClient().from("tools").select("name, slug, description, enabled").order("name");
+      return error || !data ? [] : (data as ToolRow[]);
+    } catch {
+      return [];
+    }
+  },
+  ["toolkit-tool-rows"],
+  { revalidate: 30, tags: ["toolkit-tools"] },
+);
 
-  try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("tools")
-      .select("name, slug, description, enabled")
-      .order("name");
-
-    if (error || !data?.length) return toolkitTools;
-
-    return toolkitTools.map((tool) => {
-      const row = data.find((item: { slug: string }) => item.slug === tool.slug);
-      return row
-        ? {
-            ...tool,
-            name: row.name ?? tool.name,
-            description: row.description ?? tool.description,
-            enabled: row.enabled ?? tool.enabled,
-          }
-        : tool;
-    });
-  } catch {
-    return toolkitTools;
-  }
-}, ["toolkit-tools"], { revalidate: 30, tags: ["toolkit-tools"] });
+async function loadToolkitTools() {
+  const rows = await loadToolRows();
+  return toolkitTools.map((tool) => {
+    const row = rows.find((item) => item.slug === tool.slug);
+    return row
+      ? { ...tool, name: row.name ?? tool.name, description: row.description ?? tool.description, enabled: row.enabled ?? tool.enabled }
+      : tool;
+  });
+}
 
 export async function listToolkitTools() {
   return loadToolkitTools();
