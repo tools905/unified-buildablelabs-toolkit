@@ -15,6 +15,8 @@ import { candidateSchema, applicationSchema, type CandidateInput } from "@/lib/v
 
 export const TALENT_BUCKET = "talent-files";
 const LINK_TTL_SECONDS = 10 * 60;
+// Gets every new application by email, whoever the workspace admins are.
+const TALENT_ALWAYS_NOTIFY = { full_name: "Aditi Chourasia", email: "aditi@buildablelabs.com" };
 
 export type TalentFile = { id: string; kind: "resume" | "work"; storage_path: string; file_name: string; size_bytes: number; created_at: string };
 export type TalentCandidate = {
@@ -306,10 +308,15 @@ async function emailAdmins(admin: SupabaseClient<any>, workspaceId: string, appl
   const url = getAppLink("/tools/talent-bank");
   const escape = (value: string) => value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
   type Profile = { full_name: string | null; email: string | null };
+  // Workspace admins, plus Aditi, who always receives new applications even if she is not an admin.
+  const recipients = new Map<string, Profile>([[TALENT_ALWAYS_NOTIFY.email, TALENT_ALWAYS_NOTIFY]]);
+  for (const row of (admins ?? []) as { profile: Profile | Profile[] | null }[]) {
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    if (profile?.email) recipients.set(profile.email.toLowerCase(), profile);
+  }
   await Promise.allSettled(
-    (admins ?? []).map((row: { profile: Profile | Profile[] | null }) => {
-      const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
-      if (!profile?.email) return Promise.resolve();
+    [...recipients.values()].map((profile) => {
+      if (!profile.email) return Promise.resolve();
       const first = profile.full_name?.split(/\s+/)[0] || "there";
       return sendEmail(admin, {
         to: profile.email,
