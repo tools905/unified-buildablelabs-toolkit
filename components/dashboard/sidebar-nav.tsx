@@ -18,6 +18,7 @@ import {
   Plug,
   Settings,
   Share2,
+  UserSearch,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -100,6 +101,11 @@ const toolNav: Array<{
     match: ["/tools/meetings"],
     title: "Meetings",
     items: [{ href: "/tools/meetings", label: "Recaps", icon: CalendarClock, exact: true }],
+  },
+  {
+    match: ["/tools/talent-bank"],
+    title: "Talent Bank",
+    items: [{ href: "/tools/talent-bank", label: "Candidates", icon: UserSearch, exact: true, adminOnly: true }],
   },
   {
     // Newsletter is part of Content Board: it sits right below Calendar, and its pages show this

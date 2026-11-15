@@ -8,6 +8,7 @@ import {
   BookOpen,
   Newspaper,
   Share2,
+  UserSearch,
   type LucideIcon,
 } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -32,6 +33,7 @@ const TOOL_ICONS: Record<ToolkitToolSlug, LucideIcon> = {
   meetings: CalendarClock,
   newsletter: Newspaper,
   "content-board": KanbanSquare,
+  "talent-bank": UserSearch,
 };
 
 function ToolCardBody({ tool }: { tool: ToolkitTool }) {
@@ -105,7 +107,7 @@ export default async function DashboardPage() {
   const workspace = await requireDefaultWorkspace(supabase, user.id);
   const [tools, admin] = await Promise.all([listToolkitTools(), isWorkspaceAdmin(workspace.id, user.id, supabase)]);
   const stats = admin ? await loadAdminStats(supabase, workspace.id) : null;
-  const companyTools = tools.filter((tool) => tool.group === "company");
+  const companyTools = tools.filter((tool) => tool.group === "company" && (admin || !tool.adminOnly));
   // Newsletter now lives inside Content Board (its sidebar, below Calendar), so it has no card of its own.
   const contentTools = tools.filter((tool) => tool.group === "content" && tool.slug !== "newsletter");
 

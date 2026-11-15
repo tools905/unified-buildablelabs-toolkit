@@ -84,6 +84,28 @@ export async function countPdfPages(pdf: Uint8Array): Promise<number | null> {
   }
 }
 
+// The words on a PDF's first pages (a resume's name, email and so on), or "" when it has none or
+// can't be opened.
+export async function readPdfText(pdf: Uint8Array, maxPages = 3): Promise<string> {
+  const pdfjs = await loadPdfjs();
+  const task = pdfjs.getDocument(openOptions(pdf));
+  try {
+    const doc = await task.promise;
+    const lines: string[] = [];
+    for (let number = 1; number <= Math.min(doc.numPages, maxPages); number++) {
+      const page = await doc.getPage(number);
+      const content = await page.getTextContent();
+      lines.push(content.items.map((item) => ("str" in item ? item.str + (item.hasEOL ? "\n" : " ") : "")).join(""));
+      page.cleanup();
+    }
+    return lines.join("\n").replace(/[ \t]+/g, " ").trim();
+  } catch {
+    return "";
+  } finally {
+    await task.destroy();
+  }
+}
+
 // A small JPEG of the first page, for the board card, when the browser did not send one.
 export async function renderPdfThumbnail(pdf: Uint8Array): Promise<Uint8Array | null> {
   const pdfjs = await loadPdfjs();

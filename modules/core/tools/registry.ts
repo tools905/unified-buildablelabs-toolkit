@@ -12,7 +12,8 @@ export type ToolkitToolSlug =
   | "resources"
   | "meetings"
   | "newsletter"
-  | "content-board";
+  | "content-board"
+  | "talent-bank";
 
 export type ToolkitToolGroup = "company" | "content";
 
@@ -89,6 +90,15 @@ export const toolkitTools: ToolkitTool[] = [
     enabled: true,
     adminOnly: false,
     group: "content",
+  },
+  {
+    name: "Talent Bank",
+    slug: "talent-bank",
+    description: "Keep promising candidates, their resumes and work, and collect applications through one link.",
+    enabled: true,
+    // Admins only: hidden from members on the Dashboard and in the sidebar, and the pages refuse them.
+    adminOnly: true,
+    group: "company",
   },
 ];
 

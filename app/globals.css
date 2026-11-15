@@ -440,3 +440,80 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     animation: none;
   }
 }
+
+/* The public application form (components/talent/apply-*): a faint grid, drifting glows, a slow scan
+   line and steps that rise into place. Still for anyone who prefers less motion. */
+.apply-grid {
+  background-image:
+    linear-gradient(rgba(124, 140, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 140, 255, 0.07) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 35%, #000 30%, transparent 85%);
+}
+.apply-aurora {
+  animation: apply-drift 18s ease-in-out infinite alternate;
+}
+.apply-aurora-slow {
+  animation-duration: 26s;
+  animation-direction: alternate-reverse;
+}
+@keyframes apply-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(8vw, 6vh, 0) scale(1.15);
+  }
+}
+.apply-scan {
+  animation: apply-scan 9s linear infinite;
+}
+@keyframes apply-scan {
+  from {
+    top: -10rem;
+  }
+  to {
+    top: 100%;
+  }
+}
+.apply-step {
+  animation: apply-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes apply-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(4px);
+  }
+}
+.apply-input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(184, 190, 204, 0.22);
+  border-radius: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.apply-input:focus {
+  outline: none;
+  border-bottom-color: #275bff;
+  box-shadow: 0 10px 24px -18px rgba(39, 91, 255, 0.9);
+}
+.apply-input::placeholder {
+  color: #4a5162;
+}
+.apply-orbit {
+  animation: apply-orbit 2.4s linear infinite;
+}
+@keyframes apply-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .apply-aurora,
+  .apply-scan,
+  .apply-step,
+  .apply-orbit {
+    animation: none;
+  }
+}

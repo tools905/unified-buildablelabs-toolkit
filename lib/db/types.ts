@@ -24,7 +24,8 @@ export type NotificationType =
   | "content_idea_markup"
   | "content_idea_changes_done"
   | "content_idea_comment"
-  | "content_idea_over_limit";
+  | "content_idea_over_limit"
+  | "talent_application";
 export type TicketStatus = "backlog" | "assigned" | "in_progress" | "in_review" | "done";
 export type TicketReviewStatus = "pending_review" | "verified" | "disputed";
 export type LinearLinkSource = "auto_identifier" | "auto_semantic" | "manual";
